@@ -17,6 +17,7 @@ const PROTOTYPE_AUTH = !supabaseEnabled;
 
 function mapSupabaseUser(authUser) {
   if (!authUser) return null;
+  const isMainAdmin = authUser.email?.trim().toLowerCase() === (import.meta.env.VITE_MAIN_ADMIN_EMAIL || 'gama.orgas.up@phinmaed.com').trim().toLowerCase();
   return {
     id: authUser.id,
     name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Artist',
@@ -24,7 +25,7 @@ function mapSupabaseUser(authUser) {
     lastName: authUser.user_metadata?.lastName || '',
     extensionName: authUser.user_metadata?.extensionName || '',
     email: authUser.email,
-    role: authUser.user_metadata?.role === 'admin' ? 'admin' : 'artist',
+    role: isMainAdmin ? 'main_admin' : (authUser.user_metadata?.role === 'admin' ? 'admin' : 'artist'),
     specializations: authUser.user_metadata?.specializations || [],
     bio: authUser.user_metadata?.bio || '',
   };

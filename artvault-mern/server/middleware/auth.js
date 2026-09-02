@@ -27,6 +27,12 @@ async function mirrorSupabaseUser(authUser) {
     user.supabaseUserId = authUser.id;
   }
 
+  // Preserve the designated owner account as the main administrator.
+  const mainAdminEmail = (process.env.MAIN_ADMIN_EMAIL || '').trim().toLowerCase();
+  if (mainAdminEmail && authUser.email.toLowerCase() === mainAdminEmail) {
+    user.role = 'main_admin';
+  }
+
   await user.save();
   return user;
 }

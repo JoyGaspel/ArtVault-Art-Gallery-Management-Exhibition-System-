@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
@@ -16,7 +17,16 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').sp
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'artvault-server' }));
+app.get('/api/health', (req, res) => {
+  const connected = mongoose.connection.readyState === 1;
+  res.status(connected ? 200 : 503).json({
+    status: connected ? 'ok' : 'degraded',
+    service: 'artvault-server',
+    database: connected ? 'connected' : 'disconnected',
+    databaseName: mongoose.connection.name || null,
+    supabase: process.env.SUPABASE_URL && process.env.SUPABASE_PUBLISHABLE_KEY ? 'configured' : 'not configured',
+  });
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/artworks', artworkRoutes);

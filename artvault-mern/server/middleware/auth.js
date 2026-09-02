@@ -27,6 +27,15 @@ async function mirrorSupabaseUser(authUser) {
     user.supabaseUserId = authUser.id;
   }
 
+  // Backfill profile data for users created before Supabase sync was enabled.
+  const metadata = authUser.user_metadata || {};
+  if (!user.firstName && metadata.firstName) user.firstName = metadata.firstName;
+  if (!user.lastName && metadata.lastName) user.lastName = metadata.lastName;
+  if (!user.extensionName && metadata.extensionName) user.extensionName = metadata.extensionName;
+  if ((!user.name || user.name === authUser.email) && metadata.name) user.name = metadata.name;
+  if (!user.bio && metadata.bio) user.bio = metadata.bio;
+  if ((!user.specializations || !user.specializations.length) && Array.isArray(metadata.specializations)) user.specializations = metadata.specializations;
+
   // Preserve the designated owner account as the main administrator.
   const mainAdminEmail = (process.env.MAIN_ADMIN_EMAIL || '').trim().toLowerCase();
   if (mainAdminEmail && authUser.email.toLowerCase() === mainAdminEmail) {

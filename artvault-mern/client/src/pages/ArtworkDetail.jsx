@@ -23,6 +23,7 @@ export default function ArtworkDetail() {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
   function load() {
     setLoading(true);
@@ -43,6 +44,11 @@ export default function ArtworkDetail() {
   }
 
   useEffect(load, [id]);
+  useEffect(() => setZoom(1), [id]);
+  useEffect(() => {
+    document.documentElement.style.setProperty('--detail-zoom', String(zoom));
+    return () => document.documentElement.style.removeProperty('--detail-zoom');
+  }, [zoom]);
 
   const canManage = user && artwork && (['admin', 'sub_admin', 'main_admin'].includes(user.role) || user.id === artwork.artist?._id);
 
@@ -93,6 +99,14 @@ export default function ArtworkDetail() {
     <section>
       <button className="back-link" onClick={() => navigate(-1)}>← Back</button>
 
+      {artwork.image_path && (
+        <div className="image-zoom-controls" aria-label="Artwork image zoom controls">
+          <button type="button" onClick={() => setZoom((value) => Math.max(1, value - 0.25))} disabled={zoom <= 1} aria-label="Zoom out">−</button>
+          <span>{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => setZoom((value) => Math.min(2, value + 0.25))} disabled={zoom >= 2} aria-label="Zoom in">+</button>
+          <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
+        </div>
+      )}
       <div className="detail-layout">
         <div className="detail-hero">{artwork.image_path ? <img src={artwork.image_path} alt={artwork.title} /> : '🖼️'}</div>
         <div className="detail-body">
@@ -136,15 +150,16 @@ export default function ArtworkDetail() {
             <>
               <h1 style={{ marginBottom: 18 }}>Edit artwork</h1>
               <div className="field">
-                <label>Title</label>
+                <label>Title <span className="required-mark" aria-hidden="true">*</span></label>
                 <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               </div>
               <div className="field">
-                <label>Description</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                <label>Description <span className="optional-mark">(optional)</span></label>
+                <textarea maxLength={1000} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                <div className="hint">{form.description.length}/1000 characters</div>
               </div>
               <div className="field">
-                <label>Categories</label>
+                <label>Categories <span className="optional-mark">(optional)</span></label>
                 <div className="chip-select">
                   {ALL_CATEGORIES.map((c) => (
                     <button
@@ -158,7 +173,7 @@ export default function ArtworkDetail() {
                 </div>
               </div>
               <div className="field">
-                <label>Materials (comma separated)</label>
+                <label>Materials <span className="optional-mark">(optional)</span></label>
                 <input value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} />
               </div>
               <div className="detail-actions">

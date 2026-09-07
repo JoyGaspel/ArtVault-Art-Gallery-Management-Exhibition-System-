@@ -130,6 +130,10 @@ button, input, textarea, select{ font-family:inherit; }
 .detail-artist{ display:flex; align-items:center; gap:10px; margin:12px 0 18px; cursor:pointer; width:fit-content; background:none; border:none; padding:0; text-decoration:none; }
 .detail-artist .av{ width:30px; height:30px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--violet-deep); }
 .detail-artist span.name{ font-size:14px; color:var(--violet-deep); font-weight:600; }
+.profile-edit-link{ display:inline-flex; margin-top:12px; text-decoration:none; }
+.profile-avatar-preview,.profile-avatar-xl{ object-fit:cover; border-radius:50%; display:block; }
+.profile-avatar-preview{ width:64px; height:64px; margin-bottom:10px; }
+.profile-avatar-xl{ width:72px; height:72px; }
 .detail-desc{ color:var(--ink-soft); font-size:14.5px; line-height:1.7; margin-bottom:22px; }
 .meta-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
 .meta-box{ background:var(--lilac-soft); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
@@ -157,12 +161,24 @@ button, input, textarea, select{ font-family:inherit; }
 .exhibit-info{ flex:1; }
 .exhibit-info .name{ font-size:17px; font-weight:600; }
 .exhibit-info .desc{ font-size:13px; color:var(--ink-soft); margin-top:3px; }
+.exhibit-status{ display:inline-flex; width:max-content; margin-bottom:7px; padding:4px 8px; border-radius:999px; background:var(--accent-soft); color:var(--violet-deep); font:10px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.04em; }
+.exhibit-status.past{ background:var(--lilac-soft); color:var(--ink-faint); }
+.exhibit-card-featured{ border-color:rgba(110,79,163,.35); background:linear-gradient(135deg,#fff 0%,#fbf9ff 100%); box-shadow:0 12px 26px rgba(72,52,120,.1); }
+.exhibit-card-featured .exhibit-date{ background:var(--accent-soft); border-radius:12px; border-right:0; padding:10px 14px; width:76px; }
+.exhibit-count{ flex:0 0 auto; min-width:58px; padding:8px 12px; border-left:1px solid var(--line); text-align:center; color:var(--ink-soft); }
+.exhibit-count strong{ display:block; color:var(--violet-deep); font:600 22px 'Fraunces',serif; line-height:1; }
+.exhibit-count span{ display:block; margin-top:3px; font:10px 'IBM Plex Mono',monospace; text-transform:uppercase; color:var(--ink-faint); }
+.exhibit-arrow{ flex:0 0 auto; color:var(--violet); font-size:22px; transition:transform .15s ease; }
+.exhibit-card:hover .exhibit-arrow{ transform:translateX(4px); }
 .exhibit-row-actions{ display:flex; gap:8px; flex:0 0 auto; }
 
 .form-card{ background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius); padding:28px; max-width:640px; }
 .field{ margin-bottom:18px; }
 .field label{ display:block; font-size:13px; font-weight:600; margin-bottom:7px; }
 .required-mark{ color:#C15656; font-weight:700; margin-left:2px; }
+.optional-mark{ color:var(--ink-faint); font-weight:400; margin-left:2px; }
+.gate-demo{ display:none; }
+.back-link{ display:none !important; }
 .signup-content{ align-items:center !important; overflow-y:auto; }
 .signup-card{ max-width:760px !important; padding:24px 30px; }
 .signup-card h1{ font-size:25px !important; }
@@ -186,6 +202,10 @@ button, input, textarea, select{ font-family:inherit; }
   .artist-grid{ grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:20px; }
 }
 .field input, .field textarea{ width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:10px; font-size:13.5px; background:#fff; color:var(--ink); }
+.field-input-wrap{ position:relative; }
+.field-input-wrap input{ padding-right:72px; }
+.field-show-toggle{ position:absolute; right:9px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--violet-deep); font-size:12px; font-weight:600; cursor:pointer; padding:5px 4px; }
+.field-show-toggle:focus-visible{ outline:2px solid var(--violet); border-radius:5px; }
 .field textarea{ resize:vertical; min-height:90px; }
 .field input:focus, .field textarea:focus{ outline:2px solid var(--violet); outline-offset:1px; }
 .field .hint{ font-size:11.5px; color:var(--ink-faint); margin-top:6px; }
@@ -203,6 +223,7 @@ button, input, textarea, select{ font-family:inherit; }
 .modal-head h2{ font-size:20px; }
 .modal-close{ background:none; border:none; cursor:pointer; color:var(--ink-faint); font-size:20px; }
 .modal-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:6px; }
+.modal-actions .btn, .form-card > .btn, .gate-submit{ min-height:42px; }
 
 .toast{
   position:fixed; bottom:26px; left:50%; transform:translateX(-50%);
@@ -216,8 +237,14 @@ button, input, textarea, select{ font-family:inherit; }
 .toast.err .dot{ background:#E48787; }
 
 .empty{ text-align:center; padding:60px 20px; color:var(--ink-faint); }
+.route-loading{ min-height:40vh; display:grid; place-items:center; color:var(--ink-soft); font-size:14px; }
 .upload-preview{ display:block; width:min(100%,420px); max-height:280px; object-fit:cover; border-radius:14px; margin-top:10px; border:1px solid var(--line); }
 .art-thumb img,.detail-hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+.detail-hero img{ transform:scale(var(--detail-zoom, 1)); transition:transform .2s ease; transform-origin:center; }
+.image-zoom-controls{ display:flex; align-items:center; justify-content:flex-end; gap:6px; margin:0 0 10px; color:var(--ink-soft); font-size:12px; }
+.image-zoom-controls button{ border:1px solid var(--line); border-radius:7px; padding:5px 9px; background:var(--bg-card); color:var(--ink); cursor:pointer; }
+.image-zoom-controls button:disabled{ opacity:.45; cursor:not-allowed; }
+.art-placeholder{ display:grid; place-items:center; width:100%; height:100%; font-size:48px; line-height:1; }
 .stat-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:26px; }
 .stat-box{ background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
 .stat-box .num{ font-family:'Fraunces', serif; font-size:28px; font-weight:600; color:var(--violet-deep); }
@@ -378,6 +405,17 @@ button, input, textarea, select{ font-family:inherit; }
   .responsive-signout{ border:1px solid rgba(110,79,163,.35); background:#fff; color:var(--violet-deep); cursor:pointer; box-shadow:0 1px 3px rgba(43,36,64,.08); }
   .responsive-signout:hover{ background:var(--accent-soft); border-color:var(--violet); }
   .topbar{ position:sticky; top:66px; z-index:110; background:#fff; }
+  .admin-responsive-nav{ min-height:104px; height:auto; flex-wrap:wrap; align-content:center; }
+  .admin-responsive-nav .responsive-nav-links{ order:3; flex:0 0 100%; width:100%; flex-wrap:wrap; overflow:visible; justify-content:flex-start; padding:2px 0; }
+  .admin-responsive-nav + .topbar{ top:104px; }
+  .responsive-menu-toggle{ display:grid; place-items:center; order:2; width:38px; height:38px; flex:0 0 auto; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--violet-deep); font-size:20px; cursor:pointer; }
+  .responsive-nav{ position:sticky; min-height:58px; height:58px; flex-wrap:nowrap; }
+  .responsive-nav .responsive-nav-links{ display:none; position:absolute; top:58px; left:0; right:0; z-index:130; padding:10px 14px; border-bottom:1px solid var(--line); background:#fff; box-shadow:0 10px 20px rgba(43,36,64,.12); flex-wrap:wrap; overflow:visible; }
+  .responsive-nav.menu-open .responsive-nav-links{ display:flex; }
+  .responsive-nav.menu-open .responsive-nav-links{ justify-content:stretch; }
+  .responsive-nav.menu-open .responsive-nav-link{ flex:1 1 0; min-width:38px; }
+  .responsive-nav.menu-open + .topbar{ top:58px; }
+  .admin-responsive-nav + .topbar{ top:58px; }
 }
 
 @media (max-width:860px){
@@ -396,6 +434,15 @@ button, input, textarea, select{ font-family:inherit; }
   .responsive-account{ margin-left:auto; }
   .responsive-join{ padding:8px 11px; font-size:12px; }
   .topbar{ top:58px; }
+  .admin-responsive-nav{ min-height:104px; height:auto; flex-wrap:wrap; align-content:center; }
+  .admin-responsive-nav .responsive-nav-links{ order:3; flex:0 0 100%; width:100%; padding:2px 0; overflow-x:auto; }
+  .admin-responsive-nav + .topbar{ top:104px; }
+
+  /* Keep every destination visible on phones instead of hiding links in a
+     horizontal scroll strip. The links wrap into a compact second row. */
+  .responsive-nav{ min-height:104px; height:auto; flex-wrap:wrap; align-content:center; }
+  .responsive-nav .responsive-nav-links{ order:3; flex:0 0 100%; width:100%; flex-wrap:wrap; overflow:visible; justify-content:flex-start; padding:2px 0; }
+  .responsive-nav + .topbar{ top:104px; }
 }
 
 /* Keep the actual page content dense on small screens.  The responsive nav
@@ -488,6 +535,36 @@ button, input, textarea, select{ font-family:inherit; }
 .art-thumb{ background:linear-gradient(145deg,#f3edfc,#e6dafa); }
 .art-info{ background:#fff; }
 .stat-box:hover{ border-color:rgba(110,79,163,.4); }
+.account-security-card{ margin-top:18px; }
+.account-security-card h2{ font-size:20px; margin-bottom:18px; }
+.settings-section{ display:grid; grid-template-columns:minmax(0,1fr) minmax(360px,1fr); column-gap:28px; align-items:start; }
+.settings-page-head{ display:contents; }
+.settings-page-head > div:first-child{ grid-column:1; grid-row:1; align-self:start; }
+.settings-page-head .account-security-card{ grid-column:2; grid-row:1 / span 2; margin-top:0; max-width:none; }
+.settings-profile-grid{ grid-column:1; grid-row:2; min-width:0; }
+@media (min-width:701px){
+  .settings-section{ display:block; position:relative; }
+  .settings-page-head > div:first-child{ width:calc(50% - 14px); }
+  .settings-page-head .account-security-card{ position:absolute; top:0; right:0; width:calc(50% - 14px); box-sizing:border-box; }
+  .settings-profile-grid{ width:calc(50% - 14px); margin-top:28px; }
+}
+
+/* Profile settings follows the natural reading order: edit/preview first,
+   account security last. Flatten the header so the security card participates
+   in the page flow instead of creating a tall empty column. */
+.settings-section{ display:flex; flex-direction:column; align-items:stretch; }
+.settings-page-head{ display:contents; }
+.settings-page-head > div:first-child{ order:1; width:auto; }
+.settings-profile-grid{ order:2; width:100%; margin-top:20px; }
+.settings-page-head .account-security-card{ order:3; position:static; width:100%; margin:28px 0 0; max-width:none; }
+.account-danger-zone{ display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:22px; padding-top:16px; border-top:1px solid rgba(163,72,72,.2); }
+@media (max-width:700px){
+  .settings-section{ display:block; }
+  .settings-page-head{ display:block; }
+  .settings-page-head .account-security-card{ margin-top:20px; }
+  .settings-profile-grid{ display:grid !important; grid-template-columns:1fr !important; gap:20px !important; margin-top:20px; }
+  .account-danger-zone{ align-items:flex-start; flex-direction:column; }
+}
 
 /* Row-ordered masonry used by the public gallery. Cards are assigned to
    columns in index order, then packed vertically to remove row gaps. */
@@ -518,6 +595,8 @@ button, input, textarea, select{ font-family:inherit; }
 .moderation-toolbar input{ min-width:0; width:100%; max-width:420px; border:1px solid var(--line); border-radius:9px; background:#fff; padding:10px 12px; color:var(--ink); font-size:13px; }
 .moderation-toolbar span{ flex:0 0 auto; color:var(--ink-soft); font-size:12px; }
 .moderation-art-placeholder{ width:44px; height:44px; flex:0 0 auto; display:grid; place-items:center; border-radius:10px; background:linear-gradient(145deg, var(--lilac), var(--violet-deep)); color:#fff; font-family:'Fraunces', serif; font-size:12px; }
+.moderation-art-preview{ width:112px; height:82px; flex:0 0 112px; display:grid; place-items:center; overflow:hidden; border:1px solid var(--line); border-radius:10px; background:linear-gradient(145deg,#f3edfc,#e6dafa); color:var(--violet-deep); font-family:'Fraunces',serif; font-size:12px; }
+.moderation-art-preview img{ width:100%; height:100%; display:block; object-fit:cover; }
 .gate-demo,.prototype-note{ display:none !important; }
 .login-role-picker{ margin-top:18px; padding-top:14px; border-top:1px solid var(--line); text-align:center; }
 .login-role-picker .lbl{ display:block; margin-bottom:8px; font:10px 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); }
@@ -532,6 +611,7 @@ button, input, textarea, select{ font-family:inherit; }
   .admin-artist-card .exhibit-row-actions{ width:100%; margin-left:60px; }
   .moderation-toolbar{ align-items:stretch; flex-direction:column; }
   .moderation-toolbar input{ max-width:none; }
+  .moderation-art-preview{ width:86px; height:68px; flex-basis:86px; }
 }
 
 /* Consistent compact layouts across development and production sizes. */
@@ -562,7 +642,223 @@ button, input, textarea, select{ font-family:inherit; }
   .modal-actions .btn{flex:1; justify-content:center;}
   .admin-artist-card .exhibit-row-actions{width:100%; margin-left:0;}
   .admin-artist-card .exhibit-row-actions .btn{flex:1; justify-content:center;}
+  .exhibit-card{align-items:flex-start; flex-wrap:wrap;}
+  .exhibit-card .exhibit-info{min-width:0; flex:1 1 calc(100% - 80px);}
+  .exhibit-card .exhibit-row-actions{width:100%; flex:1 1 100%; justify-content:flex-end;}
+  .exhibit-card .exhibit-row-actions .btn{flex:1; justify-content:center;}
   .detail-hero{height:260px;}
   .detail-actions{display:flex; flex-wrap:wrap; gap:8px;}
   .detail-actions .btn{flex:1; justify-content:center;}
+}
+
+/* Responsive navigation uses a compact hamburger drawer at tablet/phone widths. */
+@media (max-width:860px){
+  .responsive-nav,.admin-responsive-nav{ min-height:58px; height:58px; flex-wrap:nowrap; }
+  .responsive-nav .responsive-nav-links{ display:none; position:absolute; top:58px; left:0; right:0; z-index:130; flex-wrap:wrap; overflow:visible; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); box-shadow:0 10px 20px rgba(43,36,64,.12); }
+  .responsive-nav.menu-open .responsive-nav-links{ display:flex; }
+  .responsive-nav + .topbar,.admin-responsive-nav + .topbar{ top:58px; }
+}
+
+@media (max-width:860px){
+  .topbar{ min-height:60px; height:60px; padding:8px 16px; }
+  .topbar .search{ padding:8px 12px; max-width:none; width:100%; flex:1 1 auto; }
+  .stat-row{ margin-bottom:16px; }
+  .admin-list{ gap:8px; }
+  .admin-artist-card{ padding:14px 16px; gap:10px; }
+  .admin-artist-tags{ margin-top:6px; }
+  .content > section{ max-width:none; }
+  .page-head{ margin-bottom:16px; }
+  .gallery-grid,.gallery-masonry{ gap:12px; }
+  .gallery-masonry-column{ gap:12px; }
+  .exhibit-list{ gap:10px; }
+  .exhibit-card{ padding:16px 18px; gap:14px; }
+  .form-card{ margin-bottom:12px; }
+  .detail-layout{ gap:20px; }
+  .meta-grid{ gap:10px; margin-bottom:16px; }
+}
+
+@media (max-width:620px){
+  .content{ padding:14px 12px 28px; }
+  .page-head{ margin-bottom:12px; }
+  .page-head h1{ margin-bottom:2px; }
+  .stat-row{ gap:8px; margin-bottom:12px; }
+  .stat-box{ padding:12px 14px; }
+  .gallery-grid,.gallery-masonry{ gap:8px; }
+  .gallery-masonry-column{ gap:8px; }
+  .exhibit-list,.admin-list{ gap:8px; }
+  .exhibit-card{ padding:13px 14px; gap:10px; }
+  .exhibit-card-featured .exhibit-date{ width:58px; padding:8px 9px; }
+  .exhibit-count{ min-width:48px; padding:6px 7px; }
+  .exhibit-count strong{ font-size:18px; }
+  .exhibit-arrow{ font-size:18px; }
+  .form-card{ padding:16px 14px; }
+  .field{ margin-bottom:14px; }
+  .modal-box{ max-height:calc(100vh - 24px); }
+}
+
+/* Final responsive normalization: cards should size to their content rather
+   than stretch to a neighboring card's height. */
+@media (max-width:1100px){
+  .gallery-grid,.gallery-masonry{ align-items:start; }
+  .art-card,.admin-artist-card,.exhibit-card{ height:auto !important; min-height:0; }
+  .art-info{ flex:none; }
+}
+
+/* Compact mobile header: keep the brand, search, account and menu together.
+   Navigation links and sign-out live in the opened hamburger panel. */
+.responsive-search{ display:none; }
+.responsive-menu-signout{ display:none; }
+@media (max-width:860px){
+  .responsive-nav,.admin-responsive-nav{
+    min-height:58px !important;
+    height:58px !important;
+    flex-wrap:nowrap !important;
+    gap:8px;
+  }
+  .responsive-brand{ order:1; flex:0 0 auto; min-width:0; }
+  .responsive-brand span{ white-space:nowrap; }
+  .responsive-search{
+    display:flex !important;
+    order:2;
+    flex:1 1 auto;
+    min-width:0;
+    align-items:center;
+    gap:7px;
+    padding:7px 10px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    background:var(--lilac-soft);
+    color:var(--ink-faint);
+    font:10px 'IBM Plex Mono',monospace;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+  }
+  .responsive-search input{
+    min-width:0;
+    width:100%;
+    border:0;
+    outline:0;
+    background:transparent;
+    color:var(--ink);
+    font:13px 'Work Sans',sans-serif;
+    text-transform:none;
+  }
+  .responsive-account{ order:3; flex:0 0 auto; margin-left:0 !important; }
+  .responsive-signout{ display:none !important; }
+  .responsive-menu-toggle{ order:4; flex:0 0 auto; display:grid !important; }
+  .responsive-nav .responsive-nav-links{
+    top:58px !important;
+    display:none;
+    width:auto;
+    flex-wrap:wrap;
+    padding:10px 14px;
+  }
+  .responsive-nav.menu-open .responsive-nav-links{ display:flex !important; }
+  .responsive-menu-signout{
+    display:block;
+    width:100%;
+    margin-top:6px;
+    padding:10px;
+    border:1px solid rgba(163,72,72,.3);
+    border-radius:9px;
+    background:#fff;
+    color:#a34848;
+    font:700 13px 'Work Sans',sans-serif;
+    cursor:pointer;
+  }
+  .responsive-menu-signout::before{
+    content:'⎋';
+    display:inline-block;
+    margin-right:7px;
+    font-size:16px;
+    line-height:1;
+    vertical-align:-1px;
+  }
+  .responsive-menu-signout{
+    width:40px;
+    height:40px;
+    margin-left:auto;
+    padding:0;
+    display:grid;
+    place-items:center;
+    font-size:0;
+  }
+  .responsive-menu-signout::before{ margin:0; font-size:19px; }
+  .responsive-nav + .topbar,.admin-responsive-nav + .topbar{ display:none !important; }
+}
+@media (max-width:620px){
+  .responsive-nav{ padding-left:9px !important; padding-right:9px !important; gap:6px; }
+  .responsive-brand{ gap:5px; }
+  .responsive-brand span{ display:inline !important; font-size:17px; }
+  .responsive-search{ padding:6px 8px; }
+  .responsive-search > span{ display:none; }
+  .responsive-search input{ font-size:12px; }
+  .responsive-user-name{ display:none !important; }
+}
+
+/* Detail views preserve each uploaded image's own aspect ratio instead of
+   cropping every artwork into the same fixed frame. */
+.detail-hero{
+  height:auto;
+  min-height:260px;
+  overflow:hidden;
+}
+.detail-hero img{
+  width:100%;
+  height:auto;
+  max-height:70vh;
+  object-fit:contain;
+}
+
+/* Balanced masonry keeps cards packed instead of preserving the tallest
+   neighbouring card's row height. */
+.gallery-masonry{
+  display:block;
+  column-count:var(--gallery-columns, 1);
+  column-gap:18px;
+  column-fill:balance;
+}
+.gallery-masonry > .art-card{
+  display:inline-flex;
+  width:100%;
+  height:auto !important;
+  margin:0 0 18px;
+  vertical-align:top;
+  break-inside:avoid;
+}
+.gallery-masonry .art-thumb.has-image{
+  flex:0 0 auto;
+  height:auto;
+}
+.gallery-masonry .art-thumb.has-image img{
+  height:auto;
+}
+.gallery-masonry-column{ display:contents; }
+@media (max-width:860px){
+  .gallery-masonry .art-thumb.has-image{
+    max-height:220px;
+    overflow:hidden;
+    background:var(--lilac-soft);
+  }
+  .gallery-masonry .art-thumb.has-image img{
+    max-height:220px;
+    object-fit:contain;
+  }
+}
+@media (max-width:620px){
+  .gallery-masonry{ column-gap:10px; }
+  .gallery-masonry > .art-card{ margin-bottom:10px; }
+  .gallery-masonry .art-thumb.has-image{
+    max-height:190px;
+    overflow:hidden;
+    background:var(--lilac-soft);
+  }
+  .gallery-masonry .art-thumb.has-image img{
+    max-height:190px;
+    object-fit:contain;
+  }
+}
+@media (max-width:390px){
+  .gallery-masonry .art-thumb.has-image,
+  .gallery-masonry .art-thumb.has-image img{ max-height:220px; }
 }

@@ -58,6 +58,10 @@ export default function Gallery() {
     );
   }, [artworks, search]);
 
+  // Do not render empty masonry columns when the final filtered page has
+  // fewer artworks than the available screen columns.
+  const renderedColumnCount = Math.min(columnCount, Math.max(1, visible.length));
+
   return (
     <section>
       <div className="page-head">
@@ -88,14 +92,8 @@ export default function Gallery() {
         <div className="empty">No artworks here yet. Be the first to upload one.</div>
       )}
       {!err && !loading && visible.length > 0 && (
-        <div className="gallery-masonry" style={{ '--gallery-columns': columnCount }}>
-          {Array.from({ length: columnCount }, (_, column) => (
-            <div className="gallery-masonry-column" key={column}>
-              {visible.filter((_, index) => index % columnCount === column).map((w) => (
-                <ArtCard key={w._id} artwork={w} />
-              ))}
-            </div>
-          ))}
+        <div className="gallery-masonry" style={{ '--gallery-columns': renderedColumnCount }}>
+          {visible.map((w) => <ArtCard key={w._id} artwork={w} />)}
         </div>
       )}
     </section>
@@ -105,6 +103,7 @@ export default function Gallery() {
 function getColumnCount() {
   if (typeof window === 'undefined') return 1;
   if (window.innerWidth <= 390) return 1;
-  if (window.innerWidth <= 860) return 2;
+  if (window.innerWidth <= 620) return 2;
+  if (window.innerWidth <= 860) return 3;
   return Math.max(1, Math.min(6, Math.floor((window.innerWidth - 296) / 240)));
 }

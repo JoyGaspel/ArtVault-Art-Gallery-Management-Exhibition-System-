@@ -35,15 +35,18 @@ export default function Signup() {
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
-    if (!firstName || !lastName || !email || !password || !confirm) {
+    const cleanFirstName = firstName.trim().replace(/\s+/g, ' ');
+    const cleanLastName = lastName.trim().replace(/\s+/g, ' ');
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanFirstName || !cleanLastName || !cleanEmail || !password || !confirm) {
       setError('Fill in every field to create your account.');
       return;
     }
-    if (!validPersonName(firstName)) {
+    if (!validPersonName(cleanFirstName)) {
       setError('First name must begin with a capital letter, contain letters only, and be at least 2 characters.');
       return;
     }
-    if (!validPersonName(lastName)) {
+    if (!validPersonName(cleanLastName)) {
       setError('Last name must begin with a capital letter, contain letters only, and be at least 2 characters.');
       return;
     }
@@ -62,8 +65,8 @@ export default function Signup() {
     setSubmitting(true);
     try {
       const cleanExtension = extensionName.trim().replace(/\.$/, '');
-      const name = `${firstName.trim()} ${lastName.trim()}${cleanExtension ? ` ${cleanExtension}` : ''}`;
-      const result = await signup({ name, firstName: firstName.trim(), lastName: lastName.trim(), extensionName: cleanExtension, email, password, role: 'artist' });
+      const name = `${cleanFirstName} ${cleanLastName}${cleanExtension ? ` ${cleanExtension}` : ''}`;
+      const result = await signup({ name, firstName: cleanFirstName, lastName: cleanLastName, extensionName: cleanExtension, email: cleanEmail, password, role: 'artist' });
       if (result?.needsConfirmation) {
         setConfirmationSent(true);
       } else {
@@ -108,12 +111,12 @@ export default function Signup() {
         <form className="signup-form" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="firstName">First name <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="firstName" required value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="e.g. Juan" autoComplete="given-name" />
+            <input id="firstName" required maxLength={50} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="e.g. Juan" autoComplete="given-name" />
             <div className="hint">At least 2 letters, starting with a capital letter. Letters only.</div>
           </div>
           <div className="field">
             <label htmlFor="lastName">Last name <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="lastName" required value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="e.g. Dela Cruz" autoComplete="family-name" />
+            <input id="lastName" required maxLength={50} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="e.g. Dela Cruz" autoComplete="family-name" />
             <div className="hint">Use letters only; each name must be at least 2 characters.</div>
           </div>
           <div className="field">

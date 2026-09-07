@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,20 +24,35 @@ function LinkItem({ to, children, icon, end = false }) {
 export default function ResponsiveNav() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
-  const isArtist = user?.role === 'artist' || user?.role === 'main_admin';
+  const isMainAdmin = user?.role === 'main_admin';
+  const isArtist = user?.role === 'artist';
 
   function signOut() {
     logout();
     navigate('/login', { replace: true });
   }
 
+  function onSearch(event) {
+    event.preventDefault();
+    const value = query.trim();
+    if (value) navigate(`/?search=${encodeURIComponent(value)}`);
+    setMenuOpen(false);
+  }
+
   return (
-    <nav className="responsive-nav" aria-label="Main navigation">
+    <nav className={`responsive-nav${isAdmin ? ' admin-responsive-nav' : ''}${menuOpen ? ' menu-open' : ''}`} aria-label="Main navigation">
       <NavLink to="/" className="responsive-brand" aria-label="ArtVault home">
         <img className="responsive-brand-mark" src="/artvault-logos/artvault_logo_lightbg.png" alt="" />
         <span>ArtVault</span>
       </NavLink>
+
+      <form className="responsive-search" onSubmit={onSearch} role="search">
+        <span aria-hidden="true">Search</span>
+        <input type="search" aria-label="Search the gallery" placeholder="Search artworks, artists, exhibits" value={query} onChange={(event) => setQuery(event.target.value)} />
+      </form>
 
       <div className="responsive-nav-links">
         <LinkItem to="/" icon="⌂" end>Gallery</LinkItem>
@@ -50,10 +66,16 @@ export default function ResponsiveNav() {
         {isAdmin && <>
           <LinkItem to="/manage-gallery" icon="▣">Manage gallery</LinkItem>
           <LinkItem to="/manage-exhibits" icon="▤">Manage exhibits</LinkItem>
-          <LinkItem to="/manage-artists" icon="♙">Manage artists</LinkItem>
+          <LinkItem to="/manage-artists" icon="⚙">Manage artists</LinkItem>
+          {isMainAdmin && <LinkItem to="/manage-sub-admins" icon="⚡">Manage sub-admins</LinkItem>}
           <LinkItem to="/archives" icon="▱">Archives</LinkItem>
         </>}
+        {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out">Sign out</button>}
       </div>
+
+      <button className="responsive-menu-toggle" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen}>
+        <span aria-hidden="true">☰</span>
+      </button>
 
       <div className="responsive-account">
         {user ? <>
@@ -61,7 +83,6 @@ export default function ResponsiveNav() {
             <span className="responsive-avatar">{initials(user.name)}</span>
             <span className="responsive-user-name">{user.name}</span>
           </NavLink>
-          <button type="button" className="responsive-signout" onClick={signOut}>Sign out</button>
         </> : <>
           <NavLink className="responsive-login" to="/login">Log in</NavLink>
           <NavLink className="responsive-join" to="/signup">Sign up</NavLink>

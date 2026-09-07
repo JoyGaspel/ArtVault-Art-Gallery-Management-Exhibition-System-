@@ -3,6 +3,44 @@ const Exhibit = require('../models/Exhibit');
 const Archive = require('../models/Archive');
 const mongoose = require('mongoose');
 
+const ALLOWED_IMAGE_TYPES = new Map([
+  ['image/png', '89504e470d0a1a0a'],
+  ['image/jpeg', 'ffd8ff'],
+  ['image/webp', '52494646'],
+  ['image/gif', '47494638'],
+]);
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_CATEGORIES = 5;
+const MAX_MATERIALS = 20;
+
+function cleanText(value, maxLength) {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
+}
+
+function cleanList(value, maxItems, maxItemLength) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => cleanText(item, maxItemLength)).filter(Boolean))].slice(0, maxItems);
+}
+
+function validateImageData(imagePath) {
+  if (!imagePath) return '';
+  if (typeof imagePath !== 'string') throw Object.assign(new Error('Artwork image must be a valid file.'), { status: 400 });
+  const match = /^data:([^;]+);base64,([a-z0-9+/=\s]+)$/i.exec(imagePath);
+  if (!match) throw Object.assign(new Error('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.'), { status: 400 });
+  const mime = match[1].toLowerCase();
+  const expected = ALLOWED_IMAGE_TYPES.get(mime);
+  if (!expected) throw Object.assign(new Error('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.'), { status: 400 });
+  const buffer = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+  if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) throw Object.assign(new Error('Image must be between 1 byte and 10 MB.'), { status: 400 });
+  const signature = buffer.subarray(0, expected.length).toString('hex');
+  if (mime === 'image/webp') {
+    if (signature !== expected || buffer.subarray(8, 12).toString('ascii') !== 'WEBP') throw Object.assign(new Error('The image file is invalid.'), { status: 400 });
+  } else if (signature !== expected && !(mime === 'image/gif' && ['474946383761', '474946383961'].includes(buffer.subarray(0, 6).toString('hex')))) {
+    throw Object.assign(new Error('The image file content does not match its type.'), { status: 400 });
+  }
+  return `data:${mime};base64,${match[2].replace(/\s/g, '')}`;
+}
+
 // GET /api/artworks?category=&artist=&page=&limit=
 async function listArtworks(req, res, next) {
   try {
@@ -71,14 +109,19 @@ async function getArtworkImage(req, res, next) {
 async function createArtwork(req, res, next) {
   try {
     const { title, description, image_path, categories, materials } = req.body;
-    if (!title) return res.status(400).json({ message: 'Title is required.' });
+    const cleanTitle = cleanText(title, 150);
+    if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
+    if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
+    const cleanDescription = cleanText(description, 1000);
+    if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
+    if (typeof description !== 'undefined' && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
 
     const artwork = await Artwork.create({
-      title,
-      description,
-      image_path,
-      categories: categories || [],
-      materials: materials || [],
+      title: cleanTitle,
+      description: cleanDescription,
+      image_path: validateImageData(image_path),
+      categories: cleanList(categories, MAX_CATEGORIES, 40),
+      materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
     });
 
@@ -130,14 +173,17 @@ async function updateArtwork(req, res, next) {
   try {
     const artwork = req.artwork;
     const { title, description, image_path, categories, materials } = req.body;
-    if (title !== undefined && !title.trim()) {
+    if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
       return res.status(400).json({ message: 'Artwork title cannot be empty.' });
     }
-    if (title !== undefined) artwork.title = title;
-    if (description !== undefined) artwork.description = description;
-    if (image_path !== undefined) artwork.image_path = image_path;
-    if (categories !== undefined) artwork.categories = categories;
-    if (materials !== undefined) artwork.materials = materials;
+    if (title !== undefined && title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
+    if (description !== undefined && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
+    if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
+    if (title !== undefined) artwork.title = cleanText(title, 50);
+    if (description !== undefined) artwork.description = cleanText(description, 1000);
+    if (image_path !== undefined) artwork.image_path = validateImageData(image_path);
+    if (categories !== undefined) artwork.categories = cleanList(categories, MAX_CATEGORIES, 40);
+    if (materials !== undefined) artwork.materials = cleanList(materials, MAX_MATERIALS, 80);
 
     await artwork.save();
     res.json({ artwork });

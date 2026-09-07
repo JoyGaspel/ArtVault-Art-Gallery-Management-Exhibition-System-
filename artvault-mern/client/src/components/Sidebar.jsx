@@ -24,7 +24,8 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
-  const isArtist = user?.role === 'artist' || user?.role === 'main_admin';
+  const isMainAdmin = user?.role === 'main_admin';
+  const isArtist = user?.role === 'artist';
 
   function signOut() {
     logout();
@@ -58,7 +59,8 @@ export default function Sidebar() {
             <div className="nav-heading">Curation</div>
             <NavigationLink to="/manage-gallery" label="Manage gallery" icon="▣" />
             <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="▤" />
-            <NavigationLink to="/manage-artists" label="Manage artists" icon="♙" />
+            <NavigationLink to="/manage-artists" label="Manage artists" icon="⚙" />
+            {isMainAdmin && <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="⚡" />}
             <NavigationLink to="/archives" label="Archives" icon="▱" />
           </div>
         )}

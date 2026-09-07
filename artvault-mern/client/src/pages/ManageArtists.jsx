@@ -52,9 +52,10 @@ export default function ManageArtists() {
     }
     setSaving(true);
     try {
-      await api.put(`/artists/admin/${editing._id}`, form);
+      const response = await api.put(`/artists/admin/${editing._id}`, form);
       showToast(`${form.name} updated.`);
       setEditing(null);
+      setArtists((current) => current.map((item) => item._id === editing._id ? { ...item, ...response.data.artist } : item));
       load();
     } catch (error) {
       showToast(error.response?.data?.message || 'Could not update this artist.', true);
@@ -75,6 +76,7 @@ export default function ManageArtists() {
     try {
       await api.delete(`/artists/admin/${artist._id}`);
       showToast(`${artist.name}'s account was removed.`);
+      setArtists((current) => current.filter((item) => item._id !== artist._id));
       load();
     } catch (error) {
       showToast(error.response?.data?.message || 'Could not remove this artist.', true);
@@ -88,8 +90,9 @@ export default function ManageArtists() {
   async function confirmRole() {
     const { artist, nextRole } = pendingRole || {}; setPendingRole(null); if (!artist) return;
     try {
-      await api.put(`/artists/admin/${artist._id}/role`, { role: nextRole });
+      const response = await api.put(`/artists/admin/${artist._id}/role`, { role: nextRole });
       showToast(nextRole === 'sub_admin' ? `${artist.name} is now a sub-admin.` : `${artist.name} is now an artist.`);
+      setArtists((current) => current.map((item) => item._id === artist._id ? { ...item, ...response.data.artist } : item));
       load();
     } catch (error) {
       showToast(error.response?.data?.message || 'Could not change this account role.', true);
@@ -146,15 +149,16 @@ export default function ManageArtists() {
               <button className="modal-close" type="button" aria-label="Close" onClick={() => setEditing(null)}>x</button>
             </div>
             <div className="field">
-              <label>Display name</label>
-              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+              <label>Display name <span className="required-mark" aria-hidden="true">*</span></label>
+              <input maxLength={120} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
             </div>
             <div className="field">
-              <label>Bio</label>
-              <textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} />
+              <label>Bio <span className="optional-mark">(optional)</span></label>
+              <textarea maxLength={50} value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} />
+              <div className="hint">{form.bio.length}/50 characters</div>
             </div>
             <div className="field">
-              <label>Disciplines</label>
+              <label>Disciplines <span className="optional-mark">(optional)</span></label>
               <div className="chip-select">
                 {specializations.map((item) => <button key={item} type="button" className={`chip-toggle${form.specializations.includes(item) ? ' on' : ''}`} onClick={() => toggleSpecialization(item)}>{item}</button>)}
               </div>

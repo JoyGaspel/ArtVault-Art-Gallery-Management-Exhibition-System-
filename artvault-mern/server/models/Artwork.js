@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const artworkSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true, trim: true, maxlength: 150 },
-    description: { type: String, trim: true, maxlength: 2000, default: '' },
+    title: { type: String, required: true, trim: true, maxlength: 50 },
+    description: { type: String, trim: true, maxlength: 1000, default: '' },
     image_path: { type: String, trim: true, default: '' },
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true },
     categories: { type: [String], default: [] },

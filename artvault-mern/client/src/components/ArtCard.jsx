@@ -21,7 +21,7 @@ export default function ArtCard({ artwork, height }) {
   return (
     <Link to={`/artworks/${artwork._id}`} className="art-card" style={{ textDecoration: 'none', color: 'inherit' }}>
       <div className={`art-thumb${imageSrc && !imageFailed ? ' has-image' : ''}`} style={height ? { height } : undefined}>
-        {imageSrc && !imageFailed ? <img src={imageSrc} alt={artwork.title} loading="lazy" decoding="async" onError={() => setImageFailed(true)} /> : emojiFor(artwork.categories)}
+        {imageSrc && !imageFailed ? <img src={imageSrc} alt={artwork.title} loading="lazy" decoding="async" onError={() => setImageFailed(true)} /> : <span className="art-placeholder" role="img" aria-label="Artwork placeholder">{emojiFor(artwork.categories)}</span>}
       </div>
       <div className="art-info">
         <div className="t">{artwork.title}</div>

@@ -13,16 +13,25 @@ function generateToken(user) {
 // POST /api/auth/signup
 async function signup(req, res, next) {
   try {
-    const { name, email, password, role, specializations, bio } = req.body;
+    const { name, email, password, specializations, bio } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const normalizedName = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+    const firstName = typeof req.body.firstName === 'string' ? req.body.firstName.trim() : '';
+    const lastName = typeof req.body.lastName === 'string' ? req.body.lastName.trim() : '';
 
-    if (!name || !email || !password) {
+    if (!normalizedName || !normalizedEmail || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
+    }
+    if (firstName && (!/^[A-Z][A-Za-z]{1,49}$/.test(firstName) || firstName.length > 50)) return res.status(400).json({ message: 'First name must start with a capital letter and contain 2–50 letters.' });
+    if (lastName && (!/^[A-Z][A-Za-z]{1,49}(?: [A-Z][A-Za-z]{1,49})*$/.test(lastName) || lastName.length > 50)) return res.status(400).json({ message: 'Last name must start with a capital letter and contain 2–50 letters.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Enter a valid email address.' });
     }
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
     }
 
-    const existing = await Artist.findOne({ email: email.toLowerCase() });
+    const existing = await Artist.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(409).json({ message: 'That email is already registered — try signing in instead.' });
     }
@@ -31,10 +40,11 @@ async function signup(req, res, next) {
     // accounts are provisioned separately (see README), matching the note
     // shown on the sign-up page.
     const user = await Artist.create({
-      name,
-      email,
+      name: normalizedName.slice(0, 120),
+      email: normalizedEmail,
       password, // hashed by the pre-save hook on the model
-      role: role === 'admin' ? 'artist' : 'artist',
+      // Never accept a role from a public request.
+      role: 'artist',
       specializations: specializations || [],
       bio: bio || '',
     });
@@ -50,11 +60,16 @@ async function signup(req, res, next) {
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const user = await Artist.findOne({ email: email.toLowerCase() }).select('+password');
+    const user = await Artist.findOne({ email: normalizedEmail }).select('+password +supabaseUserId');
+
+    if (user?.supabaseUserId && !user.emailConfirmedAt) {
+      return res.status(403).json({ message: 'Please confirm your email before signing in.' });
+    }
 
     // STEP 2 — locked accounts are rejected before any password check
     if (user && user.lockUntil && user.lockUntil > Date.now()) {

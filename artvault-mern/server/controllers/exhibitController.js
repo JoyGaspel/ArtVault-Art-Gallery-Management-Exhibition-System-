@@ -5,6 +5,7 @@ const Artwork = require('../models/Artwork');
 // GET /api/exhibits
 async function listExhibits(req, res, next) {
   try {
+    res.set('Cache-Control', 'no-store');
     const exhibits = await Exhibit.find()
       .populate({ path: 'artworks', select: 'title categories' })
       .sort({ event_date: 1 })
@@ -21,6 +22,7 @@ async function listExhibits(req, res, next) {
 // GET /api/exhibits/:id
 async function getExhibit(req, res, next) {
   try {
+    res.set('Cache-Control', 'no-store');
     const exhibit = await Exhibit.findById(req.params.id).populate({
       path: 'artworks',
       select: '-image_path',

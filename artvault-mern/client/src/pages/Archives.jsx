@@ -19,8 +19,8 @@ export default function Archives() {
   useEffect(() => { load(); }, []);
   const visible = filter === 'all' ? archives : archives.filter((item) => item.entityType === filter);
   const count = (type) => archives.filter((item) => item.entityType === type).length;
-  async function restore(item) { try { await api.post(`/archives/${item._id}/restore`); toast('Item restored.'); load(); } catch (e) { toast(e.response?.data?.message || 'Could not restore item.', true); } }
-  async function purge() { const item = pending; setPending(null); if (!item) return; try { await api.delete(`/archives/${item._id}`); toast('Permanently deleted.'); load(); } catch (e) { toast(e.response?.data?.message || 'Could not permanently delete item.', true); } }
+  async function restore(item) { try { await api.post(`/archives/${item._id}/restore`); toast('Item restored.'); setArchives((current) => current.filter((entry) => entry._id !== item._id)); load(); } catch (e) { toast(e.response?.data?.message || 'Could not restore item.', true); } }
+  async function purge() { const item = pending; setPending(null); if (!item) return; try { await api.delete(`/archives/${item._id}`); toast('Permanently deleted.'); setArchives((current) => current.filter((entry) => entry._id !== item._id)); load(); } catch (e) { toast(e.response?.data?.message || 'Could not permanently delete item.', true); } }
   return <section><div className="page-head"><div><div className="eyebrow">Administration · Recovery</div><h1>Archives</h1><div className="sub">Deleted items are held here until permanently removed.</div></div></div>
     <div className="stat-row archive-categories">
       {[['all', 'All archived items', archives.length], ['artist', 'Artist accounts', count('artist')], ['artwork', 'Artworks', count('artwork')], ['exhibit', 'Exhibits', count('exhibit')]].map(([key, label, total]) => <button key={key} type="button" className={`stat-box archive-category${filter === key ? ' selected' : ''}`} onClick={() => setFilter(key)}><div className="num">{total}</div><div className="lbl">{label}</div></button>)}

@@ -18,7 +18,7 @@ export default function Login() {
   const [resending, setResending] = useState(false);
   const lockInterval = useRef(null);
 
-  // Demo-account shortcuts are intentionally disabled for real authentication.
+  // Kept as a safe no-op for legacy hidden markup; demo shortcuts are disabled.
   function fillDemo() {}
 
   useEffect(() => {

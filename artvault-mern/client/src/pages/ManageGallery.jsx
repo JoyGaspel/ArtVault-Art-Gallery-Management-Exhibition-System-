@@ -9,6 +9,20 @@ const categories = [
   'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
 ];
 
+function ModerationThumbnail({ artwork }) {
+  const [failed, setFailed] = useState(false);
+  const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
+  const imageSrc = artwork.image_path || (artwork.has_image ? `${apiBase}/artworks/${artwork._id}/image` : '');
+
+  return (
+    <div className="moderation-art-preview">
+      {imageSrc && !failed
+        ? <img src={imageSrc} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+        : <span aria-hidden="true">Art</span>}
+    </div>
+  );
+}
+
 export default function ManageGallery() {
   const showToast = useToast();
   const [artworks, setArtworks] = useState([]);
@@ -61,12 +75,15 @@ export default function ManageGallery() {
     }
     setSaving(true);
     try {
-      await api.put(`/artworks/${editing._id}`, {
+      const response = await api.put(`/artworks/${editing._id}`, {
         ...form,
+        title: form.title.trim().replace(/\s+/g, ' '),
+        description: form.description.trim().replace(/\s+/g, ' '),
         materials: form.materials.split(',').map((item) => item.trim()).filter(Boolean),
       });
       showToast(`"${form.title}" updated.`);
       setEditing(null);
+      setArtworks((current) => current.map((item) => item._id === editing._id ? { ...item, ...response.data.artwork } : item));
       load();
     } catch (error) {
       showToast(error.response?.data?.message || 'Could not update this artwork.', true);
@@ -83,6 +100,7 @@ export default function ManageGallery() {
     try {
       await api.delete(`/artworks/${artwork._id}`);
       showToast(`"${artwork.title}" removed from the gallery.`);
+      setArtworks((current) => current.filter((item) => item._id !== artwork._id));
       load();
     } catch (error) {
       showToast(error.response?.data?.message || 'Could not remove this artwork.', true);
@@ -116,7 +134,7 @@ export default function ManageGallery() {
         <div className="admin-list">
           {visible.map((artwork) => (
             <article className="admin-artist-card moderation-card" key={artwork._id}>
-              <div className="moderation-art-placeholder" aria-hidden="true">Art</div>
+              <ModerationThumbnail artwork={artwork} />
               <div className="admin-artist-info">
                 <h2>{artwork.title}</h2>
                 <div className="mono admin-artist-email">by {artwork.artist?.name || 'Unknown artist'} · {new Date(artwork.created_at).toLocaleDateString()}</div>
@@ -141,13 +159,13 @@ export default function ManageGallery() {
               <div><div className="eyebrow">Moderate artwork</div><h2>Edit {editing.title}</h2></div>
               <button className="modal-close" type="button" aria-label="Close" onClick={() => setEditing(null)}>x</button>
             </div>
-            <div className="field"><label>Title</label><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></div>
-            <div className="field"><label>Description</label><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></div>
+            <div className="field"><label>Title <span className="required-mark" aria-hidden="true">*</span></label><input maxLength={50} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></div>
+            <div className="field"><label>Description <span className="optional-mark">(optional)</span></label><textarea maxLength={1000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /><div className="hint">{form.description.length}/1000 characters</div></div>
             <div className="field">
-              <label>Categories</label>
+              <label>Categories <span className="optional-mark">(optional)</span></label>
               <div className="chip-select">{categories.map((item) => <button key={item} type="button" className={`chip-toggle${form.categories.includes(item) ? ' on' : ''}`} onClick={() => toggleCategory(item)}>{item}</button>)}</div>
             </div>
-            <div className="field"><label>Materials</label><input value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} /><div className="hint">Separate materials with commas.</div></div>
+            <div className="field"><label>Materials <span className="optional-mark">(optional)</span></label><input value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} /><div className="hint">Separate materials with commas.</div></div>
             <div className="modal-actions">
               <button className="btn btn-ghost" type="button" onClick={() => setEditing(null)}>Cancel</button>
               <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save changes'}</button>

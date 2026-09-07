@@ -9,8 +9,8 @@ const ALL_SPECIALIZATIONS = [
 const artistSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
-    firstName: { type: String, trim: true, maxlength: 60, default: '' },
-    lastName: { type: String, trim: true, maxlength: 80, default: '' },
+    firstName: { type: String, trim: true, maxlength: 50, default: '' },
+    lastName: { type: String, trim: true, maxlength: 50, default: '' },
     extensionName: { type: String, trim: true, maxlength: 10, default: '' },
     email: {
       type: String,
@@ -23,11 +23,13 @@ const artistSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6, select: false },
     role: { type: String, enum: ['artist', 'sub_admin', 'main_admin', 'admin'], default: 'artist' },
     supabaseUserId: { type: String, sparse: true, unique: true, select: false },
+    emailConfirmedAt: { type: Date, default: null },
     specializations: {
       type: [{ type: String, enum: ALL_SPECIALIZATIONS }],
       default: [],
     },
-    bio: { type: String, trim: true, maxlength: 600, default: '' },
+    bio: { type: String, trim: true, maxlength: 50, default: '' },
+    avatar_path: { type: String, trim: true, default: '' },
 
     // STEP 2 of the login flowchart — rate limiting / lockout
     failedLoginAttempts: { type: Number, default: 0 },
@@ -59,10 +61,13 @@ artistSchema.methods.toSafeObject = function toSafeObject() {
   return {
     id: this._id,
     name: this.name,
+    firstName: this.firstName || '',
+    lastName: this.lastName || '',
     email: this.email,
     role: this.role,
     specializations: this.specializations,
     bio: this.bio,
+    avatar_path: this.avatar_path || '',
   };
 };
 

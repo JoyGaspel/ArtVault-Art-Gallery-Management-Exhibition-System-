@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../api';
 import ArtCard from '../components/ArtCard';
+import { useAuth } from '../context/AuthContext';
 
 export default function ArtistProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [artist, setArtist] = useState(null);
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ export default function ArtistProfile() {
     <section>
       <button className="back-link" onClick={() => navigate(-1)}>← Back</button>
       <div className="profile-head">
-        <div className="av-xl">{artist.name.slice(0, 2).toUpperCase()}</div>
+        {artist.avatar_path ? <img className="profile-avatar-xl" src={artist.avatar_path} alt={`${artist.name} profile`} /> : <div className="av-xl">{artist.name.slice(0, 2).toUpperCase()}</div>}
         <div>
           <h1 style={{ fontSize: 24 }}>{artist.name}</h1>
           <div className="chip-row" style={{ margin: '8px 0 0' }}>
@@ -43,6 +45,9 @@ export default function ArtistProfile() {
               <span className="chip active" key={s} style={{ cursor: 'default' }}>{s}</span>
             ))}
           </div>
+          {user && String(user.id) === String(artist._id) && (
+            <Link className="btn btn-ghost btn-sm profile-edit-link" to="/settings">Edit profile</Link>
+          )}
         </div>
       </div>
       <p className="profile-bio">{artist.bio}</p>

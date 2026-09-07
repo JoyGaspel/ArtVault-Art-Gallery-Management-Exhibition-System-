@@ -107,7 +107,12 @@ export function AuthProvider({ children }) {
       return prototypeUser;
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw { message: error.message, code: error.code, status: error.status };
+    if (error) {
+      const message = /not confirmed|email not confirmed/i.test(error.message || '')
+        ? 'Please confirm your email before signing in.'
+        : error.message;
+      throw { message, code: error.code, status: error.status };
+    }
     const sessionUser = mapSupabaseUser(data.user);
     if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
     try {
@@ -154,7 +159,12 @@ export function AuthProvider({ children }) {
         emailRedirectTo: `${window.location.origin}/login`,
       },
     });
-    if (error) throw { message: error.message };
+    if (error) {
+      const message = /already registered|already been registered|already exists/i.test(error.message || '')
+        ? 'An account with this email already exists. Please sign in instead.'
+        : error.message;
+      throw { message };
+    }
     const sessionUser = mapSupabaseUser(data.user);
     if (data.session) setUser(sessionUser);
     return { user: sessionUser, needsConfirmation: !data.session };
@@ -171,8 +181,20 @@ export function AuthProvider({ children }) {
     setUser((previous) => (previous ? { ...previous, ...partial } : previous));
   }, []);
 
+  const updatePassword = useCallback(async (password) => {
+    if (PROTOTYPE_AUTH) throw { message: 'Password changes require Supabase authentication.' };
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw { message: error.message };
+  }, []);
+
+  const updateEmail = useCallback(async (email) => {
+    if (PROTOTYPE_AUTH) throw { message: 'Email changes require Supabase authentication.' };
+    const { error } = await supabase.auth.updateUser({ email: email.trim().toLowerCase() });
+    if (error) throw { message: error.message };
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, resendConfirmation, logout, updateUser, prototypeMode: PROTOTYPE_AUTH }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, resendConfirmation, logout, updateUser, updatePassword, updateEmail, prototypeMode: PROTOTYPE_AUTH }}>
       {children}
     </AuthContext.Provider>
   );

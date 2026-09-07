@@ -22,10 +22,13 @@ async function mirrorSupabaseUser(authUser) {
       specializations: authUser.user_metadata?.specializations || [],
       bio: authUser.user_metadata?.bio || '',
       supabaseUserId: authUser.id,
+      emailConfirmedAt: authUser.email_confirmed_at ? new Date(authUser.email_confirmed_at) : null,
     });
   } else if (!user.supabaseUserId) {
     user.supabaseUserId = authUser.id;
   }
+
+  user.emailConfirmedAt = authUser.email_confirmed_at ? new Date(authUser.email_confirmed_at) : null;
 
   // Backfill profile data for users created before Supabase sync was enabled.
   const metadata = authUser.user_metadata || {};
@@ -62,6 +65,7 @@ async function requireAuth(req, res, next) {
         }
         const user = await mirrorSupabaseUser(data.user);
         if (user) {
+          req.supabaseUserId = data.user.id;
           req.user = user;
           return next();
         }

@@ -62,10 +62,15 @@ export default function ManageExhibits() {
     }
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        name: form.name.trim().replace(/\s+/g, ' '),
+        description: form.description.trim().replace(/\s+/g, ' '),
+      };
       if (editingId) {
-        await api.put(`/exhibits/${editingId}`, form);
+        await api.put(`/exhibits/${editingId}`, payload);
       } else {
-        await api.post('/exhibits', form);
+        await api.post('/exhibits', payload);
       }
       showToast(`Exhibit "${form.name}" saved.`);
       setModalOpen(false);
@@ -141,19 +146,19 @@ export default function ManageExhibits() {
               <button className="modal-close" onClick={() => setModalOpen(false)}>✕</button>
             </div>
             <div className="field">
-              <label>Exhibit name</label>
+              <label>Exhibit name <span className="required-mark" aria-hidden="true">*</span></label>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Modern Art Showcase" />
             </div>
             <div className="field">
-              <label>Description</label>
+              <label>Description <span className="optional-mark">(optional)</span></label>
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
             <div className="field">
-              <label>Event date</label>
+              <label>Event date <span className="required-mark" aria-hidden="true">*</span></label>
               <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
             </div>
             <div className="field">
-              <label>Include artworks</label>
+              <label>Include artworks <span className="optional-mark">(optional)</span></label>
               <div className="checkbox-list">
                 {artworks.map((w) => (
                   <label className="checkbox-row" key={w._id}>

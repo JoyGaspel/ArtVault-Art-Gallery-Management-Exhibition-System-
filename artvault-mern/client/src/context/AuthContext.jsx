@@ -97,9 +97,12 @@ export function AuthProvider({ children }) {
     };
   }, [resetIdleTimer, user]);
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, requestedRole = '') => {
     if (PROTOTYPE_AUTH) {
       const prototypeUser = await prototypeLogin(email, password);
+      if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(prototypeUser.role)) {
+        throw { message: 'This account does not have administrator access.' };
+      }
       setUser(prototypeUser);
       return prototypeUser;
     }
@@ -109,9 +112,21 @@ export function AuthProvider({ children }) {
     if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
     try {
       const response = await api.get('/auth/me');
+      if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(response.data.user.role)) {
+        setUser(null);
+        await supabase.auth.signOut();
+        localStorage.removeItem('artvault_token');
+        throw { message: 'This account does not have administrator access.' };
+      }
       setUser(response.data.user);
       return response.data.user;
     } catch {
+      if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(sessionUser?.role)) {
+        setUser(null);
+        await supabase.auth.signOut();
+        localStorage.removeItem('artvault_token');
+        throw { message: 'This account does not have administrator access.' };
+      }
       setUser(sessionUser);
       return sessionUser;
     }

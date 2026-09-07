@@ -2,9 +2,9 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const browseLinks = [
-  { to: '/', label: 'Gallery', icon: 'G', end: true },
-  { to: '/artists', label: 'Artists', icon: 'A' },
-  { to: '/exhibits', label: 'Exhibits', icon: 'E' },
+  { to: '/', label: 'Gallery', icon: '⌂', end: true },
+  { to: '/artists', label: 'Artists', icon: '♙' },
+  { to: '/exhibits', label: 'Exhibits', icon: '▦' },
 ];
 
 function initials(name = '') {
@@ -13,7 +13,7 @@ function initials(name = '') {
 
 function NavigationLink({ to, label, icon, end = false }) {
   return (
-    <NavLink to={to} end={end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+    <NavLink to={to} end={end} title={label} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
       <span className="nav-icon" aria-hidden="true">{icon}</span>
       <span className="nav-label">{label}</span>
     </NavLink>
@@ -28,13 +28,13 @@ export default function Sidebar() {
 
   function signOut() {
     logout();
-    navigate('/', { replace: true });
+    navigate('/login', { replace: true });
   }
 
   return (
     <aside className="sidebar" aria-label="Main navigation">
       <NavLink to="/" className="brand" aria-label="ArtVault home">
-        <img className="brand-mark" src="/artvault-logo-transparent.png" alt="" />
+        <img className="brand-mark" src="/artvault-logos/artvault_logo_darkbg.png" alt="" />
         <span className="nav-label">ArtVault</span>
       </NavLink>
 
@@ -47,19 +47,19 @@ export default function Sidebar() {
         {isArtist && (
           <div className="nav-group">
             <div className="nav-heading">My studio</div>
-            <NavigationLink to="/upload" label="Upload artwork" icon="+" />
-            <NavigationLink to={`/artists/${user.id}`} label="My public profile" icon="P" />
-            <NavigationLink to="/settings" label="Profile settings" icon="S" />
+            <NavigationLink to="/upload" label="Upload artwork" icon="＋" />
+            <NavigationLink to={`/artists/${user.id}`} label="My public profile" icon="◎" />
+            <NavigationLink to="/settings" label="Profile settings" icon="⚙" />
           </div>
         )}
 
         {isAdmin && (
           <div className="nav-group">
             <div className="nav-heading">Curation</div>
-            <NavigationLink to="/manage-gallery" label="Manage gallery" icon="G" />
-            <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="M" />
-            <NavigationLink to="/manage-artists" label="Manage artists" icon="A" />
-            <NavigationLink to="/archives" label="Archives" icon="R" />
+            <NavigationLink to="/manage-gallery" label="Manage gallery" icon="▣" />
+            <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="▤" />
+            <NavigationLink to="/manage-artists" label="Manage artists" icon="♙" />
+            <NavigationLink to="/archives" label="Archives" icon="▱" />
           </div>
         )}
       </nav>

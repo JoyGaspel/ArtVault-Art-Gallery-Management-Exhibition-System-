@@ -15,22 +15,46 @@ export default function Gallery() {
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
+  const [columnCount, setColumnCount] = useState(() => getColumnCount());
 
   useEffect(() => {
+    const onResize = () => setColumnCount(getColumnCount());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setErr('');
     const query = active !== 'All' ? { category: active } : {};
     api
-      .get('/artworks', { params: query })
-      .then((res) => setArtworks(res.data.artworks))
-      .catch(() => setErr('Could not load the gallery. Is the API running?'))
-      .finally(() => setLoading(false));
+      .get('/artworks', { params: { ...query, page: 1, limit: 100 } })
+      .then((res) => {
+        if (cancelled) return;
+        const result = res.data?.artworks;
+        if (!Array.isArray(result)) throw new Error('The gallery response was invalid.');
+        setArtworks(result);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setArtworks([]);
+        setErr(error.response?.data?.message || 'Could not load the gallery. Check that the API is running.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, [active]);
 
   const visible = useMemo(() => {
     if (!search) return artworks;
     const q = search.toLowerCase();
     return artworks.filter(
-      (w) => w.title.toLowerCase().includes(q) || (w.categories || []).some((c) => c.toLowerCase().includes(q))
+      (w) => (w.title || '').toLowerCase().includes(q)
+        || (w.artist?.name || '').toLowerCase().includes(q)
+        || (w.categories || []).some((c) => c.toLowerCase().includes(q))
     );
   }, [artworks, search]);
 
@@ -64,12 +88,23 @@ export default function Gallery() {
         <div className="empty">No artworks here yet. Be the first to upload one.</div>
       )}
       {!err && !loading && visible.length > 0 && (
-        <div className="gallery-grid">
-          {visible.map((w, i) => (
-            <ArtCard key={w._id} artwork={w} height={150 + ((i * 37) % 120)} />
+        <div className="gallery-masonry" style={{ '--gallery-columns': columnCount }}>
+          {Array.from({ length: columnCount }, (_, column) => (
+            <div className="gallery-masonry-column" key={column}>
+              {visible.filter((_, index) => index % columnCount === column).map((w) => (
+                <ArtCard key={w._id} artwork={w} />
+              ))}
+            </div>
           ))}
         </div>
       )}
     </section>
   );
+}
+
+function getColumnCount() {
+  if (typeof window === 'undefined') return 1;
+  if (window.innerWidth <= 390) return 1;
+  if (window.innerWidth <= 860) return 2;
+  return Math.max(1, Math.min(6, Math.floor((window.innerWidth - 296) / 240)));
 }

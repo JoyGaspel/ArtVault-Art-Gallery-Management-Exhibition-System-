@@ -6,8 +6,12 @@ const Artwork = require('../models/Artwork');
 async function listExhibits(req, res, next) {
   try {
     const exhibits = await Exhibit.find()
-      .populate({ path: 'artworks', select: 'title image_path categories' })
-      .sort({ event_date: 1 });
+      .populate({ path: 'artworks', select: 'title categories' })
+      .sort({ event_date: 1 })
+      .lean();
+    exhibits.forEach((exhibit) => {
+      exhibit.artworks = exhibit.artworks.map((artwork) => ({ ...artwork, has_image: true }));
+    });
     res.json({ exhibits });
   } catch (err) {
     next(err);
@@ -19,9 +23,11 @@ async function getExhibit(req, res, next) {
   try {
     const exhibit = await Exhibit.findById(req.params.id).populate({
       path: 'artworks',
+      select: '-image_path',
       populate: { path: 'artist', select: 'name' },
-    });
+    }).lean();
     if (!exhibit) return res.status(404).json({ message: 'Exhibit not found.' });
+    exhibit.artworks = exhibit.artworks.map((artwork) => ({ ...artwork, has_image: true }));
     res.json({ exhibit });
   } catch (err) {
     next(err);

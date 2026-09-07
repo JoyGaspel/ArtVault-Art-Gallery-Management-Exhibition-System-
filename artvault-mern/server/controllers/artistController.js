@@ -23,7 +23,11 @@ async function getArtist(req, res, next) {
     const artist = await Artist.findById(req.params.id).select('name specializations bio role createdAt');
     if (!artist) return res.status(404).json({ message: 'Artist not found.' });
 
-    const artworks = await Artwork.find({ artist: artist._id }).sort({ created_at: -1 });
+    const artworks = (await Artwork.find({ artist: artist._id })
+      .select('-image_path')
+      .sort({ created_at: -1 })
+      .lean())
+      .map((artwork) => ({ ...artwork, has_image: true }));
     res.json({ artist, artworks });
   } catch (err) {
     next(err);

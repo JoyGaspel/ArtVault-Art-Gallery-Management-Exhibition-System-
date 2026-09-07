@@ -94,7 +94,7 @@ export default function ArtworkDetail() {
       <button className="back-link" onClick={() => navigate(-1)}>← Back</button>
 
       <div className="detail-layout">
-        <div className="detail-hero">🖼️</div>
+        <div className="detail-hero">{artwork.image_path ? <img src={artwork.image_path} alt={artwork.title} /> : '🖼️'}</div>
         <div className="detail-body">
           {!editing ? (
             <>

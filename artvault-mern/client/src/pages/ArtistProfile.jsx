@@ -9,6 +9,13 @@ export default function ArtistProfile() {
   const [artist, setArtist] = useState(null);
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [columnCount, setColumnCount] = useState(() => profileColumnCount());
+
+  useEffect(() => {
+    const onResize = () => setColumnCount(profileColumnCount());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -43,12 +50,23 @@ export default function ArtistProfile() {
       {artworks.length === 0 ? (
         <div className="empty">No published pieces yet.</div>
       ) : (
-        <div className="gallery-grid" style={{ marginTop: 14 }}>
-          {artworks.map((w, i) => (
-            <ArtCard key={w._id} artwork={{ ...w, artist }} height={150 + ((i * 41) % 110)} />
+        <div className="gallery-masonry" style={{ '--gallery-columns': columnCount, marginTop: 14 }}>
+          {Array.from({ length: columnCount }, (_, column) => (
+            <div className="gallery-masonry-column" key={column}>
+              {artworks.filter((_, index) => index % columnCount === column).map((w) => (
+                <ArtCard key={w._id} artwork={{ ...w, artist }} />
+              ))}
+            </div>
           ))}
         </div>
       )}
     </section>
   );
+}
+
+function profileColumnCount() {
+  if (typeof window === 'undefined') return 1;
+  if (window.innerWidth <= 390) return 1;
+  if (window.innerWidth <= 860) return 2;
+  return 4;
 }

@@ -4,7 +4,7 @@ export default function AuthNav({ active }) {
   return (
     <header className="auth-nav">
       <Link to="/" className="auth-nav-brand" aria-label="ArtVault home">
-        <img src="/artvault-logo-transparent.png" alt="" />
+        <img src="/artvault-logos/artvault_logo_lightbg.png" alt="" />
         <span>ArtVault</span>
       </Link>
       <nav className="auth-nav-links" aria-label="Public navigation">

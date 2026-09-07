@@ -1,27 +1,64 @@
 const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
 const Archive = require('../models/Archive');
+const mongoose = require('mongoose');
 
 // GET /api/artworks?category=&artist=&page=&limit=
 async function listArtworks(req, res, next) {
   try {
-    const { category, artist, page = 1, limit = 24 } = req.query;
+    const { category, artist } = req.query;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    // Keep the public gallery responsive while still allowing management pages
+    // to request a larger page explicitly.
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
     const filter = {};
     if (category) filter.categories = category;
-    if (artist) filter.artist = artist;
+    if (artist && mongoose.isValidObjectId(artist)) filter.artist = new mongoose.Types.ObjectId(artist);
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const skip = (page - 1) * limit;
 
     const [artworks, total] = await Promise.all([
-      Artwork.find(filter)
-        .populate('artist', 'name specializations')
-        .sort({ created_at: -1 })
-        .skip(skip)
-        .limit(Number(limit)),
+      Artwork.aggregate([
+        { $match: filter },
+        { $sort: { created_at: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        { $lookup: {
+          from: 'artists',
+          let: { artistId: '$artist' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
+            { $project: { name: 1, specializations: 1 } },
+          ],
+          as: 'artist',
+        } },
+        { $project: {
+          title: 1, description: 1, categories: 1, materials: 1,
+          created_at: 1, updated_at: 1,
+          artist: { $arrayElemAt: ['$artist', 0] },
+          // Do not send multi-megabyte base64 data in every gallery response.
+          has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+        } },
+      ]),
       Artwork.countDocuments(filter),
     ]);
 
-    res.json({ artworks, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    res.json({ artworks, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/artworks/:id/image — streams the stored MongoDB data URL only
+// when a card/detail view actually needs it.
+async function getArtworkImage(req, res, next) {
+  try {
+    const artwork = await Artwork.findById(req.params.id).select('image_path').lean();
+    if (!artwork?.image_path) return res.status(404).end();
+    const match = /^data:([^;]+);base64,(.+)$/s.exec(artwork.image_path);
+    if (!match) return res.redirect(artwork.image_path);
+    res.set('Cache-Control', 'public, max-age=3600, immutable');
+    res.type(match[1]).send(Buffer.from(match[2], 'base64'));
   } catch (err) {
     next(err);
   }
@@ -121,6 +158,7 @@ async function deleteArtwork(req, res, next) {
 
 module.exports = {
   listArtworks,
+  getArtworkImage,
   createArtwork,
   getArtwork,
   updateArtwork,

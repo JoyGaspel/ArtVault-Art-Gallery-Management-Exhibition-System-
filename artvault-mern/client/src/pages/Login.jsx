@@ -3,18 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthNav from '../components/AuthNav';
 
-const DEMO = {
-  artist: { email: 'juan@artvault.com', password: 'artist123' },
-  admin: { email: 'admin@artvault.com', password: 'admin123' },
-};
-
 export default function Login() {
-  const { login, user, resendConfirmation, prototypeMode } = useAuth();
+  const { login, user, resendConfirmation } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [loginRole, setLoginRole] = useState('artist');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [lockSeconds, setLockSeconds] = useState(0);
@@ -22,9 +18,15 @@ export default function Login() {
   const [resending, setResending] = useState(false);
   const lockInterval = useRef(null);
 
+  // Demo-account shortcuts are intentionally disabled for real authentication.
+  function fillDemo() {}
+
   useEffect(() => {
-    if (user) navigate('/', { replace: true });
-  }, [user, navigate]);
+    // Do not redirect while a role-restricted sign-in is still being checked.
+    // This prevents an artist account from briefly reaching the homepage after
+    // selecting Admin and then being rejected.
+    if (user && !submitting) navigate('/', { replace: true });
+  }, [user, navigate, submitting]);
 
   useEffect(() => {
     if (lockSeconds <= 0) {
@@ -34,11 +36,6 @@ export default function Login() {
     lockInterval.current = setInterval(() => setLockSeconds((s) => s - 1), 1000);
     return () => clearInterval(lockInterval.current);
   }, [lockSeconds > 0]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function fillDemo(kind) {
-    setEmail(DEMO[kind].email);
-    setPassword(DEMO[kind].password);
-  }
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -51,7 +48,7 @@ export default function Login() {
     }
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(email, password, loginRole);
       navigate('/');
     } catch (err) {
       if (err.locked) {
@@ -60,6 +57,11 @@ export default function Login() {
         setNeedsConfirmation(true);
         setError('Please confirm your email before signing in.');
       } else {
+        if (err.message === 'This account does not have administrator access.') {
+          setError('You selected Admin, but this account is not an administrator. Choose Artist or use an approved admin account.');
+          setPassword('');
+          return;
+        }
         const message = err.message === 'Failed to fetch'
           ? 'Cannot reach Supabase. Check the Project URL in client/.env, confirm the project is active, then restart Vite.'
           : (err.message || 'Invalid credentials.');
@@ -96,7 +98,7 @@ export default function Login() {
       <div className="gate">
       <div className="gate-pitch">
         <Link to="/" className="gate-brand">
-          <img className="gate-brand-logo" src="/artvault-logo-transparent.png" alt="" />
+          <img className="gate-brand-logo" src="/artvault-logos/artvault_logo_lightbg.png" alt="" />
           ArtVault
         </Link>
         <h1>Show What You Make,<br />Not Just <em>Where</em> You Keep It.</h1>
@@ -115,16 +117,10 @@ export default function Login() {
             Passwords are hashed before checking against your account. Three failed attempts
             locks sign-in for 5 minutes.
           </p>
-          {prototypeMode && (
-            <div className="prototype-note">
-              Prototype session is running locally for now. It will be replaced by the secure database session when the backend is connected.
-            </div>
-          )}
-
           {error && (
             <div className="gate-error"><span>⚠</span><span>{error}</span></div>
           )}
-          {needsConfirmation && !prototypeMode && (
+          {needsConfirmation && (
             <button className="resend-confirmation" type="button" onClick={resendEmail} disabled={resending}>
               {resending ? 'Sending...' : 'Resend confirmation email'}
             </button>
@@ -162,6 +158,15 @@ export default function Login() {
               {submitting ? 'Verifying…' : 'Sign in'}
             </button>
           </form>
+
+          <div className="login-role-picker" aria-label="Account type">
+            <span className="lbl">Sign in as</span>
+            <div className="login-role-buttons">
+              <button type="button" className={`demo-chip${loginRole === 'artist' ? ' selected' : ''}`} onClick={() => setLoginRole('artist')}>Artist</button>
+              <button type="button" className={`demo-chip${loginRole === 'admin' ? ' selected' : ''}`} onClick={() => setLoginRole('admin')}>Admin</button>
+            </div>
+            <div className="login-role-hint">{loginRole === 'admin' ? 'Only approved admin accounts can continue.' : 'Artist accounts can access artist features after sign-in.'}</div>
+          </div>
 
           <div className="gate-demo">
             <div className="lbl">Demo accounts — still runs the real sign-in check</div>

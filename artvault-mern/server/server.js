@@ -13,9 +13,23 @@ const archiveRoutes = require('./routes/archiveRoutes');
 
 const app = express();
 
-const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',');
-app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json({ limit: '5mb' }));
+// Render/Vercel environment variables are often entered as a comma-separated
+// list. Trim each value so an accidental space does not cause a CORS failure.
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    // Requests from curl/health checks have no Origin header and are safe.
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+}));
+// Images are sent as data URLs and stored in MongoDB. MongoDB documents are
+// limited to 16 MB; larger media should use GridFS in a future iteration.
+app.use(express.json({ limit: '15mb' }));
 
 app.get('/api/health', (req, res) => {
   const connected = mongoose.connection.readyState === 1;

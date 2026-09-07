@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -11,6 +12,7 @@ const ALL_CATEGORIES = [
 export default function Upload() {
   const navigate = useNavigate();
   const showToast = useToast();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -18,6 +20,8 @@ export default function Upload() {
   const [categories, setCategories] = useState(['Digital Art']);
   const [titleErr, setTitleErr] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState('');
 
   function toggleCategory(cat) {
     setCategories((c) => (c.includes(cat) ? c.filter((x) => x !== cat) : [...c, cat]));
@@ -30,16 +34,26 @@ export default function Upload() {
     }
     setSaving(true);
     try {
+      let image_path = '';
+      if (image) {
+        image_path = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Could not read the image file.'));
+          reader.readAsDataURL(image);
+        });
+      }
       const res = await api.post('/artworks', {
         title,
         description,
+        image_path,
         materials: materials.split(',').map((s) => s.trim()).filter(Boolean),
         categories,
       });
       showToast(`"${res.data.artwork.title}" published to the gallery.`);
       navigate(`/artworks/${res.data.artwork._id}`);
     } catch (err) {
-      showToast(err.response?.data?.message || 'Could not publish this artwork.', true);
+      showToast(err.response?.data?.message || err.message || 'Could not publish this artwork.', true);
     } finally {
       setSaving(false);
     }
@@ -56,6 +70,12 @@ export default function Upload() {
       </div>
 
       <div className="form-card">
+        <div className="field">
+          <label htmlFor="artwork-image">Artwork image</label>
+          <input id="artwork-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; setImage(file || null); setPreview(file ? URL.createObjectURL(file) : ''); }} />
+          <div className="hint">Upload a JPG, PNG, or WebP image.</div>
+          {preview && <img className="upload-preview" src={preview} alt="Artwork preview" />}
+        </div>
         <div className="field">
           <label>Title</label>
           <input

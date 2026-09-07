@@ -19,10 +19,10 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={showToast}>
       {children}
-      <div className={`toast${show ? ' show' : ''}${isErr ? ' err' : ''}`}>
+      {show && <div className={`toast show${isErr ? ' err' : ''}`} role="status" aria-live="polite">
         <span className="dot" />
         <span>{msg}</span>
-      </div>
+      </div>}
     </ToastContext.Provider>
   );
 }

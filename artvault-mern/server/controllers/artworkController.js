@@ -6,6 +6,9 @@ const mongoose = require('mongoose');
 // GET /api/artworks?category=&artist=&page=&limit=
 async function listArtworks(req, res, next) {
   try {
+    // Artwork uploads should appear immediately in the deployed gallery;
+    // do not let a browser/CDN serve an older list response.
+    res.set('Cache-Control', 'no-store');
     const { category, artist } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     // Keep the public gallery responsive while still allowing management pages

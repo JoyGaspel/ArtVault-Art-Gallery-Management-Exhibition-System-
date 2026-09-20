@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import ArtCard from '../components/ArtCard';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 const CATEGORIES = [
   'All', 'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -23,10 +24,10 @@ export default function Gallery() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  useEffect(() => {
+  function loadGallery(showLoading = true) {
     let cancelled = false;
-    setLoading(true);
-    setErr('');
+    if (showLoading) setLoading(true);
+    if (showLoading) setErr('');
     const query = active !== 'All' ? { category: active } : {};
     api
       .get('/artworks', { params: { ...query, page: 1, limit: 100 } })
@@ -38,15 +39,20 @@ export default function Gallery() {
       })
       .catch((error) => {
         if (cancelled) return;
-        setArtworks([]);
-        setErr(error.response?.data?.message || 'Could not load the gallery. Check that the API is running.');
+        if (showLoading) setArtworks([]);
+        if (showLoading) setErr(error.response?.data?.message || 'Could not load the gallery. Check that the API is running.');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [active]);
+  }
+
+  // Keep the current cards in place while switching categories so the
+  // scroll position does not jump to the top during the request.
+  useEffect(() => loadGallery(artworks.length === 0), [active]);
+  useAutoRefresh(() => loadGallery(false));
 
   const visible = useMemo(() => {
     if (!search) return artworks;
@@ -60,7 +66,10 @@ export default function Gallery() {
 
   // Do not render empty masonry columns when the final filtered page has
   // fewer artworks than the available screen columns.
-  const renderedColumnCount = Math.min(columnCount, Math.max(1, visible.length));
+  // Adapt the number of columns to the result count so the final cards do
+  // not sit in mostly empty columns, especially on wide screens.
+  const idealColumns = Math.ceil(Math.sqrt(visible.length * 1.25));
+  const renderedColumnCount = Math.min(columnCount, Math.max(1, idealColumns));
 
   return (
     <section>
@@ -92,9 +101,12 @@ export default function Gallery() {
         <div className="empty">No artworks here yet. Be the first to upload one.</div>
       )}
       {!err && !loading && visible.length > 0 && (
-        <div className="gallery-masonry" style={{ '--gallery-columns': renderedColumnCount }}>
-          {visible.map((w) => <ArtCard key={w._id} artwork={w} />)}
-        </div>
+        <>
+          <div className={`gallery-masonry${search || active !== 'All' ? ' filtered-results' : ''}`} style={{ '--gallery-columns': renderedColumnCount }}>
+            {visible.map((w) => <ArtCard key={w._id} artwork={w} />)}
+          </div>
+          <div className="gallery-end-marker" role="status">You&apos;ve reached the end of the gallery.</div>
+        </>
       )}
     </section>
   );

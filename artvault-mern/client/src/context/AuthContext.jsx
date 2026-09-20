@@ -60,20 +60,18 @@ export function AuthProvider({ children }) {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      const sessionUser = mapSupabaseUser(data.session?.user);
       if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
       if (data.session?.access_token) {
-        api.get('/auth/me').then((response) => setUser(response.data.user)).catch(() => setUser(sessionUser)).finally(() => setLoading(false));
+        api.get('/auth/me').then((response) => setUser(response.data.user)).catch(() => setUser(null)).finally(() => setLoading(false));
       } else {
         setUser(null);
         setLoading(false);
       }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = mapSupabaseUser(session?.user);
       if (session?.access_token) {
         localStorage.setItem('artvault_token', session.access_token);
-        api.get('/auth/me').then((response) => setUser(response.data.user)).catch(() => setUser(sessionUser));
+        api.get('/auth/me').then((response) => setUser(response.data.user)).catch(() => setUser(null));
       } else {
         localStorage.removeItem('artvault_token');
         setUser(null);
@@ -106,14 +104,30 @@ export function AuthProvider({ children }) {
       setUser(prototypeUser);
       return prototypeUser;
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     if (error) {
+      // Keep older MongoDB-only accounts usable during the Supabase migration.
+      // Accounts already linked to Supabase cannot bypass Supabase because the
+      // server stores an unusable random legacy password for those users.
+      try {
+        const legacy = await api.post('/auth/login', { email, password });
+        if (legacy.data?.token && legacy.data?.user) {
+          localStorage.setItem('artvault_token', legacy.data.token);
+          if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(legacy.data.user.role)) {
+            localStorage.removeItem('artvault_token');
+            throw { message: 'This account does not have administrator access.' };
+          }
+          setUser(legacy.data.user);
+          return legacy.data.user;
+        }
+      } catch (legacyError) {
+        if (legacyError?.message === 'This account does not have administrator access.') throw legacyError;
+      }
       const message = /not confirmed|email not confirmed/i.test(error.message || '')
         ? 'Please confirm your email before signing in.'
         : error.message;
       throw { message, code: error.code, status: error.status };
     }
-    const sessionUser = mapSupabaseUser(data.user);
     if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
     try {
       const response = await api.get('/auth/me');
@@ -125,15 +139,19 @@ export function AuthProvider({ children }) {
       }
       setUser(response.data.user);
       return response.data.user;
-    } catch {
-      if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(sessionUser?.role)) {
-        setUser(null);
-        await supabase.auth.signOut();
-        localStorage.removeItem('artvault_token');
-        throw { message: 'This account does not have administrator access.' };
+    } catch (verificationError) {
+      setUser(null);
+      await supabase.auth.signOut();
+      localStorage.removeItem('artvault_token');
+      // Preserve deliberate role/access errors (for example, an artist
+      // choosing the Admin sign-in option) instead of replacing them with a
+      // misleading server-verification message.
+      if (verificationError?.message === 'This account does not have administrator access.') {
+        throw verificationError;
       }
-      setUser(sessionUser);
-      return sessionUser;
+      const serverMessage = verificationError?.response?.data?.message;
+      if (serverMessage) throw { message: serverMessage, status: verificationError.response.status };
+      throw { message: 'Could not verify your account with the application server. Please try again.' };
     }
   }, []);
 
@@ -167,7 +185,27 @@ export function AuthProvider({ children }) {
     }
     const sessionUser = mapSupabaseUser(data.user);
     if (data.session) setUser(sessionUser);
-    return { user: sessionUser, needsConfirmation: !data.session };
+    return { user: sessionUser, needsConfirmation: !data.session, needsOtp: !data.session };
+  }, []);
+
+  const verifySignupOtp = useCallback(async (email, token) => {
+    if (PROTOTYPE_AUTH) throw { message: 'OTP verification requires Supabase authentication.' };
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: token.trim(),
+      type: 'signup',
+    });
+    if (error) throw { message: error.message };
+    if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
+    try {
+      const response = await api.get('/auth/me');
+      setUser(response.data.user);
+      return response.data.user;
+    } catch {
+      await supabase.auth.signOut();
+      localStorage.removeItem('artvault_token');
+      throw { message: 'The email was verified, but the application server could not confirm the account.' };
+    }
   }, []);
 
   const resendConfirmation = useCallback(async (email) => {
@@ -181,20 +219,28 @@ export function AuthProvider({ children }) {
     setUser((previous) => (previous ? { ...previous, ...partial } : previous));
   }, []);
 
-  const updatePassword = useCallback(async (password) => {
+  const requestPasswordOtp = useCallback(async (currentPassword) => {
     if (PROTOTYPE_AUTH) throw { message: 'Password changes require Supabase authentication.' };
+    const verification = await supabase.auth.signInWithPassword({ email: user?.email, password: currentPassword });
+    if (verification.error) throw { message: 'Current password is incorrect.' };
+    const { error } = await supabase.auth.signInWithOtp({
+      email: user?.email,
+      options: { shouldCreateUser: false },
+    });
+    if (error) throw { message: error.message };
+  }, [user]);
+
+  const updatePassword = useCallback(async (password, otp = '') => {
+    if (PROTOTYPE_AUTH) throw { message: 'Password changes require Supabase authentication.' };
+    if (!otp.trim()) throw { message: 'Enter the verification code sent to your email.' };
+    const verification = await supabase.auth.verifyOtp({ email: user?.email, token: otp.trim(), type: 'email' });
+    if (verification.error) throw { message: verification.error.message };
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw { message: error.message };
-  }, []);
-
-  const updateEmail = useCallback(async (email) => {
-    if (PROTOTYPE_AUTH) throw { message: 'Email changes require Supabase authentication.' };
-    const { error } = await supabase.auth.updateUser({ email: email.trim().toLowerCase() });
-    if (error) throw { message: error.message };
-  }, []);
+  }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, resendConfirmation, logout, updateUser, updatePassword, updateEmail, prototypeMode: PROTOTYPE_AUTH }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, verifySignupOtp, resendConfirmation, logout, updateUser, requestPasswordOtp, updatePassword, prototypeMode: PROTOTYPE_AUTH }}>
       {children}
     </AuthContext.Provider>
   );

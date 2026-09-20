@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthNav from '../components/AuthNav';
+import PasswordToggle from '../components/PasswordToggle';
 
 export default function Signup() {
-  const { signup, user } = useAuth();
+  const { signup, verifySignupOtp, resendConfirmation, user } = useAuth();
   const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState('');
@@ -18,6 +19,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [otp, setOtp] = useState('');
 
   function validPersonName(value) {
     const clean = value.trim();
@@ -67,7 +69,7 @@ export default function Signup() {
       const cleanExtension = extensionName.trim().replace(/\.$/, '');
       const name = `${cleanFirstName} ${cleanLastName}${cleanExtension ? ` ${cleanExtension}` : ''}`;
       const result = await signup({ name, firstName: cleanFirstName, lastName: cleanLastName, extensionName: cleanExtension, email: cleanEmail, password, role: 'artist' });
-      if (result?.needsConfirmation) {
+      if (result?.needsOtp || result?.needsConfirmation) {
         setConfirmationSent(true);
       } else {
         navigate('/');
@@ -82,6 +84,33 @@ export default function Signup() {
     }
   }
 
+  async function onVerifyOtp(event) {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await verifySignupOtp(email, otp);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err.message || 'That verification code is invalid or expired.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resendOtp() {
+    try {
+      await resendConfirmation(email);
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Could not send another code.');
+    }
+  }
+
   return (
     <div className="auth-page signup-page">
       <AuthNav active="signup" />
@@ -92,9 +121,18 @@ export default function Signup() {
             <div className="eyebrow">Check your inbox</div>
             <h1 style={{ fontSize: 26, marginBottom: 8 }}>Confirm your email</h1>
             <p className="sub" style={{ color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.6 }}>
-              We sent a confirmation link to <strong>{email}</strong>. Open it before signing in to ArtVault.
+              We sent a 6-digit verification code to <strong>{email}</strong>. Enter it below to activate your ArtVault account.
             </p>
             <div className="prototype-note">If the email does not arrive, check Supabase Authentication → Email Templates and your spam folder.</div>
+            {error && <div className="gate-error"><span>⚠</span><span>{error}</span></div>}
+            <form onSubmit={onVerifyOtp}>
+              <div className="field">
+                <label htmlFor="signup-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
+                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))} placeholder="6-digit code" />
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>{submitting ? 'Verifying…' : 'Verify email'}</button>
+            </form>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={resendOtp}>Send another code</button>
             <div className="gate-switch"><Link to="/login">Go to sign in</Link></div>
           </>
         ) : (
@@ -132,7 +170,7 @@ export default function Signup() {
             <label htmlFor="password">Password <span className="required-mark" aria-hidden="true">*</span></label>
             <div className="gate-field-wrap">
               <input id="password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete="new-password" />
-              <button type="button" className="gate-show-toggle" onClick={() => setShowPassword((value) => !value)}>{showPassword ? 'hide' : 'show'}</button>
+              <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />
             </div>
             <div className="hint">Use at least 6 characters. A longer mix of letters, numbers, and symbols is recommended.</div>
           </div>
@@ -140,7 +178,7 @@ export default function Signup() {
             <label htmlFor="confirm">Confirm password <span className="required-mark" aria-hidden="true">*</span></label>
             <div className="gate-field-wrap">
               <input id="confirm" type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter the same password" autoComplete="new-password" />
-              <button type="button" className="gate-show-toggle" onClick={() => setShowConfirm((value) => !value)}>{showConfirm ? 'hide' : 'show'}</button>
+              <PasswordToggle visible={showConfirm} onToggle={() => setShowConfirm((value) => !value)} />
             </div>
             <div className="hint">Administrator accounts are provisioned separately — this form always creates an Artist account.</div>
           </div>

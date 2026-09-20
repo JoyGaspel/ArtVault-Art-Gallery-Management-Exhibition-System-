@@ -1,32 +1,31 @@
-import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
 
-const Login = lazy(() => import('./pages/Login'));
-const Signup = lazy(() => import('./pages/Signup'));
-const Gallery = lazy(() => import('./pages/Gallery'));
-const ArtworkDetail = lazy(() => import('./pages/ArtworkDetail'));
-const Artists = lazy(() => import('./pages/Artists'));
-const ArtistProfile = lazy(() => import('./pages/ArtistProfile'));
-const Exhibits = lazy(() => import('./pages/Exhibits'));
-const ExhibitDetail = lazy(() => import('./pages/ExhibitDetail'));
-const Upload = lazy(() => import('./pages/Upload'));
-const Settings = lazy(() => import('./pages/Settings'));
-const ManageExhibits = lazy(() => import('./pages/ManageExhibits'));
-const ManageArtists = lazy(() => import('./pages/ManageArtists'));
-const ManageSubAdmins = lazy(() => import('./pages/ManageSubAdmins'));
-const ManageGallery = lazy(() => import('./pages/ManageGallery'));
-const Archives = lazy(() => import('./pages/Archives'));
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Gallery from './pages/Gallery';
+import ArtworkDetail from './pages/ArtworkDetail';
+import Artists from './pages/Artists';
+import ArtistProfile from './pages/ArtistProfile';
+import Exhibits from './pages/Exhibits';
+import ExhibitDetail from './pages/ExhibitDetail';
+import Upload from './pages/Upload';
+import Settings from './pages/Settings';
+import ManageExhibits from './pages/ManageExhibits';
+import ManageArtists from './pages/ManageArtists';
+import ManageSubAdmins from './pages/ManageSubAdmins';
+import ManageGallery from './pages/ManageGallery';
+import Archives from './pages/Archives';
+import AuditLogs from './pages/AuditLogs';
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <Suspense fallback={<div className="route-loading" role="status">Loading ArtVault…</div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
@@ -39,15 +38,15 @@ export default function App() {
               <Route path="/exhibits" element={<Exhibits />} />
               <Route path="/exhibits/:id" element={<ExhibitDetail />} />
               <Route path="/upload" element={<ProtectedRoute role="artist"><Upload /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute role="artist"><Settings /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute role={['artist', 'admin', 'sub_admin', 'main_admin']}><Settings /></ProtectedRoute>} />
               <Route path="/manage-exhibits" element={<ProtectedRoute role="admin"><ManageExhibits /></ProtectedRoute>} />
               <Route path="/manage-artists" element={<ProtectedRoute role="admin"><ManageArtists /></ProtectedRoute>} />
               <Route path="/manage-sub-admins" element={<ProtectedRoute role={['main_admin']}><ManageSubAdmins /></ProtectedRoute>} />
               <Route path="/manage-gallery" element={<ProtectedRoute role="admin"><ManageGallery /></ProtectedRoute>} />
               <Route path="/archives" element={<ProtectedRoute role="admin"><Archives /></ProtectedRoute>} />
+              <Route path="/audit-logs" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><AuditLogs /></ProtectedRoute>} />
             </Route>
           </Routes>
-          </Suspense>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

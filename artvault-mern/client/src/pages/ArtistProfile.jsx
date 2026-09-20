@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../api';
 import ArtCard from '../components/ArtCard';
 import { useAuth } from '../context/AuthContext';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 export default function ArtistProfile() {
   const { id } = useParams();
@@ -13,7 +14,23 @@ export default function ArtistProfile() {
   const [loading, setLoading] = useState(true);
   const [columnCount, setColumnCount] = useState(() => profileColumnCount());
 
+  function loadProfile() {
+    setLoading(true);
+    return api
+      .get(`/artists/${id}`)
+      .then((res) => {
+        setArtist(res.data.artist);
+        setArtworks(res.data.artworks);
+      })
+      .finally(() => setLoading(false));
+  }
+
   useEffect(() => {
+    loadProfile();
+  }, [id]);
+  useAutoRefresh(loadProfile);
+
+  /*useEffect(() => {
     const onResize = () => setColumnCount(profileColumnCount());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -28,7 +45,7 @@ export default function ArtistProfile() {
         setArtworks(res.data.artworks);
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id]);*/
 
   if (loading) return <div className="empty">Loading…</div>;
   if (!artist) return <div className="empty">Artist not found.</div>;

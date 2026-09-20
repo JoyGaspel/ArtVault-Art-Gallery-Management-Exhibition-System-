@@ -1,12 +1,14 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const Artist = require('../models/Artist');
 
 const MAX_FAILED_ATTEMPTS = 3;
+const BCRYPT_ROUNDS = 12;
 const LOCK_DURATION_MS = 5 * 60 * 1000; // STEP 2 of the flowchart — 5 minute lockout
 
 function generateToken(user) {
   return jwt.sign({ sub: user._id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '30m',
   });
 }
 
@@ -19,7 +21,7 @@ async function signup(req, res, next) {
     const firstName = typeof req.body.firstName === 'string' ? req.body.firstName.trim() : '';
     const lastName = typeof req.body.lastName === 'string' ? req.body.lastName.trim() : '';
 
-    if (!normalizedName || !normalizedEmail || !password) {
+    if (!normalizedName || !normalizedEmail || typeof password !== 'string' || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
     }
     if (firstName && (!/^[A-Z][A-Za-z]{1,49}$/.test(firstName) || firstName.length > 50)) return res.status(400).json({ message: 'First name must start with a capital letter and contain 2–50 letters.' });
@@ -29,6 +31,9 @@ async function signup(req, res, next) {
     }
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+    if (password.length > 128) {
+      return res.status(400).json({ message: 'Password must be 128 characters or fewer.' });
     }
 
     const existing = await Artist.findOne({ email: normalizedEmail });
@@ -61,11 +66,16 @@ async function login(req, res, next) {
   try {
     const { email, password } = req.body;
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
+    if (password.length > 128) return res.status(400).json({ message: 'Password must be 128 characters or fewer.' });
 
     const user = await Artist.findOne({ email: normalizedEmail }).select('+password +supabaseUserId');
+
+    if (user?.status === 'suspended') {
+      return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
+    }
 
     if (user?.supabaseUserId && !user.emailConfirmedAt) {
       return res.status(403).json({ message: 'Please confirm your email before signing in.' });
@@ -110,6 +120,8 @@ async function login(req, res, next) {
     // success — reset the counter, issue the session
     user.failedLoginAttempts = 0;
     user.lockUntil = null;
+    // Upgrade hashes created with an older bcrypt cost after a successful login.
+    if (bcrypt.getRounds(user.password) < BCRYPT_ROUNDS) user.password = password;
     await user.save();
 
     const token = generateToken(user);

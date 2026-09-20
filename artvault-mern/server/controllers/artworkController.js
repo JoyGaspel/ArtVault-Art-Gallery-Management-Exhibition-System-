@@ -2,6 +2,7 @@ const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
 const Archive = require('../models/Archive');
 const mongoose = require('mongoose');
+const { recordAudit } = require('../utils/audit');
 
 const ALLOWED_IMAGE_TYPES = new Map([
   ['image/png', '89504e470d0a1a0a'],
@@ -69,7 +70,7 @@ async function listArtworks(req, res, next) {
           let: { artistId: '$artist' },
           pipeline: [
             { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
-            { $project: { name: 1, specializations: 1 } },
+            { $project: { name: 1, avatar_path: 1, specializations: 1 } },
           ],
           as: 'artist',
         } },
@@ -124,6 +125,7 @@ async function createArtwork(req, res, next) {
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
     });
+    recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
 
     res.status(201).json({ artwork });
   } catch (err) {
@@ -186,6 +188,7 @@ async function updateArtwork(req, res, next) {
     if (materials !== undefined) artwork.materials = cleanList(materials, MAX_MATERIALS, 80);
 
     await artwork.save();
+    recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
     res.json({ artwork });
   } catch (err) {
     next(err);
@@ -199,6 +202,7 @@ async function deleteArtwork(req, res, next) {
     await Archive.create({ entityType: 'artwork', entityId: artwork._id, snapshot: artwork.toObject(), deletedBy: req.user._id });
     await artwork.deleteOne();
     await Exhibit.updateMany({}, { $pull: { artworks: artwork._id } });
+    recordAudit({ req, action: 'delete', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
     res.json({ message: 'Artwork removed.' });
   } catch (err) {
     next(err);

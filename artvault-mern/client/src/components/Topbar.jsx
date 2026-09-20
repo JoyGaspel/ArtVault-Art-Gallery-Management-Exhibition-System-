@@ -1,17 +1,32 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Topbar() {
-  const [q, setQ] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const [q, setQ] = useState(() => new URLSearchParams(location.search).get('search') || '');
   const { user } = useAuth();
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
-  const isArtist = user?.role === 'artist' || user?.role === 'main_admin';
+  const isArtist = user?.role === 'artist';
+
+  useEffect(() => {
+    setQ(new URLSearchParams(location.search).get('search') || '');
+  }, [location.pathname, location.search]);
+
+  function updateSearch(value) {
+    setQ(value);
+    const params = new URLSearchParams(location.search);
+    const trimmed = value.trim();
+    if (trimmed) params.set('search', trimmed);
+    else params.delete('search');
+    const query = params.toString();
+    navigate({ pathname: location.pathname, search: query ? `?${query}` : '' }, { replace: true });
+  }
 
   function onSearch(event) {
     event.preventDefault();
-    if (q.trim()) navigate(`/?search=${encodeURIComponent(q.trim())}`);
+    updateSearch(q);
   }
 
   return (
@@ -23,12 +38,15 @@ export default function Topbar() {
           aria-label="Search the gallery"
           placeholder="Search artworks, artists, exhibits"
           value={q}
-          onChange={(event) => setQ(event.target.value)}
+          onChange={(event) => updateSearch(event.target.value)}
         />
       </form>
       <div className="topbar-spacer" />
       {isArtist && <button className="btn btn-primary" type="button" onClick={() => navigate('/upload')}>Upload artwork</button>}
-      {isAdmin && <button className="btn btn-primary" type="button" onClick={() => navigate('/manage-gallery')}>Moderate gallery</button>}
+      {isAdmin && <>
+        <button className="btn btn-primary" type="button" onClick={() => navigate('/manage-gallery')}>Manage gallery</button>
+        <button className="btn btn-primary" type="button" onClick={() => navigate('/manage-exhibits')}>Manage exhibits</button>
+      </>}
       {!user && (
         <div className="topbar-guest-actions">
           <Link className="btn btn-ghost" to="/login">Sign in</Link>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -16,6 +17,7 @@ export default function ManageSubAdmins() {
       .catch((error) => toast(error.response?.data?.message || 'Could not load sub-admins.', true)).finally(() => setLoading(false));
   }
   useEffect(load, []);
+  useAutoRefresh(load);
   async function revoke() {
     const account = pending; setPending(null); if (!account) return;
     try { await api.put(`/artists/admin/${account._id}/role`, { role: 'artist' }); setAccounts((current) => current.filter((item) => item._id !== account._id)); toast(`${account.name} is now a regular artist.`); load(); }

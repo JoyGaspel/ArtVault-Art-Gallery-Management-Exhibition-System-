@@ -7,9 +7,15 @@ async function connectDB() {
   }
 
   mongoose.set('strictQuery', true);
+  // Prevent query selector objects supplied by clients from becoming MongoDB
+  // operators (for example, an unexpected $where/$gt filter).
+  mongoose.set('sanitizeFilter', true);
 
   try {
-    const conn = await mongoose.connect(uri);
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10,
+    });
     console.log(`MongoDB connected: ${conn.connection.host}/${conn.connection.name}`);
   } catch (err) {
     console.error('MongoDB connection failed:', err.message);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthNav from '../components/AuthNav';
+import PasswordToggle from '../components/PasswordToggle';
 
 export default function Login() {
   const { login, user, resendConfirmation } = useAuth();
@@ -48,8 +49,8 @@ export default function Login() {
     }
     setSubmitting(true);
     try {
-      await login(email, password, loginRole);
-      navigate('/');
+      const signedInUser = await login(email, password);
+      navigate(['admin', 'sub_admin', 'main_admin'].includes(signedInUser?.role) ? '/manage-gallery' : '/');
     } catch (err) {
       if (err.locked) {
         setLockSeconds(err.secondsLeft || 300);
@@ -147,9 +148,7 @@ export default function Login() {
                   id="password" type={showPw ? 'text' : 'password'} required placeholder="Enter your ArtVault password"
                   value={password} onChange={(e) => setPassword(e.target.value)} disabled={lockSeconds > 0}
                 />
-                <button type="button" className="gate-show-toggle" onClick={() => setShowPw((s) => !s)}>
-                  {showPw ? 'hide' : 'show'}
-                </button>
+                <PasswordToggle visible={showPw} onToggle={() => setShowPw((s) => !s)} />
               </div>
             </div>
 
@@ -158,23 +157,6 @@ export default function Login() {
               {submitting ? 'Verifying…' : 'Sign in'}
             </button>
           </form>
-
-          <div className="login-role-picker" aria-label="Account type">
-            <span className="lbl">Sign in as</span>
-            <div className="login-role-buttons">
-              <button type="button" className={`demo-chip${loginRole === 'artist' ? ' selected' : ''}`} onClick={() => setLoginRole('artist')}>Artist</button>
-              <button type="button" className={`demo-chip${loginRole === 'admin' ? ' selected' : ''}`} onClick={() => setLoginRole('admin')}>Admin</button>
-            </div>
-            <div className="login-role-hint">{loginRole === 'admin' ? 'Only approved admin accounts can continue.' : 'Artist accounts can access artist features after sign-in.'}</div>
-          </div>
-
-          <div className="gate-demo">
-            <div className="lbl">Demo accounts — still runs the real sign-in check</div>
-            <div className="gate-demo-row">
-              <button className="demo-chip" onClick={() => fillDemo('artist')}>🎨 Artist</button>
-              <button className="demo-chip" onClick={() => fillDemo('admin')}>🛡️ Admin</button>
-            </div>
-          </div>
 
           <div className="gate-switch">
             New here? <Link to="/signup">Create an account</Link>

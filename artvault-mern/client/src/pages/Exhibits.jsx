@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 function monthDay(dateStr) {
   const d = new Date(dateStr);
@@ -19,11 +20,18 @@ function exhibitStatus(dateStr) {
 
 export default function Exhibits() {
   const [exhibits, setExhibits] = useState([]);
+  const [params] = useSearchParams();
+  const search = (params.get('search') || '').trim().toLowerCase();
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.get('/exhibits').then((res) => setExhibits(res.data.exhibits)).finally(() => setLoading(false));
-  }, []);
+  function load() {
+    setLoading(true);
+    return api.get('/exhibits').then((res) => setExhibits(res.data.exhibits)).finally(() => setLoading(false));
+  }
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(load);
+
+  const visibleExhibits = search ? exhibits.filter((exhibit) => [exhibit.name, exhibit.description].filter(Boolean).some((value) => String(value).toLowerCase().includes(search))) : exhibits;
 
   return (
     <section>
@@ -36,10 +44,10 @@ export default function Exhibits() {
       </div>
 
       {loading && <div className="empty">Loading…</div>}
-      {!loading && exhibits.length === 0 && <div className="empty">No exhibits scheduled yet.</div>}
-      {!loading && exhibits.length > 0 && (
+      {!loading && visibleExhibits.length === 0 && <div className="empty">{search ? 'No exhibits match your search.' : 'No exhibits scheduled yet.'}</div>}
+      {!loading && visibleExhibits.length > 0 && (
         <div className="exhibit-list">
-          {exhibits.map((e, index) => {
+          {visibleExhibits.map((e, index) => {
             const md = monthDay(e.event_date);
             const status = exhibitStatus(e.event_date);
             return (

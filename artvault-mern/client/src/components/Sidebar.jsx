@@ -26,6 +26,7 @@ export default function Sidebar() {
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
   const isMainAdmin = user?.role === 'main_admin';
   const isArtist = user?.role === 'artist';
+  const canEditProfile = ['artist', 'admin', 'sub_admin', 'main_admin'].includes(user?.role);
 
   function signOut() {
     logout();
@@ -54,6 +55,11 @@ export default function Sidebar() {
           </div>
         )}
 
+        {canEditProfile && !isArtist && <div className="nav-group">
+          <div className="nav-heading">Account</div>
+          <NavigationLink to="/settings" label="Profile settings" icon="⚙" />
+        </div>}
+
         {isAdmin && (
           <div className="nav-group">
             <div className="nav-heading">Curation</div>
@@ -62,6 +68,7 @@ export default function Sidebar() {
             <NavigationLink to="/manage-artists" label="Manage artists" icon="⚙" />
             {isMainAdmin && <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="⚡" />}
             <NavigationLink to="/archives" label="Archives" icon="▱" />
+            {['sub_admin', 'main_admin'].includes(user?.role) && <NavigationLink to="/audit-logs" label={isMainAdmin ? 'Activity logs' : 'Artist activity'} icon="☷" />}
           </div>
         )}
       </nav>
@@ -71,7 +78,7 @@ export default function Sidebar() {
       {user ? (
         <div className="account-panel">
           <NavLink to={isArtist ? `/artists/${user.id}` : '/manage-exhibits'} className="side-foot">
-            <div className="avatar">{initials(user.name)}</div>
+            {user.avatar_path ? <img className="avatar avatar-image" src={user.avatar_path} alt="" /> : <div className="avatar">{initials(user.name)}</div>}
             <div className="who nav-label">
               <div className="name">{user.name}</div>
               <div className="role">{user.role === 'main_admin' ? 'Main administrator' : user.role === 'sub_admin' ? 'Sub administrator' : isAdmin ? 'Administrator' : 'Artist account'}</div>

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 const categories = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -26,8 +27,9 @@ function ModerationThumbnail({ artwork }) {
 export default function ManageGallery() {
   const showToast = useToast();
   const [artworks, setArtworks] = useState([]);
+  const [params] = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => params.get('search') || '');
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -41,6 +43,7 @@ export default function ManageGallery() {
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
+  useAutoRefresh(load);
 
   const visible = useMemo(() => {
     const value = query.trim().toLowerCase();

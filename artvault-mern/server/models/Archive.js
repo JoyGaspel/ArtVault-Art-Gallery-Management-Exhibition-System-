@@ -5,6 +5,7 @@ const archiveSchema = new mongoose.Schema({
   entityId: { type: mongoose.Schema.Types.ObjectId, required: true },
   snapshot: { type: mongoose.Schema.Types.Mixed, required: true },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true },
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
   deletedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 

@@ -63,8 +63,20 @@ async function requireAuth(req, res, next) {
         if (!data.user.email_confirmed_at) {
           return res.status(403).json({ message: 'Please confirm your email before continuing.' });
         }
-        const user = await mirrorSupabaseUser(data.user);
+        let user;
+        try {
+          user = await mirrorSupabaseUser(data.user);
+        } catch (mirrorError) {
+          console.error('Supabase-to-Mongo user sync failed:', mirrorError);
+          if (process.env.NODE_ENV !== 'production') {
+            return res.status(500).json({ message: `Could not sync your account: ${mirrorError.message}` });
+          }
+          return res.status(500).json({ message: 'Could not sync your account with the application database.' });
+        }
         if (user) {
+          if (user.status === 'suspended') {
+            return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
+          }
           req.supabaseUserId = data.user.id;
           req.user = user;
           return next();
@@ -75,6 +87,7 @@ async function requireAuth(req, res, next) {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const user = await Artist.findById(payload.sub);
     if (!user) return res.status(401).json({ message: 'This account no longer exists.' });
+    if (user.status === 'suspended') return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
     req.user = user;
     next();
   } catch (err) {
@@ -82,9 +95,17 @@ async function requireAuth(req, res, next) {
   }
 }
 
-function requireAdmin(req, res, next) {
-  if (!['admin', 'sub_admin', 'main_admin'].includes(req.user.role)) return res.status(403).json({ message: 'Administrator access required.' });
-  next();
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'You do not have permission to perform this action.' });
+    }
+    next();
+  };
 }
 
-module.exports = { requireAuth, requireAdmin };
+function requireAdmin(req, res, next) {
+  return requireRole('admin', 'sub_admin', 'main_admin')(req, res, next);
+}
+
+module.exports = { requireAuth, requireRole, requireAdmin };

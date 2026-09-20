@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const BCRYPT_ROUNDS = 12;
 
 const ALL_SPECIALIZATIONS = [
   'Digital Art', 'Traditional Art', 'Painting', 'Illustration', 'Photography',
@@ -22,6 +23,8 @@ const artistSchema = new mongoose.Schema(
     },
     password: { type: String, required: true, minlength: 6, select: false },
     role: { type: String, enum: ['artist', 'sub_admin', 'main_admin', 'admin'], default: 'artist' },
+    status: { type: String, enum: ['active', 'suspended'], default: 'active', index: true },
+    suspendedAt: { type: Date, default: null },
     supabaseUserId: { type: String, sparse: true, unique: true, select: false },
     emailConfirmedAt: { type: Date, default: null },
     specializations: {
@@ -44,7 +47,7 @@ artistSchema.index({ createdAt: -1 });
 // STEP 1 of the login flowchart — hash the password (bcrypt) before it ever touches the DB
 artistSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
+  const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
@@ -65,6 +68,7 @@ artistSchema.methods.toSafeObject = function toSafeObject() {
     lastName: this.lastName || '',
     email: this.email,
     role: this.role,
+    status: this.status,
     specializations: this.specializations,
     bio: this.bio,
     avatar_path: this.avatar_path || '',

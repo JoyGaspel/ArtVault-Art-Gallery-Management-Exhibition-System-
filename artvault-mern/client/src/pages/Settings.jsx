@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../api';
+import PasswordToggle from '../components/PasswordToggle';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -10,8 +11,9 @@ const ALL_CATEGORIES = [
 ];
 
 export default function Settings() {
-  const { user, updateUser, updatePassword, updateEmail, logout } = useAuth();
+  const { user, updateUser, requestPasswordOtp, updatePassword, logout } = useAuth();
   const showToast = useToast();
+  const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
 
   const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -20,9 +22,12 @@ export default function Settings() {
   const [specializations, setSpecializations] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [passwordOtp, setPasswordOtp] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [passwordOtpSent, setPasswordOtpSent] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [accountSaving, setAccountSaving] = useState(false);
@@ -51,8 +56,11 @@ export default function Settings() {
     const cleanBio = bio.trim().replace(/\s+/g, ' ');
     setSaving(true);
     try {
-      const res = await api.put('/artists/me', { firstName: cleanFirstName, lastName: cleanLastName, bio: cleanBio, specializations, avatar_path: avatarPath });
+      const payload = { firstName: cleanFirstName, lastName: cleanLastName, avatar_path: avatarPath };
+      if (!isAdmin) Object.assign(payload, { bio: cleanBio, specializations });
+      const res = await api.put('/artists/me', payload);
       updateUser(res.data.artist);
+      window.dispatchEvent(new Event('artvault:data-changed'));
       setName(res.data.artist.name);
       setFirstName(cleanFirstName);
       setLastName(cleanLastName);
@@ -66,26 +74,21 @@ export default function Settings() {
     }
   }
 
-  async function changeEmail() {
-    const email = newEmail.trim().toLowerCase();
-    if (!email || email === user.email.toLowerCase()) return showToast('Enter a different email address.', true);
-    setAccountSaving(true);
-    try {
-      await updateEmail(email);
-      setNewEmail('');
-      showToast('Check your inbox to confirm the new email address.');
-    } catch (err) { showToast(err.message || 'Could not change email.', true); }
-    finally { setAccountSaving(false); }
-  }
-
   async function changePassword() {
+    if (!currentPassword) return showToast('Enter your current password.', true);
     if (newPassword.length < 8) return showToast('Password must be at least 8 characters.', true);
     if (newPassword !== confirmPassword) return showToast('Passwords do not match.', true);
     setAccountSaving(true);
     try {
-      await updatePassword(newPassword);
-      setNewPassword(''); setConfirmPassword('');
-      showToast('Password updated successfully.');
+      if (!passwordOtpSent) {
+        await requestPasswordOtp(currentPassword);
+        setPasswordOtpSent(true);
+        showToast('A verification code was sent to your email.');
+      } else {
+        await updatePassword(newPassword, passwordOtp);
+        setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordOtp(''); setPasswordOtpSent(false);
+        showToast('Password updated successfully.');
+      }
     } catch (err) { showToast(err.message || 'Could not change password.', true); }
     finally { setAccountSaving(false); }
   }
@@ -109,37 +112,46 @@ export default function Settings() {
         <div>
           <div className="eyebrow">Account</div>
           <h1>Profile settings</h1>
-          <div className="sub">This is what other visitors see on your artist profile.</div>
+          <div className="sub">{isAdmin ? 'Manage the profile information shown for your administrator account.' : 'This is what other visitors see on your artist profile.'}</div>
         </div>
 
         <div className="form-card account-security-card">
           <div className="eyebrow">Security</div>
           <h2>Account access</h2>
           <div className="field">
-            <label htmlFor="new-email">Change email <span className="optional-mark">(optional)</span></label>
-            <input id="new-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder={user?.email || 'new@email.com'} />
-            <div className="hint">A confirmation link will be sent before the new email is used.</div>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={changeEmail} disabled={accountSaving}>Update email</button>
+            <label htmlFor="current-password">Current password <span className="required-mark" aria-hidden="true">*</span></label>
+            <div className="field-input-wrap">
+              <input id="current-password" type={showCurrentPassword ? 'text' : 'password'} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Enter your current password" autoComplete="current-password" />
+              <PasswordToggle visible={showCurrentPassword} onToggle={() => setShowCurrentPassword((value) => !value)} />
+            </div>
           </div>
           <div className="field">
             <label htmlFor="new-password">New password <span className="optional-mark">(optional)</span></label>
             <div className="field-input-wrap">
               <input id="new-password" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
-              <button type="button" className="field-show-toggle" onClick={() => setShowNewPassword((value) => !value)} aria-label={showNewPassword ? 'Hide password' : 'Show password'}>{showNewPassword ? 'Hide' : 'Show'}</button>
+              <PasswordToggle visible={showNewPassword} onToggle={() => setShowNewPassword((value) => !value)} />
             </div>
           </div>
           <div className="field">
             <label htmlFor="confirm-new-password">Confirm new password <span className="optional-mark">(optional)</span></label>
             <div className="field-input-wrap">
               <input id="confirm-new-password" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" />
-              <button type="button" className="field-show-toggle" onClick={() => setShowConfirmPassword((value) => !value)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>{showConfirmPassword ? 'Hide' : 'Show'}</button>
+              <PasswordToggle visible={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
             </div>
             <button className="btn btn-ghost btn-sm" type="button" onClick={changePassword} disabled={accountSaving}>Update password</button>
+            {passwordOtpSent && (
+              <div className="field" style={{ marginTop: 12 }}>
+                <label htmlFor="password-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
+                <input id="password-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={passwordOtp} onChange={(e) => setPasswordOtp(e.target.value.replace(/\D/g, ''))} placeholder="6-digit code" />
+                <div className="hint">Enter the code sent to {user?.email} and press Update password again.</div>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => requestPasswordOtp(currentPassword)} disabled={accountSaving}>Send another code</button>
+              </div>
+            )}
           </div>
-          <div className="account-danger-zone">
-            <div><strong>Delete account</strong><div className="hint">Your artworks will be archived before deletion.</div></div>
+          {!isAdmin && <div className="account-danger-zone">
+            <div><strong>Delete account</strong><div className="hint">Your account and artworks will be suspended and sent to the main administrator for review.</div></div>
             <button className="btn btn-danger btn-sm" type="button" onClick={deleteAccount} disabled={accountSaving}>Delete account</button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -168,12 +180,12 @@ export default function Settings() {
             <input maxLength={50} value={lastName} onChange={(e) => { setLastName(e.target.value); setSaved(false); }} />
             <div className="hint">At least 2 letters, starting with a capital letter.</div>
           </div>
-          <div className="field">
+          {!isAdmin && <div className="field">
             <label>Bio <span className="optional-mark">(optional)</span></label>
             <textarea maxLength={50} value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} />
             <div className="hint">{bio.length}/50 characters</div>
-          </div>
-          <div className="field">
+          </div>}
+          {!isAdmin && <div className="field">
             <label>Specializations <span className="optional-mark">(optional)</span></label>
             <div className="chip-select">
               {ALL_CATEGORIES.map((c) => (
@@ -187,7 +199,7 @@ export default function Settings() {
               ))}
             </div>
             <div className="hint">Shown as tags on your public profile.</div>
-          </div>
+          </div>}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
             <button className="btn btn-primary" onClick={save} disabled={saving}>
               {saving ? <span className="spinner" /> : null}
@@ -198,23 +210,20 @@ export default function Settings() {
         </div>
 
         <div>
-          <div className="eyebrow">Public preview</div>
+          <div className="eyebrow">{isAdmin ? 'Administrator profile' : 'Public preview'}</div>
           <div className="artist-card" style={{ cursor: 'default' }}>
             {avatarPath ? <img className="profile-avatar-preview" src={avatarPath} alt="Profile preview" /> : <div className="av-lg">{(`${firstName} ${lastName}`.trim() || '?').slice(0, 2).toUpperCase()}</div>}
             <div className="name">{`${firstName} ${lastName}`.trim() || 'Unnamed artist'}</div>
-            <div className="bio">{bio}</div>
-            <div className="tags">
-              {specializations.map((s) => (
-                <span className="tiny-tag" key={s}>{s}</span>
-              ))}
-            </div>
+            {!isAdmin && <><div className="bio">{bio}</div><div className="tags">
+              {specializations.map((s) => <span className="tiny-tag" key={s}>{s}</span>)}
+            </div></>}
           </div>
         </div>
       </div>
       {confirmDelete && (
         <ConfirmDialog
           title="Delete your account?"
-          message="Your artworks will be moved to Archives before the account is permanently removed. This cannot be undone."
+          message="Your account will be suspended and your artworks moved to Archives. The main administrator can restore or permanently delete it."
           confirmLabel="Delete account"
           danger
           onConfirm={confirmAccountDeletion}

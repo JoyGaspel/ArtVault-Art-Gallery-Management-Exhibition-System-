@@ -1,9 +1,10 @@
 const express = require('express');
-const { listArchives, restoreArchive, permanentlyDeleteArchive } = require('../controllers/archiveController');
+const { listArchives, restoreArchive, permanentlyDeleteArchive, requestArchiveDeletion } = require('../controllers/archiveController');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireAuth, requireAdmin);
 router.get('/', listArchives);
 router.post('/:id/restore', restoreArchive);
+router.post('/:id/request-delete', requestArchiveDeletion);
 router.delete('/:id', permanentlyDeleteArchive);
 module.exports = router;

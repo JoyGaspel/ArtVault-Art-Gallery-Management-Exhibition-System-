@@ -9,7 +9,7 @@ export default function ProtectedRoute({ children, role }) {
   const allowedRoles = role === 'admin'
     ? ['admin', 'sub_admin', 'main_admin']
     : role === 'artist'
-      ? ['artist', 'main_admin']
+      ? ['artist']
     : (Array.isArray(role) ? role : [role]);
   if (role && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
 

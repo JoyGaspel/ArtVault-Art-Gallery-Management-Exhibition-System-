@@ -17,7 +17,16 @@ function errorHandler(err, req, res, next) {
     return res.status(400).json({ message: 'Invalid id format.' });
   }
 
-  res.status(err.status || 500).json({ message: err.message || 'Something went wrong on the server.' });
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Request payload is too large.' });
+  }
+
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  const production = process.env.NODE_ENV === 'production';
+  const message = production && status >= 500
+    ? 'Something went wrong on the server.'
+    : (err.message || 'Something went wrong on the server.');
+  res.status(status).json({ message });
 }
 
 module.exports = { notFound, errorHandler };

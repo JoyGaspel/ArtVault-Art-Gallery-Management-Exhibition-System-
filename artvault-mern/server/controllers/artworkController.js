@@ -85,7 +85,16 @@ async function listArtworks(req, res, next) {
       Artwork.countDocuments(filter),
     ]);
 
-    res.json({ artworks, total, page, pages: Math.ceil(total / limit) });
+    // Give clients an absolute image endpoint. This avoids relying on a
+    // separately built frontend's API base URL for gallery thumbnails.
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
+    const artworksWithImageUrls = artworks.map((artwork) => ({
+      ...artwork,
+      image_url: artwork.has_image
+        ? `${imageOrigin}/api/artworks/${artwork._id}/image`
+        : '',
+    }));
+    res.json({ artworks: artworksWithImageUrls, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }

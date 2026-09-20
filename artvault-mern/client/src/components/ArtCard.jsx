@@ -17,7 +17,7 @@ export default function ArtCard({ artwork, height }) {
   const [imageFailed, setImageFailed] = useState(false);
   const artistName = artwork.artist?.name || 'Unknown artist';
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
-  const imageSrc = artwork.image_path || (artwork.has_image ? `${apiBase}/artworks/${artwork._id}/image` : '');
+  const imageSrc = artwork.image_path || artwork.image_url || (artwork.has_image ? `${apiBase}/artworks/${artwork._id}/image` : '');
   return (
     <Link to={`/artworks/${artwork._id}`} className="art-card" style={{ textDecoration: 'none', color: 'inherit' }}>
       <div className={`art-thumb${imageSrc && !imageFailed ? ' has-image' : ''}`} style={height ? { height } : undefined}>

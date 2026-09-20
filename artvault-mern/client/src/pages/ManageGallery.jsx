@@ -13,7 +13,7 @@ const categories = [
 function ModerationThumbnail({ artwork }) {
   const [failed, setFailed] = useState(false);
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
-  const imageSrc = artwork.image_path || (artwork.has_image ? `${apiBase}/artworks/${artwork._id}/image` : '');
+  const imageSrc = artwork.image_path || artwork.image_url || (artwork.has_image ? `${apiBase}/artworks/${artwork._id}/image` : '');
 
   return (
     <div className="moderation-art-preview">

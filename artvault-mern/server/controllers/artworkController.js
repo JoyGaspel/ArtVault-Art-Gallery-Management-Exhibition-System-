@@ -107,12 +107,12 @@ async function getArtworkImage(req, res, next) {
   try {
     const artwork = await Artwork.findById(req.params.id).select('image_path').lean();
     if (!artwork?.image_path) return res.status(404).end();
+    // Helmet sets CORP=same-origin globally. Remove and replace it only for
+    // this public image response so the Vercel gallery can display it.
+    res.removeHeader('Cross-Origin-Resource-Policy');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     const match = /^data:([^;]+);base64,(.+)$/s.exec(artwork.image_path);
     if (!match) return res.redirect(artwork.image_path);
-    // Only artwork image responses are intended for cross-origin display by
-    // the Vercel frontend; keep Helmet's same-origin policy for all other API
-    // responses.
-    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.set('Cache-Control', 'public, max-age=3600, immutable');
     res.type(match[1]).send(Buffer.from(match[2], 'base64'));
   } catch (err) {

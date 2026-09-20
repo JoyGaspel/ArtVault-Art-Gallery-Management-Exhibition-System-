@@ -60,29 +60,13 @@ async function listArtworks(req, res, next) {
     const skip = (page - 1) * limit;
 
     const [artworks, total] = await Promise.all([
-      Artwork.aggregate([
-        { $match: filter },
-        { $sort: { created_at: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-        { $lookup: {
-          from: 'artists',
-          let: { artistId: '$artist' },
-          pipeline: [
-            { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
-            { $project: { name: 1, avatar_path: 1, specializations: 1 } },
-          ],
-          as: 'artist',
-        } },
-        { $project: {
-          title: 1, description: 1, categories: 1, materials: 1,
-          created_at: 1, updated_at: 1,
-          image_path: 1,
-          artist: { $arrayElemAt: ['$artist', 0] },
-          // Do not send multi-megabyte base64 data in every gallery response.
-          has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
-        } },
-      ]),
+      Artwork.find(filter)
+        .select('title description image_path artist categories materials created_at updated_at')
+        .populate('artist', 'name avatar_path specializations')
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Artwork.countDocuments(filter),
     ]);
 
@@ -91,7 +75,7 @@ async function listArtworks(req, res, next) {
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const artworksWithImageUrls = artworks.map((artwork) => ({
       ...artwork,
-      image_url: artwork.has_image
+      image_url: artwork.image_path
         ? `${imageOrigin}/api/artworks/${artwork._id}/image`
         : '',
     }));

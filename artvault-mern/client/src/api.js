@@ -7,9 +7,10 @@ const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
 const deployedApiUrl = 'https://artvault-art-gallery-management.onrender.com/api';
+const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(configuredApiUrl);
 const apiBaseUrl = isLocal
   ? '/api'
-  : (configuredApiUrl && !configuredApiUrl.includes(',') ? configuredApiUrl : deployedApiUrl);
+  : (configuredApiUrl && !configuredApiUrl.includes(',') && !configuredIsLocal ? configuredApiUrl : deployedApiUrl);
 
 const api = axios.create({ baseURL: apiBaseUrl });
 

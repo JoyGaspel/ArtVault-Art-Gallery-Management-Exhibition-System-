@@ -109,6 +109,10 @@ async function getArtworkImage(req, res, next) {
     if (!artwork?.image_path) return res.status(404).end();
     const match = /^data:([^;]+);base64,(.+)$/s.exec(artwork.image_path);
     if (!match) return res.redirect(artwork.image_path);
+    // Only artwork image responses are intended for cross-origin display by
+    // the Vercel frontend; keep Helmet's same-origin policy for all other API
+    // responses.
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.set('Cache-Control', 'public, max-age=3600, immutable');
     res.type(match[1]).send(Buffer.from(match[2], 'base64'));
   } catch (err) {

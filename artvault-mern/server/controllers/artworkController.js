@@ -77,6 +77,7 @@ async function listArtworks(req, res, next) {
         { $project: {
           title: 1, description: 1, categories: 1, materials: 1,
           created_at: 1, updated_at: 1,
+          image_path: 1,
           artist: { $arrayElemAt: ['$artist', 0] },
           // Do not send multi-megabyte base64 data in every gallery response.
           has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },

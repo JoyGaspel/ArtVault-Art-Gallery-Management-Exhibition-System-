@@ -1,12 +1,14 @@
 import axios from 'axios';
 
-// Local development goes through Vite's proxy. Deployed builds call Render
+// Local development goes through Vite's proxy. Deployed builds call Railway
 // directly. This keeps one checked-out client working in both environments,
 // even if an old Vercel variable accidentally contains comma-separated URLs.
 const configuredApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-const deployedApiUrl = 'https://artvault-art-gallery-management.onrender.com/api';
+// Keep a production fallback so an accidentally missing Vercel variable does
+// not silently send image/API requests to the retired Render service.
+const deployedApiUrl = 'https://artvault-art-gallery-management-exhibition-syste-production.up.railway.app/api';
 const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(configuredApiUrl);
 const apiBaseUrl = isLocal
   ? '/api'

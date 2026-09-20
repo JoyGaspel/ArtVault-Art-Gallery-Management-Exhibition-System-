@@ -10,9 +10,10 @@ const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
 // not silently send image/API requests to the retired Render service.
 const deployedApiUrl = 'https://artvault-art-gallery-management-exhibition-syste-production.up.railway.app/api';
 const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(configuredApiUrl);
-const apiBaseUrl = isLocal
-  ? '/api'
-  : (configuredApiUrl && !configuredApiUrl.includes(',') && !configuredIsLocal ? configuredApiUrl : deployedApiUrl);
+// Production must always use the live Railway backend. This prevents a stale
+// Vercel VITE_API_URL (for example an old Render or localhost value) from
+// breaking artwork image requests while the rest of the API still appears to load.
+const apiBaseUrl = isLocal ? '/api' : deployedApiUrl;
 
 const api = axios.create({ baseURL: apiBaseUrl });
 

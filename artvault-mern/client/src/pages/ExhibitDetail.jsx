@@ -20,18 +20,16 @@ export default function ExhibitDetail() {
   return (
     <section>
       <button className="back-link" onClick={() => navigate(-1)}>← Back to exhibits</button>
-      <div className="page-head">
-        <div>
-          <div className="eyebrow">{new Date(exhibit.event_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-          <h1>{exhibit.name}</h1>
-          <div className="sub">{exhibit.description}</div>
-        </div>
+      <div className="exhibit-detail-hero">
+        <div><div className="eyebrow">Digital exhibition · {new Date(exhibit.event_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</div><h1>{exhibit.name}</h1><p>{exhibit.description || 'A curated collection of works from the ArtVault community.'}</p></div>
+        <div className="exhibit-detail-count"><strong>{exhibit.artworks.length}</strong><span>works on view</span></div>
       </div>
+      <div className="exhibit-welcome"><span>✦</span><div><strong>Welcome to the exhibition</strong><small>Explore each work to discover its story, artist, and materials.</small></div></div>
 
       {exhibit.artworks.length === 0 ? (
         <div className="empty">No artworks assigned to this exhibit yet.</div>
       ) : (
-        <div className="gallery-grid">
+        <div className="gallery-grid exhibit-art-gallery">
           {exhibit.artworks.map((w, i) => (
             <ArtCard key={w._id} artwork={w} height={150 + ((i * 39) % 110)} />
           ))}

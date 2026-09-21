@@ -1,6 +1,6 @@
 const express = require('express');
 const {
-  listArtists, getArtist, updateMyProfile, deleteMyAccount,
+  listArtists, getArtist, getArtistAvatar, updateMyProfile, deleteMyAccount,
   listAdminArtists, updateArtistAsAdmin, deleteArtistAsAdmin, setArtistRole,
   setArtistStatus,
 } = require('../controllers/artistController');
@@ -9,6 +9,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', listArtists);
+router.get('/:id/avatar', getArtistAvatar);
 router.put('/me', requireAuth, updateMyProfile);
 router.delete('/me', requireAuth, deleteMyAccount);
 router.get('/admin', requireAuth, requireAdmin, listAdminArtists);

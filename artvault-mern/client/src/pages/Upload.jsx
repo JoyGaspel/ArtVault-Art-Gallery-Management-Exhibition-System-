@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
@@ -24,6 +24,7 @@ export default function Upload() {
   const [saving, setSaving] = useState(false);
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');
+  const fileInputRef = useRef(null);
 
   function toggleCategory(cat) {
     setCategories((c) => (c.includes(cat) ? c.filter((x) => x !== cat) : [...c, cat]));
@@ -46,8 +47,16 @@ export default function Upload() {
       event.target.value = '';
       return;
     }
+    if (preview) URL.revokeObjectURL(preview);
     setImage(file);
     setPreview(URL.createObjectURL(file));
+  }
+
+  function removeImage() {
+    if (preview) URL.revokeObjectURL(preview);
+    setImage(null);
+    setPreview('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function publish() {
@@ -85,23 +94,28 @@ export default function Upload() {
   }
 
   return (
-    <section>
+    <section className="upload-page">
       <div className="page-head">
         <div>
-          <div className="eyebrow">POST /api/artworks</div>
+          <div className="eyebrow">ARTIST STUDIO · NEW WORK</div>
           <h1>Upload an artwork</h1>
           <div className="sub">Add a new piece to your portfolio and the public gallery.</div>
         </div>
       </div>
 
-      <div className="form-card">
+      <div className="form-card upload-form-card">
         <div className="field">
           <label htmlFor="artwork-image">Artwork image <span className="optional-mark">(optional)</span></label>
           {/* image/* gives the native picker its normal "Image files" filter;
               handleImageChange and the API still enforce the supported formats. */}
-          <input id="artwork-image" type="file" accept="image/*" onChange={handleImageChange} />
+          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept="image/*" onChange={handleImageChange} />
           <div className="hint">PNG, JPG/JPEG, WebP, or GIF only. Maximum 10 MB.</div>
-          {preview && <img className="upload-preview" src={preview} alt="Artwork preview" />}
+          {preview && (
+            <div className="upload-preview-wrap">
+              <img className="upload-preview" src={preview} alt="Artwork preview" />
+              <button type="button" className="upload-preview-remove" onClick={removeImage} aria-label="Remove selected artwork image" title="Remove selected image">×</button>
+            </div>
+          )}
         </div>
         <div className="field">
           <label>Title <span className="required-mark" aria-hidden="true">*</span></label>
@@ -139,7 +153,7 @@ export default function Upload() {
           <div className="hint">Separate materials with commas.</div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+        <div className="form-actions">
           <button className="btn btn-primary" onClick={publish} disabled={saving}>
             {saving ? <span className="spinner" /> : null}
             {saving ? 'Publishing…' : 'Publish artwork'}

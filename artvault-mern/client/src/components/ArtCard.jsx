@@ -17,9 +17,10 @@ export default function ArtCard({ artwork, height }) {
   const [imageFailed, setImageFailed] = useState(false);
   const artistName = artwork.artist?.name || 'Unknown artist';
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
-  // Always try the image endpoint for gallery records. Older deployed API
-  // responses may not include `has_image`, even though MongoDB has the file.
-  const imageSrc = artwork.image_path || artwork.image_url || `${apiBase}/artworks/${artwork._id}/image`;
+  // Prefer the same-origin/API image endpoint. Older API responses may omit
+  // `has_image`, so only skip the request when the server explicitly says
+  // there is no stored image. This also prevents mixed-content HTTP URLs.
+  const imageSrc = artwork.image_path || (artwork.has_image !== false ? `${apiBase}/artworks/${artwork._id}/image` : '');
   return (
     <Link to={`/artworks/${artwork._id}`} className="art-card" style={{ textDecoration: 'none', color: 'inherit' }}>
       <div className={`art-thumb${imageSrc && !imageFailed ? ' has-image' : ''}`} style={height ? { height } : undefined}>

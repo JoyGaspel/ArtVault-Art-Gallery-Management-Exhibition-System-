@@ -20,6 +20,9 @@ import ManageSubAdmins from './pages/ManageSubAdmins';
 import ManageGallery from './pages/ManageGallery';
 import Archives from './pages/Archives';
 import AuditLogs from './pages/AuditLogs';
+import ExhibitSubmissions from './pages/ExhibitSubmissions';
+import ManageExhibitEntries from './pages/ManageExhibitEntries';
+import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
 
 export default function App() {
   return (
@@ -38,8 +41,11 @@ export default function App() {
               <Route path="/exhibits" element={<Exhibits />} />
               <Route path="/exhibits/:id" element={<ExhibitDetail />} />
               <Route path="/upload" element={<ProtectedRoute role="artist"><Upload /></ProtectedRoute>} />
+              <Route path="/exhibit-submissions" element={<ProtectedRoute role="artist"><ExhibitSubmissions /></ProtectedRoute>} />
+              <Route path="/exhibit-submission-status" element={<ProtectedRoute role="artist"><ExhibitSubmissionStatus /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute role={['artist', 'admin', 'sub_admin', 'main_admin']}><Settings /></ProtectedRoute>} />
               <Route path="/manage-exhibits" element={<ProtectedRoute role="admin"><ManageExhibits /></ProtectedRoute>} />
+              <Route path="/manage-exhibit-entries" element={<ProtectedRoute role="admin"><ManageExhibitEntries /></ProtectedRoute>} />
               <Route path="/manage-artists" element={<ProtectedRoute role="admin"><ManageArtists /></ProtectedRoute>} />
               <Route path="/manage-sub-admins" element={<ProtectedRoute role={['main_admin']}><ManageSubAdmins /></ProtectedRoute>} />
               <Route path="/manage-gallery" element={<ProtectedRoute role="admin"><ManageGallery /></ProtectedRoute>} />

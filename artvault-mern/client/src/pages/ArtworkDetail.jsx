@@ -112,6 +112,7 @@ export default function ArtworkDetail() {
         <div className="detail-body">
           {!editing ? (
             <>
+              <div className="eyebrow">Artwork detail</div>
               <div className="eyebrow">{(artwork.categories || []).join(' · ')}</div>
               <h1>{artwork.title}</h1>
               {artwork.artist && (
@@ -120,7 +121,7 @@ export default function ArtworkDetail() {
                   <span className="name">{artwork.artist.name}</span>
                 </Link>
               )}
-              <p className="detail-desc">{artwork.description || 'No description provided.'}</p>
+              <div className="detail-description"><div className="lbl">About this work</div><p className="detail-desc">{artwork.description || 'No description provided.'}</p></div>
               <div className="meta-grid">
                 <div className="meta-box">
                   <div className="lbl">Materials</div>

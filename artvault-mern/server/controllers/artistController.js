@@ -45,11 +45,29 @@ async function listArtists(req, res, next) {
     const filter = { role: 'artist' };
     if (specialization) filter.specializations = specialization;
 
-    const artists = await Artist.find(filter).select('name avatar_path specializations bio createdAt');
-    res.json({ artists });
+    const artists = await Artist.find(filter).select('name specializations bio createdAt').lean();
+    const withAvatarUrls = artists.map((artist) => ({
+      ...artist,
+      avatar_url: `${req.protocol}://${req.get('host')}/api/artists/${artist._id}/avatar`,
+    }));
+    res.json({ artists: withAvatarUrls });
   } catch (err) {
     next(err);
   }
+}
+
+// GET /api/artists/:id/avatar — streams a profile image without sending it
+// in the full artists directory response.
+async function getArtistAvatar(req, res, next) {
+  try {
+    const artist = await Artist.findById(req.params.id).select('avatar_path').lean();
+    if (!artist?.avatar_path) return res.status(404).end();
+    const match = /^data:([^;]+);base64,(.+)$/s.exec(artist.avatar_path);
+    if (!match) return res.redirect(artist.avatar_path);
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Cache-Control', 'public, max-age=3600, immutable');
+    res.type(match[1]).send(Buffer.from(match[2], 'base64'));
+  } catch (err) { next(err); }
 }
 
 // GET /api/artists/:id
@@ -237,6 +255,7 @@ async function deleteArtistAsAdmin(req, res, next) {
 
 module.exports = {
   listArtists,
+  getArtistAvatar,
   getArtist,
   updateMyProfile,
   deleteMyAccount,

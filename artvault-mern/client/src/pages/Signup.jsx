@@ -20,6 +20,8 @@ export default function Signup() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [otp, setOtp] = useState('');
+  const [resendSubmitting, setResendSubmitting] = useState(false);
+  const [resendFeedback, setResendFeedback] = useState('');
 
   function validPersonName(value) {
     const clean = value.trim();
@@ -86,8 +88,8 @@ export default function Signup() {
 
   async function onVerifyOtp(event) {
     event.preventDefault();
-    if (!/^\d{6}$/.test(otp.trim())) {
-      setError('Enter the 6-digit code from your email.');
+    if (!/^\d{6,8}$/.test(otp.trim())) {
+      setError('Enter the verification code from your email.');
       return;
     }
     setSubmitting(true);
@@ -96,6 +98,7 @@ export default function Signup() {
       await verifySignupOtp(email, otp);
       navigate('/', { replace: true });
     } catch (err) {
+      if (/expired|invalid/i.test(err.message || '')) setOtp('');
       setError(err.message || 'That verification code is invalid or expired.');
     } finally {
       setSubmitting(false);
@@ -103,11 +106,18 @@ export default function Signup() {
   }
 
   async function resendOtp() {
+    setResendSubmitting(true);
+    setResendFeedback('');
+    setError('');
+    // Supabase invalidates the previous code when a new one is issued.
+    setOtp('');
     try {
       await resendConfirmation(email);
-      setError('');
+      setResendFeedback(`A new verification code was sent to ${email}. Use this newest code; previous codes are no longer valid.`);
     } catch (err) {
       setError(err.message || 'Could not send another code.');
+    } finally {
+      setResendSubmitting(false);
     }
   }
 
@@ -119,20 +129,25 @@ export default function Signup() {
         {confirmationSent ? (
           <>
             <div className="eyebrow">Check your inbox</div>
-            <h1 style={{ fontSize: 26, marginBottom: 8 }}>Confirm your email</h1>
+            <h1 style={{ fontSize: 26, marginBottom: 8 }}>Enter your verification code</h1>
             <p className="sub" style={{ color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.6 }}>
-              We sent a 6-digit verification code to <strong>{email}</strong>. Enter it below to activate your ArtVault account.
+              We sent a verification code to <strong>{email}</strong>. Enter it below to activate your ArtVault account.
             </p>
-            <div className="prototype-note">If the email does not arrive, check Supabase Authentication → Email Templates and your spam folder.</div>
+            <div className="prototype-note">If the code does not arrive, check your spam folder or request a new code.</div>
             {error && <div className="gate-error"><span>⚠</span><span>{error}</span></div>}
             <form onSubmit={onVerifyOtp}>
               <div className="field">
                 <label htmlFor="signup-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
-                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))} placeholder="6-digit code" />
+                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}" maxLength={8} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Enter your code" />
               </div>
               <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>{submitting ? 'Verifying…' : 'Verify email'}</button>
             </form>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={resendOtp}>Send another code</button>
+            <div className="otp-actions">
+              <button className="btn btn-ghost otp-resend-btn" type="button" onClick={resendOtp} disabled={resendSubmitting || submitting}>
+                {resendSubmitting ? 'Sending code…' : 'Send another code'}
+              </button>
+              {resendFeedback && <div className="otp-feedback" role="status">✓ {resendFeedback}</div>}
+            </div>
             <div className="gate-switch"><Link to="/login">Go to sign in</Link></div>
           </>
         ) : (

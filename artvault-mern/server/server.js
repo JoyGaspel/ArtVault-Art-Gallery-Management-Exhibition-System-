@@ -11,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const artworkRoutes = require('./routes/artworkRoutes');
 const artistRoutes = require('./routes/artistRoutes');
 const exhibitRoutes = require('./routes/exhibitRoutes');
+const exhibitEntryRoutes = require('./routes/exhibitEntryRoutes');
 const archiveRoutes = require('./routes/archiveRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 
@@ -59,7 +60,12 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
   .filter(Boolean);
 // Browsers treat localhost and 127.0.0.1 as different origins. Allow both
 // local Vite addresses so either URL can authenticate during development.
-for (const localOrigin of ['http://localhost:5173', 'http://127.0.0.1:5173']) {
+for (const localOrigin of [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://localhost:5173',
+  'https://127.0.0.1:5173',
+]) {
   if (!allowedOrigins.includes(localOrigin)) allowedOrigins.push(localOrigin);
 }
 app.use(cors({
@@ -90,6 +96,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/artworks', artworkRoutes);
 app.use('/api/artists', artistRoutes);
 app.use('/api/exhibits', exhibitRoutes);
+app.use('/api/exhibit-entries', exhibitEntryRoutes);
 app.use('/api/archives', archiveRoutes);
 app.use('/api/audit-logs', auditRoutes);
 

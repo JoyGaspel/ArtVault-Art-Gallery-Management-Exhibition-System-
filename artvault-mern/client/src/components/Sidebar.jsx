@@ -50,6 +50,8 @@ export default function Sidebar() {
           <div className="nav-group">
             <div className="nav-heading">My studio</div>
             <NavigationLink to="/upload" label="Upload artwork" icon="＋" />
+            <NavigationLink to="/exhibit-submissions" label="Exhibit submissions" icon="✦" />
+            <NavigationLink to="/exhibit-submission-status" label="Submission status" icon="✓" />
             <NavigationLink to={`/artists/${user.id}`} label="My public profile" icon="◎" />
             <NavigationLink to="/settings" label="Profile settings" icon="⚙" />
           </div>
@@ -65,6 +67,7 @@ export default function Sidebar() {
             <div className="nav-heading">Curation</div>
             <NavigationLink to="/manage-gallery" label="Manage gallery" icon="▣" />
             <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="▤" />
+            <NavigationLink to="/manage-exhibit-entries" label="Exhibit entries" icon="✦" />
             <NavigationLink to="/manage-artists" label="Manage artists" icon="⚙" />
             {isMainAdmin && <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="⚡" />}
             <NavigationLink to="/archives" label="Archives" icon="▱" />

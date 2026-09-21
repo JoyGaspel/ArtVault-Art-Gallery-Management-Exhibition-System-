@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const SubmitExhibitEntry = require('../models/SubmitExhibitEntry');
 
 async function connectDB() {
   const uri = process.env.MONGO_URI;
@@ -16,6 +17,9 @@ async function connectDB() {
       serverSelectionTimeoutMS: 10000,
       maxPoolSize: 10,
     });
+    // Replace the original one-entry-per-artwork index so denied entries can
+    // use the second attempt without allowing duplicate pending submissions.
+    await SubmitExhibitEntry.syncIndexes();
     console.log(`MongoDB connected: ${conn.connection.host}/${conn.connection.name}`);
   } catch (err) {
     console.error('MongoDB connection failed:', err.message);

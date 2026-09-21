@@ -174,7 +174,6 @@ export function AuthProvider({ children }) {
           specializations: payload.specializations || [],
           bio: payload.bio || '',
         },
-        emailRedirectTo: `${window.location.origin}/login`,
       },
     });
     if (error) {

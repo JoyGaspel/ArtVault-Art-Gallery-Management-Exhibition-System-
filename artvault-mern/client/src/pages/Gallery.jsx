@@ -30,7 +30,7 @@ export default function Gallery() {
     if (showLoading) setErr('');
     const query = active !== 'All' ? { category: active } : {};
     api
-      .get('/artworks', { params: { ...query, page: 1, limit: 100 } })
+      .get('/artworks', { params: { ...query, page: 1, limit: 24 } })
       .then((res) => {
         if (cancelled) return;
         const result = res.data?.artworks;

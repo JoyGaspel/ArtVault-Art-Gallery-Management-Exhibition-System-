@@ -138,13 +138,17 @@ export default function Settings() {
               <input id="confirm-new-password" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" autoComplete="new-password" />
               <PasswordToggle visible={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
             </div>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={changePassword} disabled={accountSaving}>Update password</button>
+            <div className="security-action-row">
+              <button className="btn btn-ghost security-primary-btn" type="button" onClick={changePassword} disabled={accountSaving}>Update password</button>
+            </div>
             {passwordOtpSent && (
               <div className="field" style={{ marginTop: 12 }}>
                 <label htmlFor="password-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
-                <input id="password-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={passwordOtp} onChange={(e) => setPasswordOtp(e.target.value.replace(/\D/g, ''))} placeholder="6-digit code" />
+                <input id="password-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}" maxLength={8} value={passwordOtp} onChange={(e) => setPasswordOtp(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Enter your code" />
                 <div className="hint">Enter the code sent to {user?.email} and press Update password again.</div>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => requestPasswordOtp(currentPassword)} disabled={accountSaving}>Send another code</button>
+                <div className="security-action-row security-otp-actions">
+                  <button className="btn btn-ghost security-secondary-btn" type="button" onClick={async () => { try { setPasswordOtp(''); await requestPasswordOtp(currentPassword); showToast('A new verification code was sent to your email.'); } catch (err) { showToast(err.message || 'Could not send another code.', true); } }} disabled={accountSaving}>Send another code</button>
+                </div>
               </div>
             )}
           </div>

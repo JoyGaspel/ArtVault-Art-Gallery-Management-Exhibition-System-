@@ -60,13 +60,19 @@ async function listArtworks(req, res, next) {
     const skip = (page - 1) * limit;
 
     const [artworks, total] = await Promise.all([
-      Artwork.find(filter)
-        .select('title description image_path artist categories materials created_at updated_at')
-        .populate('artist', 'name avatar_path specializations')
-        .sort({ created_at: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      Artwork.aggregate([
+        { $match: filter }, { $sort: { created_at: -1 } }, { $skip: skip }, { $limit: limit },
+        { $lookup: { from: 'artists', let: { artistId: '$artist' }, pipeline: [
+          { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
+          { $project: { name: 1, specializations: 1 } },
+        ], as: 'artist' } },
+        { $project: {
+          title: 1, description: 1, categories: 1, materials: 1,
+          created_at: 1, updated_at: 1,
+          artist: { $arrayElemAt: ['$artist', 0] },
+          has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+        } },
+      ]),
       Artwork.countDocuments(filter),
     ]);
 
@@ -75,14 +81,18 @@ async function listArtworks(req, res, next) {
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const artworksWithImageUrls = artworks.map((artwork) => ({
       ...artwork,
-      image_url: artwork.image_path
-        ? `${imageOrigin}/api/artworks/${artwork._id}/image`
-        : '',
+      image_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/image` : '',
     }));
     res.json({ artworks: artworksWithImageUrls, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
+}
+
+// GET /api/artworks/mine (authenticated artist artwork picker)
+async function listMyArtworks(req, res, next) {
+  req.query.artist = String(req.user._id);
+  return listArtworks(req, res, next);
 }
 
 // GET /api/artworks/:id/image — streams the stored MongoDB data URL only
@@ -209,6 +219,7 @@ async function deleteArtwork(req, res, next) {
 
 module.exports = {
   listArtworks,
+  listMyArtworks,
   getArtworkImage,
   createArtwork,
   getArtwork,

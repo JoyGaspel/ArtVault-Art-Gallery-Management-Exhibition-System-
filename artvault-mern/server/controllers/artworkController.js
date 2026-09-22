@@ -28,15 +28,17 @@ function validateImageData(imagePath) {
   if (typeof imagePath !== 'string') throw Object.assign(new Error('Artwork image must be a valid file.'), { status: 400 });
   const match = /^data:([^;]+);base64,([a-z0-9+/=\s]+)$/i.exec(imagePath);
   if (!match) throw Object.assign(new Error('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.'), { status: 400 });
-  const mime = match[1].toLowerCase();
-  const expected = ALLOWED_IMAGE_TYPES.get(mime);
-  if (!expected) throw Object.assign(new Error('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.'), { status: 400 });
   const buffer = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
   if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) throw Object.assign(new Error('Image must be between 1 byte and 10 MB.'), { status: 400 });
-  const signature = buffer.subarray(0, expected.length).toString('hex');
-  if (mime === 'image/webp') {
-    if (signature !== expected || buffer.subarray(8, 12).toString('ascii') !== 'WEBP') throw Object.assign(new Error('The image file is invalid.'), { status: 400 });
-  } else if (signature !== expected && !(mime === 'image/gif' && ['474946383761', '474946383961'].includes(buffer.subarray(0, 6).toString('hex')))) {
+  // Detect the actual file type from its bytes. Some browsers and edited JPG
+  // files report a generic or stale MIME type even though the image is valid.
+  const signature = buffer.subarray(0, 12).toString('hex');
+  let mime = '';
+  if (signature.startsWith('89504e470d0a1a0a')) mime = 'image/png';
+  else if (signature.startsWith('ffd8ff')) mime = 'image/jpeg';
+  else if (signature.startsWith('52494646') && buffer.subarray(8, 12).toString('ascii') === 'WEBP') mime = 'image/webp';
+  else if (signature.startsWith('474946383761') || signature.startsWith('474946383961')) mime = 'image/gif';
+  if (!mime || !ALLOWED_IMAGE_TYPES.has(mime)) {
     throw Object.assign(new Error('The image file content does not match its type.'), { status: 400 });
   }
   return `data:${mime};base64,${match[2].replace(/\s/g, '')}`;

@@ -33,7 +33,8 @@ export default function Upload() {
   function handleImageChange(event) {
     const file = event.target.files?.[0];
     if (!file) { setImage(null); setPreview(''); return; }
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    const extensionLooksValid = /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type) && !extensionLooksValid) {
       setImage(null);
       setPreview('');
       showToast('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.', true);

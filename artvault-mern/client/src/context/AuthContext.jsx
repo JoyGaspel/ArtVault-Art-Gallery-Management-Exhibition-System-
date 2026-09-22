@@ -122,6 +122,16 @@ export function AuthProvider({ children }) {
         }
       } catch (legacyError) {
         if (legacyError?.message === 'This account does not have administrator access.') throw legacyError;
+        const legacyData = legacyError?.response?.data;
+        if (legacyData?.locked || Number.isInteger(legacyData?.attemptsRemaining)) {
+          throw {
+            message: legacyData.message,
+            locked: Boolean(legacyData.locked),
+            secondsLeft: legacyData.secondsLeft,
+            attemptsRemaining: legacyData.attemptsRemaining,
+            status: legacyError.response?.status,
+          };
+        }
       }
       const message = /not confirmed|email not confirmed/i.test(error.message || '')
         ? 'Please confirm your email before signing in.'
@@ -131,6 +141,10 @@ export function AuthProvider({ children }) {
     if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
     try {
       const response = await api.get('/auth/me');
+      // Reset the MongoDB lockout counter after Supabase confirms the login.
+      // Keep sign-in compatible with older API deployments that lack this
+      // endpoint yet; the successful Supabase session remains valid.
+      await api.post('/auth/login-success').catch(() => null);
       if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(response.data.user.role)) {
         setUser(null);
         await supabase.auth.signOut();

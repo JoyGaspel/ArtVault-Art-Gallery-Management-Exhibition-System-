@@ -77,6 +77,13 @@ async function requireAuth(req, res, next) {
           if (user.status === 'suspended') {
             return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
           }
+          if (user.lockUntil && user.lockUntil > Date.now()) {
+            return res.status(423).json({
+              message: 'Account locked after repeated failed attempts.',
+              locked: true,
+              secondsLeft: Math.ceil((user.lockUntil - Date.now()) / 1000),
+            });
+          }
           req.supabaseUserId = data.user.id;
           req.user = user;
           return next();
@@ -88,6 +95,13 @@ async function requireAuth(req, res, next) {
     const user = await Artist.findById(payload.sub);
     if (!user) return res.status(401).json({ message: 'This account no longer exists.' });
     if (user.status === 'suspended') return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      return res.status(423).json({
+        message: 'Account locked after repeated failed attempts.',
+        locked: true,
+        secondsLeft: Math.ceil((user.lockUntil - Date.now()) / 1000),
+      });
+    }
     req.user = user;
     next();
   } catch (err) {

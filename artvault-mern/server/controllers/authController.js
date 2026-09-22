@@ -131,9 +131,21 @@ async function login(req, res, next) {
   }
 }
 
+// POST /api/auth/login-success
+// Supabase verifies the password, while MongoDB stores the shared lockout
+// counters. Reset the counter after a successful Supabase sign-in.
+async function loginSuccess(req, res, next) {
+  try {
+    req.user.failedLoginAttempts = 0;
+    req.user.lockUntil = null;
+    await req.user.save();
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+}
+
 // GET /api/auth/me
 async function me(req, res) {
   res.json({ user: req.user.toSafeObject() });
 }
 
-module.exports = { signup, login, me };
+module.exports = { signup, login, loginSuccess, me };

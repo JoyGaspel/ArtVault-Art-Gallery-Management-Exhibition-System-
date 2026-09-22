@@ -364,6 +364,7 @@ button, input, textarea, select{ font-family:inherit; }
 .gate-submit[disabled]{ opacity:0.55; cursor:default; }
 .gate-error, .gate-locked{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:10px 13px; border-radius:10px; margin-bottom:16px; }
 .gate-error{ background:rgba(193,86,86,0.08); border:1px solid rgba(193,86,86,0.25); color:#A34848; }
+.gate-attempts{ margin:-8px 0 16px; padding:9px 13px; border-radius:10px; background:#fff5df; border:1px solid #efd39b; color:#7b571e; font-size:12.5px; line-height:1.45; }
 .otp-feedback{ margin:12px auto 0; max-width:520px; padding:10px 14px; border:1px solid rgba(72,151,103,.25); border-radius:10px; background:rgba(72,151,103,.09); color:#2e7950; font-size:12.5px; line-height:1.45; text-align:center; }
 .otp-actions{ display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:14px; }
 .otp-resend-btn{ min-height:44px; min-width:210px; padding:10px 20px; justify-content:center; white-space:nowrap; }

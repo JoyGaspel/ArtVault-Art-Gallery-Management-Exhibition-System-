@@ -14,6 +14,7 @@ export default function Login() {
   const [loginRole, setLoginRole] = useState('artist');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [attemptsRemaining, setAttemptsRemaining] = useState(null);
   const [lockSeconds, setLockSeconds] = useState(0);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [resending, setResending] = useState(false);
@@ -42,6 +43,7 @@ export default function Login() {
     e.preventDefault();
     if (lockSeconds > 0) return;
     setError('');
+    setAttemptsRemaining(null);
     setNeedsConfirmation(false);
     if (!email || !password) {
       setError('Enter both your email and password.');
@@ -54,6 +56,8 @@ export default function Login() {
     } catch (err) {
       if (err.locked) {
         setLockSeconds(err.secondsLeft || 300);
+        setAttemptsRemaining(0);
+        setError('Too many incorrect password attempts. Sign-in is locked for 5 minutes.');
       } else if (err.code === 'email_not_confirmed' || /confirm.*email|email.*confirm/i.test(err.message || '')) {
         setNeedsConfirmation(true);
         setError('Please confirm your email before signing in.');
@@ -66,7 +70,12 @@ export default function Login() {
         const message = err.message === 'Failed to fetch'
           ? 'Cannot reach Supabase. Check the Project URL in client/.env, confirm the project is active, then restart Vite.'
           : (err.message || 'Invalid credentials.');
-        setError(message);
+        const remaining = Number.isInteger(err.attemptsRemaining) ? err.attemptsRemaining : null;
+        const friendlyMessage = /invalid credentials|invalid login credentials/i.test(message)
+          ? (remaining !== null ? 'Incorrect password.' : 'Incorrect email or password.')
+          : message;
+        setError(friendlyMessage);
+        setAttemptsRemaining(remaining);
         setPassword('');
       }
     } finally {
@@ -120,6 +129,9 @@ export default function Login() {
           </p>
           {error && (
             <div className="gate-error"><span>⚠</span><span>{error}</span></div>
+          )}
+          {Number.isInteger(attemptsRemaining) && attemptsRemaining > 0 && (
+            <div className="gate-attempts">Incorrect password. You have <b>{attemptsRemaining}</b> sign-in {attemptsRemaining === 1 ? 'attempt' : 'attempts'} remaining.</div>
           )}
           {needsConfirmation && (
             <button className="resend-confirmation" type="button" onClick={resendEmail} disabled={resending}>

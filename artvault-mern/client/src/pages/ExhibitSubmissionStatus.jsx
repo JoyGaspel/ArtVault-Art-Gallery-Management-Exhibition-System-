@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../api';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 import PageLoadState from '../components/PageLoadState';
 import ArtworkThumbnail from '../components/ArtworkThumbnail';
 
@@ -8,6 +9,7 @@ const labels = { pending: 'Pending review', approved: 'Approved', denied: 'Denie
 const formatDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function ExhibitSubmissionStatus() {
+  const { user } = useAuth();
   const showToast = useToast();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,17 +17,38 @@ export default function ExhibitSubmissionStatus() {
   const [saving, setSaving] = useState('');
   const groups = useMemo(() => ['pending', 'approved', 'denied', 'withdrawn'].map((status) => ({ status, items: entries.filter((entry) => entry.status === status) })).filter((group) => group.items.length), [entries]);
 
-  function load() {
-    setLoading(true); setError('');
-    return api.get('/exhibit-entries/my').then((response) => setEntries(response.data.entries || []))
-      .catch((error) => { const message = error.response?.data?.message || 'Could not load submission status.'; setError(message); showToast(message, true); })
+  const cacheKey = user?.id ? `artvault:exhibit-submission-status:${user.id}` : '';
+  function load({ silent = false } = {}) {
+    if (!silent) setLoading(true); setError('');
+    return api.get('/exhibit-entries/my').then((response) => {
+      const nextEntries = response.data.entries || [];
+      setEntries(nextEntries);
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(nextEntries)); } catch { /* Storage is optional. */ }
+    })
+      .catch((error) => { const message = error.response?.data?.message || 'Could not load submission status.'; if (!silent) { setError(message); showToast(message, true); } })
       .finally(() => setLoading(false));
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!user?.id) return;
+    let hasCache = false;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+      if (Array.isArray(cached)) { setEntries(cached); setLoading(false); hasCache = true; }
+    } catch { /* Ignore malformed browser cache and fetch fresh data. */ }
+    load({ silent: hasCache });
+  }, [user?.id]);
 
   async function withdraw(entry) {
     setSaving(entry._id);
-    try { await api.delete(`/exhibit-entries/${entry._id}`); setEntries((current) => current.map((item) => item._id === entry._id ? { ...item, status: 'withdrawn' } : item)); showToast('Submission withdrawn.'); }
+    try {
+      await api.delete(`/exhibit-entries/${entry._id}`);
+      setEntries((current) => {
+        const nextEntries = current.map((item) => item._id === entry._id ? { ...item, status: 'withdrawn' } : item);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(nextEntries)); } catch { /* Storage is optional. */ }
+        return nextEntries;
+      });
+      showToast('Submission withdrawn.');
+    }
     catch (error) { showToast(error.response?.data?.message || 'Could not withdraw this submission.', true); }
     finally { setSaving(''); }
   }

@@ -31,7 +31,11 @@ export default function Artists() {
     if (!key || prefetchedArtistProfiles.has(key)) return;
     prefetchedArtistProfiles.add(key);
     api.get(`/artists/${key}`)
-      .then((response) => setLatestArtworks((current) => ({ ...current, [key]: response.data.artworks?.[0] || null })))
+      .then((response) => {
+        const artwork = response.data.artworks?.[0] || null;
+        if (artwork && !artwork.thumbnail_url && artwork.image_url) artwork.thumbnail_url = artwork.image_url;
+        setLatestArtworks((current) => ({ ...current, [key]: artwork }));
+      })
       .catch(() => { prefetchedArtistProfiles.delete(key); });
   }
 

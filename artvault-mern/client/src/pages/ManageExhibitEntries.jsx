@@ -9,11 +9,24 @@ export default function ManageExhibitEntries() {
   const showToast = useToast();
   const [entries, setEntries] = useState([]), [filter, setFilter] = useState('pending'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [saving, setSaving] = useState('');
   const [denying, setDenying] = useState(null), [reason, setReason] = useState('');
-  async function load() {
-    setLoading(true); setError(''); try { const response = await api.get('/exhibit-entries/review', { params: filter === 'all' ? {} : { status: filter } }); setEntries(response.data.entries || []); }
-    catch (error) { const message = error.response?.data?.message || 'Could not load exhibit entries.'; setError(message); showToast(message, true); } finally { setLoading(false); }
+  const cacheKey = `artvault:admin-exhibit-entries:${filter}`;
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true); setError('');
+    try {
+      const response = await api.get('/exhibit-entries/review', { params: filter === 'all' ? {} : { status: filter } });
+      const nextEntries = response.data.entries || [];
+      setEntries(nextEntries);
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(nextEntries)); } catch { /* Storage is optional. */ }
+    } catch (error) {
+      const message = error.response?.data?.message || 'Could not load exhibit entries.';
+      if (!silent) { setError(message); showToast(message, true); }
+    } finally { setLoading(false); }
   }
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => {
+    let hasCache = false;
+    try { const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); if (Array.isArray(cached)) { setEntries(cached); setLoading(false); hasCache = true; } } catch { /* Ignore malformed browser cache. */ }
+    load({ silent: hasCache });
+  }, [filter]);
   async function decide(entry, status, denial_reason = '') {
     setSaving(entry._id); try { await api.put(`/exhibit-entries/${entry._id}/decision`, { status, denial_reason }); showToast(status === 'approved' ? 'Entry approved for the exhibit.' : 'Entry denied.'); setDenying(null); setReason(''); await load(); }
     catch (error) { showToast(error.response?.data?.message || 'Could not update this entry.', true); } finally { setSaving(''); }

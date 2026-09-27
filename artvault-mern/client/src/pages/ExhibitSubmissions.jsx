@@ -12,13 +12,31 @@ const formatDate = (value) => new Date(value).toLocaleDateString(undefined, { mo
 export default function ExhibitSubmissions() {
   const { user } = useAuth(); const showToast = useToast();
   const [exhibits, setExhibits] = useState([]), [artworks, setArtworks] = useState([]), [entries, setEntries] = useState([]), [choices, setChoices] = useState({}), [loading, setLoading] = useState(true), [error, setError] = useState(''), [saving, setSaving] = useState('');
-  async function load() {
-    setLoading(true); setError('');
-    try { const [exhibitResponse, artworkResponse, entryResponse] = await Promise.all([api.get('/exhibits'), api.get('/artworks/mine', { params: { limit: 100 } }), api.get('/exhibit-entries/my')]); setExhibits(exhibitResponse.data.exhibits || []); setArtworks(artworkResponse.data.artworks || []); setEntries(entryResponse.data.entries || []); }
-    catch (error) { const message = error.response?.data?.message || 'Could not load exhibit submissions.'; setError(message); showToast(message, true); }
+  const cacheKey = user?.id ? `artvault:exhibit-submissions:${user.id}` : '';
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true); setError('');
+    try {
+      const [exhibitResponse, artworkResponse, entryResponse] = await Promise.all([api.get('/exhibits'), api.get('/artworks/mine', { params: { limit: 100 } }), api.get('/exhibit-entries/my')]);
+      const nextExhibits = exhibitResponse.data.exhibits || [];
+      const nextArtworks = artworkResponse.data.artworks || [];
+      const nextEntries = entryResponse.data.entries || [];
+      setExhibits(nextExhibits); setArtworks(nextArtworks); setEntries(nextEntries);
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ exhibits: nextExhibits, artworks: nextArtworks, entries: nextEntries })); } catch { /* Storage is optional. */ }
+    }
+    catch (error) { const message = error.response?.data?.message || 'Could not load exhibit submissions.'; if (!silent) { setError(message); showToast(message, true); } }
     finally { setLoading(false); }
   }
-  useEffect(() => { if (user?.id) load(); }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id) return;
+    let hasCache = false;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+      if (cached?.exhibits && cached?.artworks && cached?.entries) {
+        setExhibits(cached.exhibits); setArtworks(cached.artworks); setEntries(cached.entries); setLoading(false); hasCache = true;
+      }
+    } catch { /* Ignore malformed browser cache and fetch fresh data. */ }
+    load({ silent: hasCache });
+  }, [user?.id]);
   const upcomingExhibits = useMemo(() => exhibits.filter((exhibit) => new Date(exhibit.event_date).getTime() > Date.now()), [exhibits]);
   const existingFor = (exhibitId, artworkId) => entries.find((entry) => String(entry.exhibit?._id || entry.exhibit) === String(exhibitId) && String(entry.artwork?._id || entry.artwork) === String(artworkId));
   async function submit(exhibit) {

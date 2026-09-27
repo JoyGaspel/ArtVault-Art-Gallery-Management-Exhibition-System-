@@ -28,16 +28,21 @@ export default function ManageArtists() {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [pendingRole, setPendingRole] = useState(null);
   const [pendingStatus, setPendingStatus] = useState(null);
+  const cacheKey = 'artvault:admin-artists';
 
-  function load() {
-    setLoading(true);
+  function load({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     setError('');
     api.get('/artists/admin')
-      .then((response) => setArtists(response.data.artists))
-      .catch((error) => { const message = error.response?.data?.message || 'Could not load artist accounts.'; setError(message); showToast(message, true); })
+      .then((response) => { const nextArtists = response.data.artists || []; setArtists(nextArtists); try { sessionStorage.setItem(cacheKey, JSON.stringify(nextArtists)); } catch { /* Storage is optional. */ } })
+      .catch((error) => { const message = error.response?.data?.message || 'Could not load artist accounts.'; if (!silent) { setError(message); showToast(message, true); } })
       .finally(() => setLoading(false));
   }
-  useEffect(load, []);
+  useEffect(() => {
+    let hasCache = false;
+    try { const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); if (Array.isArray(cached)) { setArtists(cached); setLoading(false); hasCache = true; } } catch { /* Ignore malformed browser cache. */ }
+    load({ silent: hasCache });
+  }, []);
   useAutoRefresh(load);
 
   function openEdit(artist) {

@@ -22,6 +22,24 @@ export default function Signup() {
   const [otp, setOtp] = useState('');
   const [resendSubmitting, setResendSubmitting] = useState(false);
   const [resendFeedback, setResendFeedback] = useState('');
+  const [touched, setTouched] = useState({});
+
+  function markTouched(field) {
+    setTouched((current) => ({ ...current, [field]: true }));
+  }
+
+  function requiredMessage(field, value) {
+    if (!touched[field] || value.trim()) return '';
+    const messages = {
+      firstName: 'Required: enter your first name to continue.',
+      lastName: 'Required: enter your last name to continue.',
+      email: 'Required: enter a valid email so we can send your verification code.',
+      password: 'Required: create a password with at least 6 characters.',
+      confirm: 'Required: re-enter your password to confirm it.',
+      otp: 'Required: enter the verification code sent to your email.',
+    };
+    return messages[field];
+  }
 
   function validPersonName(value) {
     const clean = value.trim();
@@ -43,6 +61,7 @@ export default function Signup() {
     const cleanLastName = lastName.trim().replace(/\s+/g, ' ');
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanFirstName || !cleanLastName || !cleanEmail || !password || !confirm) {
+      setTouched({ firstName: true, lastName: true, email: true, password: true, confirm: true });
       setError('Fill in every field to create your account.');
       return;
     }
@@ -89,6 +108,7 @@ export default function Signup() {
   async function onVerifyOtp(event) {
     event.preventDefault();
     if (!/^\d{6,8}$/.test(otp.trim())) {
+      markTouched('otp');
       setError('Enter the verification code from your email.');
       return;
     }
@@ -138,7 +158,8 @@ export default function Signup() {
             <form onSubmit={onVerifyOtp}>
               <div className="field">
                 <label htmlFor="signup-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
-                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}" maxLength={8} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Enter your code" />
+                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}" maxLength={8} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} onBlur={() => markTouched('otp')} aria-invalid={Boolean(requiredMessage('otp', otp))} placeholder="Enter your code" />
+                {requiredMessage('otp', otp) && <div className="required-feedback" role="status">{requiredMessage('otp', otp)}</div>}
               </div>
               <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>{submitting ? 'Verifying…' : 'Verify email'}</button>
             </form>
@@ -164,12 +185,14 @@ export default function Signup() {
         <form className="signup-form" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="firstName">First name <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="firstName" required maxLength={50} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="e.g. Juan" autoComplete="given-name" />
+            <input id="firstName" required maxLength={50} value={firstName} onChange={(e) => setFirstName(e.target.value)} onBlur={() => markTouched('firstName')} aria-invalid={Boolean(requiredMessage('firstName', firstName))} placeholder="e.g. Juan" autoComplete="given-name" />
+            {requiredMessage('firstName', firstName) && <div className="required-feedback" role="status">{requiredMessage('firstName', firstName)}</div>}
             <div className="hint">At least 2 letters, starting with a capital letter. Letters only.</div>
           </div>
           <div className="field">
             <label htmlFor="lastName">Last name <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="lastName" required maxLength={50} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="e.g. Dela Cruz" autoComplete="family-name" />
+            <input id="lastName" required maxLength={50} value={lastName} onChange={(e) => setLastName(e.target.value)} onBlur={() => markTouched('lastName')} aria-invalid={Boolean(requiredMessage('lastName', lastName))} placeholder="e.g. Dela Cruz" autoComplete="family-name" />
+            {requiredMessage('lastName', lastName) && <div className="required-feedback" role="status">{requiredMessage('lastName', lastName)}</div>}
             <div className="hint">Use letters only; each name must be at least 2 characters.</div>
           </div>
           <div className="field">
@@ -179,22 +202,25 @@ export default function Signup() {
           </div>
           <div className="field">
             <label htmlFor="email">Email <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. juan@example.com" autoComplete="email" />
+            <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => markTouched('email')} aria-invalid={Boolean(requiredMessage('email', email))} placeholder="e.g. juan@example.com" autoComplete="email" />
+            {requiredMessage('email', email) && <div className="required-feedback" role="status">{requiredMessage('email', email)}</div>}
           </div>
           <div className="field">
             <label htmlFor="password">Password <span className="required-mark" aria-hidden="true">*</span></label>
             <div className="gate-field-wrap">
-              <input id="password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" autoComplete="new-password" />
+              <input id="password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => markTouched('password')} aria-invalid={Boolean(requiredMessage('password', password))} placeholder="At least 6 characters" autoComplete="new-password" />
               <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />
             </div>
+            {requiredMessage('password', password) && <div className="required-feedback" role="status">{requiredMessage('password', password)}</div>}
             <div className="hint">Use at least 6 characters. A longer mix of letters, numbers, and symbols is recommended.</div>
           </div>
           <div className="field">
             <label htmlFor="confirm">Confirm password <span className="required-mark" aria-hidden="true">*</span></label>
             <div className="gate-field-wrap">
-              <input id="confirm" type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter the same password" autoComplete="new-password" />
+              <input id="confirm" type={showConfirm ? 'text' : 'password'} required value={confirm} onChange={(e) => setConfirm(e.target.value)} onBlur={() => markTouched('confirm')} aria-invalid={Boolean(requiredMessage('confirm', confirm))} placeholder="Re-enter the same password" autoComplete="new-password" />
               <PasswordToggle visible={showConfirm} onToggle={() => setShowConfirm((value) => !value)} />
             </div>
+            {requiredMessage('confirm', confirm) && <div className="required-feedback" role="status">{requiredMessage('confirm', confirm)}</div>}
             <div className="hint">Administrator accounts are provisioned separately — this form always creates an Artist account.</div>
           </div>
 

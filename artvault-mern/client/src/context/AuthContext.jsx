@@ -37,6 +37,7 @@ export function AuthProvider({ children }) {
   const idleTimer = useRef(null);
 
   const logout = useCallback(() => {
+    window.clearTimeout(idleTimer.current);
     if (!PROTOTYPE_AUTH) supabase.auth.signOut();
     clearPrototypeSession();
     localStorage.removeItem('artvault_token');
@@ -44,10 +45,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const resetIdleTimer = useCallback(() => {
-    if (!PROTOTYPE_AUTH || !user) return;
-    refreshPrototypeSession();
+    if (!user) return;
+    if (PROTOTYPE_AUTH) refreshPrototypeSession();
     window.clearTimeout(idleTimer.current);
-    idleTimer.current = window.setTimeout(logout, 15 * 60 * 1000);
+    idleTimer.current = window.setTimeout(logout, 30 * 60 * 1000);
   }, [logout, user]);
 
   useEffect(() => {
@@ -85,8 +86,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!PROTOTYPE_AUTH || !user) return undefined;
-    const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
+    if (!user) return undefined;
+    const events = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
     events.forEach((event) => window.addEventListener(event, resetIdleTimer));
     resetIdleTimer();
     return () => {
@@ -144,7 +145,10 @@ export function AuthProvider({ children }) {
       // Reset the MongoDB lockout counter after Supabase confirms the login.
       // Keep sign-in compatible with older API deployments that lack this
       // endpoint yet; the successful Supabase session remains valid.
-      await api.post('/auth/login-success').catch(() => null);
+      // This bookkeeping request does not determine whether login succeeded,
+      // so do it in the background instead of making the user wait for a
+      // second round trip after /auth/me.
+      api.post('/auth/login-success').catch(() => null);
       if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(response.data.user.role)) {
         setUser(null);
         await supabase.auth.signOut();

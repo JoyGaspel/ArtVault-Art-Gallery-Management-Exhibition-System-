@@ -113,7 +113,6 @@ export default function ArtworkDetail() {
   const detailImage = displayImage;
   const exhibitArtworkIndex = exhibitContext?.artworks?.findIndex((item) => String(item._id) === String(id)) ?? -1;
   const exhibitArtworkCount = exhibitContext?.artworks?.length || 0;
-
   function moveInExhibit(direction) {
     if (exhibitArtworkIndex < 0 || !exhibitArtworkCount) return;
     const nextIndex = (exhibitArtworkIndex + direction + exhibitArtworkCount) % exhibitArtworkCount;
@@ -265,7 +264,7 @@ export default function ArtworkDetail() {
           )}
         </div>
       </div>
-      {!editing && relatedArtworks.length > 0 && <section className="related-artworks"><div className="section-kicker">More from this artist</div><h2>Continue exploring</h2><div className="gallery-grid">{relatedArtworks.map((item) => <ArtCard key={item._id} artwork={item} />)}</div></section>}
+      {!editing && relatedArtworks.length > 0 && <section className="related-artworks"><div className="section-kicker">More from this artist</div><h2>Continue exploring</h2><div className="gallery-grid related-gallery">{relatedArtworks.map((item) => <ArtCard key={item._id} artwork={item} />)}</div></section>}
       {lightboxOpen && lightboxImage && <div className="art-lightbox" role="dialog" aria-modal="true" aria-label={`${artwork.title} full view`} onClick={() => setLightboxOpen(false)}><button type="button" className="art-lightbox-close" aria-label="Close full view" onClick={() => setLightboxOpen(false)}>×</button><div className="art-lightbox-frame"><img src={lightboxImage} alt={artwork.title} onClick={(event) => event.stopPropagation()} />{lightboxLoading && <span className="art-lightbox-loading" role="status">Loading full resolution…</span>}</div></div>}
       {pendingDelete && <ConfirmDialog title="Archive artwork?" message={`“${artwork.title}” will be moved to Archives before removal.`} confirmLabel="Move to archives" danger onConfirm={confirmRemove} onCancel={() => setPendingDelete(false)} />}
     </section>

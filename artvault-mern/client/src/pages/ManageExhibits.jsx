@@ -25,19 +25,27 @@ export default function ManageExhibits() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const cacheKey = 'artvault:admin-exhibits';
 
-  function load() {
-    setLoading(true);
+  function load({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     setError('');
     Promise.all([api.get('/exhibits'), api.get('/artworks', { params: { limit: 100 } })])
       .then(([exRes, artRes]) => {
-        setExhibits(exRes.data.exhibits);
-        setArtworks(artRes.data.artworks);
+        const nextExhibits = exRes.data.exhibits || [];
+        const nextArtworks = artRes.data.artworks || [];
+        setExhibits(nextExhibits);
+        setArtworks(nextArtworks);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ exhibits: nextExhibits, artworks: nextArtworks })); } catch { /* Storage is optional. */ }
       })
-      .catch((err) => setError(err.response?.data?.message || 'Could not load exhibit management.'))
+      .catch((err) => { if (!silent) setError(err.response?.data?.message || 'Could not load exhibit management.'); })
       .finally(() => setLoading(false));
   }
-  useEffect(load, []);
+  useEffect(() => {
+    let hasCache = false;
+    try { const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); if (cached?.exhibits && cached?.artworks) { setExhibits(cached.exhibits); setArtworks(cached.artworks); setLoading(false); hasCache = true; } } catch { /* Ignore malformed browser cache. */ }
+    load({ silent: hasCache });
+  }, []);
 
   function openCreate() {
     setEditingId(null);

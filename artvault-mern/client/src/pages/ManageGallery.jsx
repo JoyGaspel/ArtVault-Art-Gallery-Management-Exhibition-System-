@@ -42,16 +42,21 @@ export default function ManageGallery() {
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const imageInputRef = useRef(null);
+  const cacheKey = 'artvault:admin-gallery';
 
-  function load() {
-    setLoading(true);
+  function load({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     setError('');
     api.get('/artworks', { params: { limit: 100 } })
-      .then((response) => setArtworks(response.data.artworks))
-      .catch((error) => { const message = error.response?.data?.message || 'Could not load gallery moderation.'; setError(message); showToast(message, true); })
+      .then((response) => { const nextArtworks = response.data.artworks || []; setArtworks(nextArtworks); try { sessionStorage.setItem(cacheKey, JSON.stringify(nextArtworks)); } catch { /* Storage is optional. */ } })
+      .catch((error) => { const message = error.response?.data?.message || 'Could not load gallery moderation.'; if (!silent) { setError(message); showToast(message, true); } })
       .finally(() => setLoading(false));
   }
-  useEffect(load, []);
+  useEffect(() => {
+    let hasCache = false;
+    try { const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); if (Array.isArray(cached)) { setArtworks(cached); setLoading(false); hasCache = true; } } catch { /* Ignore malformed browser cache. */ }
+    load({ silent: hasCache });
+  }, []);
   useAutoRefresh(load);
 
   const visible = useMemo(() => {

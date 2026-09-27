@@ -24,7 +24,13 @@ async function connectDB() {
     await SubmitExhibitEntry.syncIndexes();
     // Backfill the additive admin directory without changing existing artist
     // accounts, roles, passwords, artwork ownership, or audit references.
-    const existingAdmins = await Artist.find({ role: { $in: ['sub_admin', 'main_admin'] } }).select('_id role status').lean();
+    // `sanitizeFilter` is enabled above for request safety. Mark this
+    // server-owned operator explicitly as trusted so Mongoose does not wrap
+    // `$in` in `$eq` and try to cast the whole object to the String `role`
+    // field (which previously crashed the Railway process on startup).
+    const existingAdmins = await Artist.find({ role: mongoose.trusted({ $in: ['sub_admin', 'main_admin'] }) })
+      .select('_id role status')
+      .lean();
     for (const admin of existingAdmins) {
       await AdminProfile.updateOne(
         { artistId: admin._id },

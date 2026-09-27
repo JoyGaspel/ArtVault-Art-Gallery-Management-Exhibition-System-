@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
+import PageLoadState from '../components/PageLoadState';
 
 const categories = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -32,6 +33,7 @@ export default function ManageGallery() {
   const [artworks, setArtworks] = useState([]);
   const [params] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [query, setQuery] = useState(() => params.get('search') || '');
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(null);
@@ -43,9 +45,10 @@ export default function ManageGallery() {
 
   function load() {
     setLoading(true);
+    setError('');
     api.get('/artworks', { params: { limit: 100 } })
       .then((response) => setArtworks(response.data.artworks))
-      .catch((error) => showToast(error.response?.data?.message || 'Could not load gallery moderation.', true))
+      .catch((error) => { const message = error.response?.data?.message || 'Could not load gallery moderation.'; setError(message); showToast(message, true); })
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
@@ -173,9 +176,9 @@ export default function ManageGallery() {
         <span>{visible.length} of {artworks.length} shown</span>
       </div>
 
-      {loading && <div className="empty">Loading gallery...</div>}
-      {!loading && visible.length === 0 && <div className="empty">No artworks match this review.</div>}
-      {!loading && visible.length > 0 && (
+      <PageLoadState loading={loading} error={error} onRetry={load} label="gallery moderation…" />
+      {!loading && !error && visible.length === 0 && <div className="empty">No artworks match this review.</div>}
+      {!loading && !error && visible.length > 0 && (
         <div className="admin-list">
           {visible.map((artwork) => (
             <article className="admin-artist-card moderation-card" key={artwork._id}>

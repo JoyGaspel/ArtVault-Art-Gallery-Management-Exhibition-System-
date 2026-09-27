@@ -23,6 +23,7 @@ import AuditLogs from './pages/AuditLogs';
 import ExhibitSubmissions from './pages/ExhibitSubmissions';
 import ManageExhibitEntries from './pages/ManageExhibitEntries';
 import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
+import ArtworkLikes from './pages/ArtworkLikes';
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="/manage-gallery" element={<ProtectedRoute role="admin"><ManageGallery /></ProtectedRoute>} />
               <Route path="/archives" element={<ProtectedRoute role="admin"><Archives /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><AuditLogs /></ProtectedRoute>} />
+              <Route path="/artwork-likes" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><ArtworkLikes /></ProtectedRoute>} />
             </Route>
           </Routes>
         </ToastProvider>

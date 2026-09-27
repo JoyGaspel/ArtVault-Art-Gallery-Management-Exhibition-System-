@@ -1,11 +1,16 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Icon from './Icon';
 
 const browseLinks = [
   { to: '/', label: 'Gallery', icon: '⌂', end: true },
   { to: '/artists', label: 'Artists', icon: '♙' },
   { to: '/exhibits', label: 'Exhibits', icon: '▦' },
 ];
+
+browseLinks[0].icon = 'gallery';
+browseLinks[1].icon = 'artists';
+browseLinks[2].icon = 'exhibits';
 
 function initials(name = '') {
   return name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase() || '?';
@@ -14,7 +19,7 @@ function initials(name = '') {
 function NavigationLink({ to, label, icon, end = false }) {
   return (
     <NavLink to={to} end={end} title={label} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-      <span className="nav-icon" aria-hidden="true">{icon}</span>
+      <span className="nav-icon"><Icon name={icon} size={17} /></span>
       <span className="nav-label">{label}</span>
     </NavLink>
   );
@@ -49,29 +54,30 @@ export default function Sidebar() {
         {isArtist && (
           <div className="nav-group">
             <div className="nav-heading">My studio</div>
-            <NavigationLink to="/upload" label="Upload artwork" icon="＋" />
-            <NavigationLink to="/exhibit-submissions" label="Exhibit submissions" icon="✦" />
-            <NavigationLink to="/exhibit-submission-status" label="Submission status" icon="✓" />
-            <NavigationLink to={`/artists/${user.id}`} label="My public profile" icon="◎" />
-            <NavigationLink to="/settings" label="Profile settings" icon="⚙" />
+            <NavigationLink to="/upload" label="Upload artwork" icon="upload" />
+            <NavigationLink to="/exhibit-submissions" label="Exhibit submissions" icon="submissions" />
+            <NavigationLink to="/exhibit-submission-status" label="Submission status" icon="status" />
+            <NavigationLink to={`/artists/${user.id}`} label="My public profile" icon="profile" />
+            <NavigationLink to="/settings" label="Profile settings" icon="settings" />
           </div>
         )}
 
         {canEditProfile && !isArtist && <div className="nav-group">
           <div className="nav-heading">Account</div>
-          <NavigationLink to="/settings" label="Profile settings" icon="⚙" />
+          <NavigationLink to="/settings" label="Profile settings" icon="settings" />
         </div>}
 
         {isAdmin && (
           <div className="nav-group">
             <div className="nav-heading">Curation</div>
-            <NavigationLink to="/manage-gallery" label="Manage gallery" icon="▣" />
-            <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="▤" />
-            <NavigationLink to="/manage-exhibit-entries" label="Exhibit entries" icon="✦" />
-            <NavigationLink to="/manage-artists" label="Manage artists" icon="⚙" />
-            {isMainAdmin && <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="⚡" />}
-            <NavigationLink to="/archives" label="Archives" icon="▱" />
-            {['sub_admin', 'main_admin'].includes(user?.role) && <NavigationLink to="/audit-logs" label={isMainAdmin ? 'Activity logs' : 'Artist activity'} icon="☷" />}
+            <NavigationLink to="/manage-gallery" label="Manage gallery" icon="manageGallery" />
+            <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="manageExhibits" />
+            <NavigationLink to="/manage-exhibit-entries" label="Exhibit entries" icon="entries" />
+            <NavigationLink to="/manage-artists" label="Manage artists" icon="artists" />
+            {isMainAdmin && <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="admins" />}
+            <NavigationLink to="/archives" label="Archives" icon="archives" />
+            {['sub_admin', 'main_admin'].includes(user?.role) && <NavigationLink to="/audit-logs" label={isMainAdmin ? 'Activity logs' : 'Artist activity'} icon="activity" />}
+            {['sub_admin', 'main_admin'].includes(user?.role) && <NavigationLink to="/artwork-likes" label="Artwork likes" icon="likes" />}
           </div>
         )}
       </nav>

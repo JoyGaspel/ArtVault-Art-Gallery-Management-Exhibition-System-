@@ -1,6 +1,7 @@
 const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
 const Archive = require('../models/Archive');
+const ArtworkLike = require('../models/ArtworkLike');
 const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
 
@@ -70,10 +71,15 @@ async function listArtworks(req, res, next) {
           { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
           { $project: { name: 1, specializations: 1 } },
         ], as: 'artist' } },
+        { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
+          { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } },
+          { $count: 'count' },
+        ], as: 'like_stats' } },
         { $project: {
           title: 1, description: 1, categories: 1, materials: 1,
           created_at: 1, updated_at: 1,
           artist: { $arrayElemAt: ['$artist', 0] },
+          like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
           has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
           has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
         } },
@@ -179,10 +185,15 @@ async function getArtwork(req, res, next) {
         { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
         { $project: { name: 1, specializations: 1, bio: 1 } },
       ], as: 'artist' } },
+      { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
+        { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } },
+        { $count: 'count' },
+      ], as: 'like_stats' } },
       { $project: {
         title: 1, description: 1, categories: 1, materials: 1,
         created_at: 1, updated_at: 1,
         artist: { $arrayElemAt: ['$artist', 0] },
+        like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
         has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
         has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
       } },
@@ -261,6 +272,7 @@ async function deleteArtwork(req, res, next) {
     const artwork = req.artwork;
     await Archive.create({ entityType: 'artwork', entityId: artwork._id, snapshot: artwork.toObject(), deletedBy: req.user._id });
     await artwork.deleteOne();
+    await ArtworkLike.deleteMany({ artwork: artwork._id });
     await Exhibit.updateMany({}, { $pull: { artworks: artwork._id } });
     recordAudit({ req, action: 'delete', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
     res.json({ message: 'Artwork removed.' });

@@ -53,9 +53,14 @@ async function getExhibit(req, res, next) {
       { $addFields: { exhibit_order: { $indexOfArray: [artworkIds, '$_id'] } } },
       { $sort: { exhibit_order: 1 } },
       { $lookup: { from: 'artists', localField: 'artist', foreignField: '_id', as: 'artist' } },
+      { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
+        { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } },
+        { $count: 'count' },
+      ], as: 'like_stats' } },
       { $project: {
         title: 1, description: 1, categories: 1, materials: 1,
         created_at: 1, updated_at: 1, artist: { $arrayElemAt: ['$artist', 0] },
+        like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
         has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
         has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
       } },

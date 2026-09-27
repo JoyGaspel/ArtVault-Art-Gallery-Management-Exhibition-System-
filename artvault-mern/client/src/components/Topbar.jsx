@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import Icon from './Icon';
 
 export default function Topbar() {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ export default function Topbar() {
   return (
     <header className="topbar">
       <form className="search" onSubmit={onSearch} role="search">
-        <span className="search-icon" aria-hidden="true">Search</span>
+        <span className="search-icon"><Icon name="search" size={16} /></span>
         <input
           type="search"
           aria-label="Search the gallery"

@@ -36,7 +36,7 @@ export default function ExhibitDetail() {
       ) : (
         <div className="gallery-grid exhibit-art-gallery">
           {exhibit.artworks.map((w, i) => (
-            <ArtCard key={w._id} artwork={w} priority={i < 2} />
+            <ArtCard key={w._id} artwork={w} priority={i < 2} to={`/artworks/${w._id}?exhibit=${id}&position=${i}`} />
           ))}
         </div>
       )}

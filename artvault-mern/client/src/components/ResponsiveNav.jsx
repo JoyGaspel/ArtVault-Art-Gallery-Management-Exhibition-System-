@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Icon from './Icon';
 
 function initials(name = '') {
   return name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase() || '?';
@@ -15,7 +16,7 @@ function LinkItem({ to, children, icon, end = false }) {
       aria-label={children}
       className={({ isActive }) => `responsive-nav-link${isActive ? ' active' : ''}`}
     >
-      <span className="responsive-nav-link-icon" aria-hidden="true">{icon}</span>
+      <span className="responsive-nav-link-icon"><Icon name={icon} size={17} /></span>
       <span className="responsive-nav-link-label">{children}</span>
     </NavLink>
   );
@@ -65,33 +66,34 @@ export default function ResponsiveNav() {
       </NavLink>
 
       <form className="responsive-search" onSubmit={onSearch} role="search">
-        <span aria-hidden="true">Search</span>
+        <span aria-hidden="true"><Icon name="search" size={15} /></span>
         <input type="search" aria-label="Search the gallery" placeholder="Search artworks, artists, exhibits" value={query} onChange={(event) => updateSearch(event.target.value)} />
       </form>
 
       <div className="responsive-nav-links">
-        <LinkItem to="/" icon="⌂" end>Gallery</LinkItem>
-        <LinkItem to="/artists" icon="♙">Artists</LinkItem>
-        <LinkItem to="/exhibits" icon="▦">Exhibits</LinkItem>
+        <LinkItem to="/" icon="gallery" end>Gallery</LinkItem>
+        <LinkItem to="/artists" icon="artists">Artists</LinkItem>
+        <LinkItem to="/exhibits" icon="exhibits">Exhibits</LinkItem>
         {isArtist && <>
-          <LinkItem to="/upload" icon="＋">Upload</LinkItem>
-          <LinkItem to={`/artists/${user.id}`} icon="◎">My profile</LinkItem>
-          <LinkItem to="/settings" icon="⚙">Settings</LinkItem>
+          <LinkItem to="/upload" icon="upload">Upload</LinkItem>
+          <LinkItem to={`/artists/${user.id}`} icon="profile">My profile</LinkItem>
+          <LinkItem to="/settings" icon="settings">Settings</LinkItem>
         </>}
-        {canEditProfile && !isArtist && <LinkItem to="/settings" icon="⚙">Settings</LinkItem>}
+        {canEditProfile && !isArtist && <LinkItem to="/settings" icon="settings">Settings</LinkItem>}
         {isAdmin && <>
-          <LinkItem to="/manage-gallery" icon="▣">Manage gallery</LinkItem>
-          <LinkItem to="/manage-exhibits" icon="▤">Manage exhibits</LinkItem>
-          <LinkItem to="/manage-artists" icon="⚙">Manage artists</LinkItem>
-          {isMainAdmin && <LinkItem to="/manage-sub-admins" icon="⚡">Manage sub-admins</LinkItem>}
-          <LinkItem to="/archives" icon="▱">Archives</LinkItem>
-          {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/audit-logs" icon="☷">{isMainAdmin ? 'Activity logs' : 'Artist activity'}</LinkItem>}
+          <LinkItem to="/manage-gallery" icon="manageGallery">Manage gallery</LinkItem>
+          <LinkItem to="/manage-exhibits" icon="manageExhibits">Manage exhibits</LinkItem>
+          <LinkItem to="/manage-artists" icon="artists">Manage artists</LinkItem>
+          {isMainAdmin && <LinkItem to="/manage-sub-admins" icon="admins">Manage sub-admins</LinkItem>}
+          <LinkItem to="/archives" icon="archives">Archives</LinkItem>
+          {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/audit-logs" icon="activity">{isMainAdmin ? 'Activity logs' : 'Artist activity'}</LinkItem>}
+          {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/artwork-likes" icon="likes">Artwork likes</LinkItem>}
         </>}
         {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out">Sign out</button>}
       </div>
 
       <button className="responsive-menu-toggle" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen}>
-        <span aria-hidden="true">☰</span>
+        <span aria-hidden="true"><Icon name="menu" size={21} /></span>
       </button>
 
       <div className="responsive-account">

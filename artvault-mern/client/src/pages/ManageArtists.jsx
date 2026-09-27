@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
+import PageLoadState from '../components/PageLoadState';
 import ConfirmDialog from '../components/ConfirmDialog';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 
@@ -20,6 +21,7 @@ export default function ManageArtists() {
   const [params] = useSearchParams();
   const search = (params.get('search') || '').trim().toLowerCase();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(blankForm);
   const [saving, setSaving] = useState(false);
@@ -29,9 +31,10 @@ export default function ManageArtists() {
 
   function load() {
     setLoading(true);
+    setError('');
     api.get('/artists/admin')
       .then((response) => setArtists(response.data.artists))
-      .catch((error) => showToast(error.response?.data?.message || 'Could not load artist accounts.', true))
+      .catch((error) => { const message = error.response?.data?.message || 'Could not load artist accounts.'; setError(message); showToast(message, true); })
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
@@ -141,9 +144,9 @@ export default function ManageArtists() {
         <div className="stat-box"><div className="num">{new Set(artists.flatMap((artist) => artist.specializations || [])).size}</div><div className="lbl">Represented disciplines</div></div>
       </div>
 
-      {loading && <div className="empty">Loading artist accounts...</div>}
-      {!loading && visibleArtists.length === 0 && <div className="empty">{search ? 'No artist accounts match your search.' : 'No artist accounts yet.'}</div>}
-      {!loading && visibleArtists.length > 0 && (
+      <PageLoadState loading={loading} error={error} onRetry={load} label="artist accounts…" />
+      {!loading && !error && visibleArtists.length === 0 && <div className="empty">{search ? 'No artist accounts match your search.' : 'No artist accounts yet.'}</div>}
+      {!loading && !error && visibleArtists.length > 0 && (
         <div className="admin-list">
           {visibleArtists.map((artist) => (
             <article className="admin-artist-card" key={artist._id}>

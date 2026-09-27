@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import ArtworkLikeButton from './ArtworkLikeButton';
 
 const EMOJI_BY_CATEGORY = {
   'Digital Art': '🎨', Illustration: '✒️', Photography: '📷', Sculpture: '🗿',
@@ -15,7 +16,7 @@ function emojiFor(categories = []) {
 
 const prefetchedArtworkDetails = new Set();
 
-export default function ArtCard({ artwork, height, priority = false }) {
+export default function ArtCard({ artwork, height, priority = false, to }) {
   const [imageFailed, setImageFailed] = useState(false);
   const artistName = artwork.artist?.name || 'Unknown artist';
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
@@ -32,12 +33,13 @@ export default function ArtCard({ artwork, height, priority = false }) {
     });
   }
   return (
-    <Link to={`/artworks/${artwork._id}`} className="art-card" style={{ textDecoration: 'none', color: 'inherit' }} onMouseEnter={prefetchDetails} onFocus={prefetchDetails}>
+    <article className="art-card">
+      <Link to={to || `/artworks/${artwork._id}`} className="art-card-link" style={{ textDecoration: 'none', color: 'inherit' }} onMouseEnter={prefetchDetails} onFocus={prefetchDetails}>
       <div className={`art-thumb${imageSrc && !imageFailed ? ' has-image' : ''}`} style={height ? { height } : undefined}>
         {imageSrc && !imageFailed ? <img src={imageSrc} alt={artwork.title} sizes="(max-width: 620px) 50vw, (max-width: 1000px) 33vw, 240px" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'} decoding="async" onError={() => setImageFailed(true)} /> : <span className="art-placeholder" role="img" aria-label="Artwork placeholder">{emojiFor(artwork.categories)}</span>}
       </div>
       <div className="art-info">
-        <div className="t">{artwork.title}</div>
+        <div className="art-title-row"><div className="t">{artwork.title}</div><div className="art-card-like"><ArtworkLikeButton artworkId={artwork._id} initialCount={artwork.like_count} compact /></div></div>
         <div className="a">by {artistName}</div>
         <div className="tags">
           {(artwork.categories || []).map((c) => (
@@ -45,6 +47,7 @@ export default function ArtCard({ artwork, height, priority = false }) {
           ))}
         </div>
       </div>
-    </Link>
+      </Link>
+    </article>
   );
 }

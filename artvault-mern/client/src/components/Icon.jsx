@@ -1,0 +1,35 @@
+const PATHS = {
+  gallery: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="m3 16 5-5 4 4 3-3 6 6M8 8h.01" /></>,
+  artists: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
+  exhibits: <><path d="M3 21h18M5 21V5l7-3 7 3v16M9 9h6M9 13h6M9 17h6" /></>,
+  upload: <><path d="M12 3v12M7 8l5-5 5 5M5 21h14" /></>,
+  submissions: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h6" /></>,
+  status: <><path d="M9 11l3 3L22 4M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" /></>,
+  profile: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+  settings: <><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.2-1.7l1.4-1.1-1.4-1.4-1.1 1.4A7 7 0 0 0 16 8l-.2-1.8h-2L13.5 8a7 7 0 0 0-1.7.7l-1.2-1.3-1.4 1.4 1.4 1.1A7 7 0 0 0 10 12l-1.8.2v2L10 14.5c.2.6.4 1.1.8 1.7l-1.4 1.1 1.4 1.4 1.2-1.4c.5.3 1.1.6 1.7.7l.2 1.8h2l.3-1.8a7 7 0 0 0 1.7-.7l1.1 1.4 1.4-1.4-1.4-1.1c.3-.5.6-1.1.7-1.7l1.8-.3v-2z" /></>,
+  manageGallery: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="m7 15 3-3 2 2 3-4 3 4M7 7h.01" /></>,
+  manageExhibits: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M8 2v4M16 2v4M3 10h18M8 14h3M8 17h5" /></>,
+  entries: <><path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM8 8h8M8 12h8M8 16h5" /></>,
+  admins: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0M17 11l1 2 2 .3-1.5 1.5.4 2.2-1.9-1-1.9 1 .4-2.2L15 13.3l2-.3z" /></>,
+  archives: <><path d="M3 6h18M5 6v14h14V6M4 3h16v3H4zM9 10h6" /></>,
+  activity: <><path d="M3 12h4l2-7 4 14 2-7h6" /></>,
+  likes: <path d="M20.8 8.7c0 5.5-8.8 10.3-8.8 10.3S3.2 14.2 3.2 8.7A4.7 4.7 0 0 1 12 6.3a4.7 4.7 0 0 1 8.8 2.4Z" />,
+  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+  edit: <><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 18zM13.5 6.5l4 4" /></>,
+  delete: <><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" /></>,
+  close: <><path d="m6 6 12 12M6 18 18 6" /></>,
+  save: <path d="m5 12 4 4L19 6" />,
+  back: <path d="M19 12H5M12 19l-7-7 7-7" />,
+  refresh: <path d="M20 11a8 8 0 1 0 2 5M20 4v7h-7" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  calendar: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
+  arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+  home: <path d="m3 11 9-8 9 8v9H3zM9 20v-6h6v6" />,
+  logout: <path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6" />,
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  photo: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></>,
+};
+
+export default function Icon({ name, size = 18, stroke = 1.8, ...props }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...props}>{PATHS[name] || PATHS.photo}</svg>;
+}

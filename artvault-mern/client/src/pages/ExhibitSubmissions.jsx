@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+import PageLoadState from '../components/PageLoadState';
+import ArtworkThumbnail from '../components/ArtworkThumbnail';
 
 const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
 const deadline = (exhibit) => new Date(new Date(exhibit.event_date).getTime() - THREE_DAYS);
@@ -9,11 +11,11 @@ const formatDate = (value) => new Date(value).toLocaleDateString(undefined, { mo
 
 export default function ExhibitSubmissions() {
   const { user } = useAuth(); const showToast = useToast();
-  const [exhibits, setExhibits] = useState([]), [artworks, setArtworks] = useState([]), [entries, setEntries] = useState([]), [choices, setChoices] = useState({}), [loading, setLoading] = useState(true), [saving, setSaving] = useState('');
+  const [exhibits, setExhibits] = useState([]), [artworks, setArtworks] = useState([]), [entries, setEntries] = useState([]), [choices, setChoices] = useState({}), [loading, setLoading] = useState(true), [error, setError] = useState(''), [saving, setSaving] = useState('');
   async function load() {
-    setLoading(true);
+    setLoading(true); setError('');
     try { const [exhibitResponse, artworkResponse, entryResponse] = await Promise.all([api.get('/exhibits'), api.get('/artworks/mine', { params: { limit: 100 } }), api.get('/exhibit-entries/my')]); setExhibits(exhibitResponse.data.exhibits || []); setArtworks(artworkResponse.data.artworks || []); setEntries(entryResponse.data.entries || []); }
-    catch (error) { showToast(error.response?.data?.message || 'Could not load exhibit submissions.', true); }
+    catch (error) { const message = error.response?.data?.message || 'Could not load exhibit submissions.'; setError(message); showToast(message, true); }
     finally { setLoading(false); }
   }
   useEffect(() => { if (user?.id) load(); }, [user?.id]);
@@ -27,9 +29,9 @@ export default function ExhibitSubmissions() {
   }
   return <section className="submission-page">
     <div className="page-head"><div><div className="eyebrow">Artist studio · opportunities</div><h1>Exhibit submissions</h1><div className="sub">Send your own artwork to an upcoming exhibit for curator review.</div></div></div>
-    {loading && <div className="empty">Loading exhibit opportunities…</div>}
-    {!loading && upcomingExhibits.length === 0 && <div className="empty submission-empty"><strong>No upcoming exhibits yet.</strong><span>Check back when a new exhibit is scheduled.</span></div>}
-    {!loading && upcomingExhibits.length > 0 && <div className="submission-opportunity-grid">{upcomingExhibits.map((exhibit) => {
+    <PageLoadState loading={loading} error={error} onRetry={load} label="exhibit opportunities…" />
+    {!loading && !error && upcomingExhibits.length === 0 && <div className="empty submission-empty"><strong>No upcoming exhibits yet.</strong><span>Check back when a new exhibit is scheduled.</span></div>}
+    {!loading && !error && upcomingExhibits.length > 0 && <div className="submission-opportunity-grid">{upcomingExhibits.map((exhibit) => {
       const isOpen = Date.now() < deadline(exhibit).getTime(); const selected = choices[exhibit._id] || ''; const existing = selected ? existingFor(exhibit._id, selected) : null; const key = `${exhibit._id}:${selected}`;
       const usedIds = new Set((exhibit.artworks || []).map((artwork) => String(artwork._id || artwork)));
       const exhibitEntries = entries.filter((entry) => String(entry.exhibit?._id || entry.exhibit) === String(exhibit._id));
@@ -43,9 +45,9 @@ export default function ExhibitSubmissions() {
         <div className="submission-artwork-picker" role="listbox" aria-label={`Artwork options for ${exhibit.name}`}>
           {!isOpen && <div className="submission-picker-empty">Submissions are closed</div>}
           {isOpen && !availableArtworks.length && <div className="submission-picker-empty">No eligible artworks available</div>}
-          {isOpen && availableArtworks.map((artwork) => { const denied = exhibitEntries.find((entry) => String(entry.artwork?._id || entry.artwork) === String(artwork._id) && entry.status === 'denied'); const isSelected = String(selected) === String(artwork._id); return <button className={`submission-artwork-option${isSelected ? ' selected' : ''}`} key={artwork._id} type="button" role="option" aria-selected={isSelected} onClick={() => setChoices((current) => ({ ...current, [exhibit._id]: artwork._id }))}><span className="submission-artwork-option-title">{artwork.title}</span><span className="submission-artwork-option-meta">{(artwork.categories || []).join(' · ') || 'Uncategorized'}</span>{denied && <span className="submission-retry-badge">1 retry remaining</span>}</button>; })}
+          {isOpen && availableArtworks.map((artwork) => { const denied = exhibitEntries.find((entry) => String(entry.artwork?._id || entry.artwork) === String(artwork._id) && entry.status === 'denied'); const isSelected = String(selected) === String(artwork._id); return <button className={`submission-artwork-option${isSelected ? ' selected' : ''}`} key={artwork._id} type="button" role="option" aria-selected={isSelected} onClick={() => setChoices((current) => ({ ...current, [exhibit._id]: artwork._id }))}><ArtworkThumbnail artwork={artwork} alt="" /><span className="submission-artwork-option-copy"><span className="submission-artwork-option-title">{artwork.title}</span><span className="submission-artwork-option-meta">{(artwork.categories || []).join(' · ') || 'Uncategorized'}</span></span>{denied && <span className="submission-retry-badge">1 retry remaining</span>}</button>; })}
         </div>
-        {selectedArtwork && <div className="submission-artwork-details"><strong>{selectedArtwork.title}</strong><span>{(selectedArtwork.categories || []).join(' · ') || 'Uncategorized'}</span><span>{(selectedArtwork.materials || []).join(', ') || 'Materials not specified'} · uploaded {formatDate(selectedArtwork.created_at)}</span></div>}
+        {selectedArtwork && <div className="submission-artwork-details"><ArtworkThumbnail artwork={selectedArtwork} alt="" /><div><strong>{selectedArtwork.title}</strong><span>{(selectedArtwork.categories || []).join(' · ') || 'Uncategorized'}</span><span>{(selectedArtwork.materials || []).join(', ') || 'Materials not specified'} · uploaded {formatDate(selectedArtwork.created_at)}</span></div></div>}
         {!selected && availableArtworks.length === 0 && isOpen && <div className="submission-no-artworks">All of your artworks are already submitted to or included in this exhibit.</div>}
         {existing && <div className={`submission-inline-status ${existing.status}`}>Already submitted ({existing.status})</div>}
         <button className="btn btn-primary submission-submit-btn" type="button" disabled={!isOpen || !selected || Boolean(existing) || saving === key} onClick={() => submit(exhibit)}>{saving === key ? 'Submitting…' : 'Submit for review'}</button>

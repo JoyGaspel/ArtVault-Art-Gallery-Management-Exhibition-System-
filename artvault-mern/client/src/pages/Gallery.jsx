@@ -114,7 +114,7 @@ export default function Gallery() {
 
 function getColumnCount() {
   if (typeof window === 'undefined') return 1;
-  if (window.innerWidth <= 390) return 1;
+  if (window.innerWidth <= 340) return 1;
   if (window.innerWidth <= 620) return 2;
   if (window.innerWidth <= 860) return 3;
   return Math.max(1, Math.min(6, Math.floor((window.innerWidth - 296) / 240)));

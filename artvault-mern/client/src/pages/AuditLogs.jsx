@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import { useAuth } from '../context/AuthContext';
+import PageLoadState from '../components/PageLoadState';
 
 export default function AuditLogs() {
   const { user } = useAuth();
@@ -18,8 +19,7 @@ export default function AuditLogs() {
   useEffect(() => { load(); }, []);
   useAutoRefresh(load);
   return <section><div className="page-head"><div><div className="eyebrow">Administration · Audit</div><h1>{isSubAdmin ? 'Artist activity' : 'Activity logs'}</h1><div className="sub">{isSubAdmin ? 'Review activity from artist accounts.' : 'Review account and content changes.'}</div></div></div>
-    {loading && <div className="empty">Loading activity...</div>}
-    {!loading && error && <div className="empty">{error}</div>}
+    <PageLoadState loading={loading} error={error} onRetry={load} label="activity logs…" />
     {!loading && !error && !logs.length && <div className="empty">No activity recorded yet.</div>}
     {!loading && !error && logs.length > 0 && <div className="admin-list">{logs.map((log) => <article className="admin-artist-card" key={log._id}><div className="admin-artist-info"><h2>{log.action.replace(/_/g, ' ')}</h2><div className="mono admin-artist-email">{log.actor?.name || 'Unknown account'} · {log.entityType} · {new Date(log.createdAt).toLocaleString()}</div><div>{log.details ? JSON.stringify(log.details) : ''}</div></div></article>)}</div>}
   </section>;

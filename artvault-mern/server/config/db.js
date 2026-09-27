@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const SubmitExhibitEntry = require('../models/SubmitExhibitEntry');
 const Artist = require('../models/Artist');
 const AdminProfile = require('../models/AdminProfile');
+const ArtworkLike = require('../models/ArtworkLike');
 
 async function connectDB() {
   const uri = process.env.MONGO_URI;
@@ -22,6 +23,7 @@ async function connectDB() {
     // Replace the original one-entry-per-artwork index so denied entries can
     // use the second attempt without allowing duplicate pending submissions.
     await SubmitExhibitEntry.syncIndexes();
+    await ArtworkLike.syncIndexes();
     // Backfill the additive admin directory without changing existing artist
     // accounts, roles, passwords, artwork ownership, or audit references.
     // `sanitizeFilter` is enabled above for request safety. Mark this

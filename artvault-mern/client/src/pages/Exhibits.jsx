@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import useAutoRefresh from '../hooks/useAutoRefresh';
+import PageLoadState from '../components/PageLoadState';
 
 const prefetchedExhibits = new Set();
 
@@ -25,10 +26,14 @@ export default function Exhibits() {
   const [params] = useSearchParams();
   const search = (params.get('search') || '').trim().toLowerCase();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   function load() {
     setLoading(true);
-    return api.get('/exhibits').then((res) => setExhibits(res.data.exhibits)).finally(() => setLoading(false));
+    setError('');
+    return api.get('/exhibits').then((res) => setExhibits(res.data.exhibits || [])).catch((err) => {
+      setError(err.response?.data?.message || 'Could not load exhibits. Check that the API is running.');
+    }).finally(() => setLoading(false));
   }
   useEffect(() => { load(); }, []);
   useAutoRefresh(load);
@@ -51,9 +56,9 @@ export default function Exhibits() {
         </div>
       </div>
 
-      {loading && <div className="empty">Loading…</div>}
-      {!loading && visibleExhibits.length === 0 && <div className="empty">{search ? 'No exhibits match your search.' : 'No exhibits scheduled yet.'}</div>}
-      {!loading && visibleExhibits.length > 0 && (
+      <PageLoadState loading={loading} error={error} onRetry={load} label="exhibits…" />
+      {!loading && !error && visibleExhibits.length === 0 && <div className="empty">{search ? 'No exhibits match your search.' : 'No exhibits scheduled yet.'}</div>}
+      {!loading && !error && visibleExhibits.length > 0 && (
         <div className="exhibit-list">
           {visibleExhibits.map((e, index) => {
             const md = monthDay(e.event_date);

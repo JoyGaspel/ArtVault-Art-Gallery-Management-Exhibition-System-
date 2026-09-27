@@ -86,7 +86,7 @@ export default function ArtistProfile() {
 
 function profileColumnCount() {
   if (typeof window === 'undefined') return 1;
-  if (window.innerWidth <= 390) return 1;
+  if (window.innerWidth <= 340) return 1;
   if (window.innerWidth <= 860) return 2;
   return 4;
 }

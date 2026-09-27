@@ -7,6 +7,7 @@ const supabase = require('../config/supabase');
 const { ALL_SPECIALIZATIONS } = require('../models/Artist');
 const { recordAudit } = require('../utils/audit');
 const AdminProfile = require('../models/AdminProfile');
+const ArtworkLike = require('../models/ArtworkLike');
 
 async function syncAdminProfile(artist) {
   const isAdmin = ['sub_admin', 'main_admin'].includes(artist.role);
@@ -98,9 +99,14 @@ async function getArtist(req, res, next) {
     const artworks = (await Artwork.aggregate([
       { $match: { artist: artist._id } },
       { $sort: { created_at: -1 } },
+      { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
+        { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } },
+        { $count: 'count' },
+      ], as: 'like_stats' } },
       { $project: {
         title: 1, description: 1, categories: 1, materials: 1,
         created_at: 1, updated_at: 1, artist: 1,
+        like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
         has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
         has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
       } },
@@ -165,6 +171,7 @@ async function deleteMyAccount(req, res, next) {
         entityType: 'artwork', entityId: snapshot._id, snapshot, deletedBy: req.user._id,
       })));
       await Exhibit.updateMany({}, { $pull: { artworks: { $in: artworks.map((item) => item._id) } } });
+      await ArtworkLike.deleteMany({ artwork: mongoose.trusted({ $in: artworks.map((item) => item._id) }) });
       await Artwork.deleteMany({ artist: req.user._id });
     }
     await Archive.create({ entityType: 'artist', entityId: req.user._id, snapshot: req.user.toObject(), deletedBy: req.user._id });
@@ -280,6 +287,7 @@ async function deleteArtistAsAdmin(req, res, next) {
       await Archive.insertMany(artworkDocs.map((snapshot) => ({ entityType: 'artwork', entityId: snapshot._id, snapshot, deletedBy: req.user._id })));
       await Exhibit.updateMany({}, { $pull: { artworks: { $in: artworkIds } } });
       await Artwork.deleteMany({ _id: { $in: artworkIds } });
+      await ArtworkLike.deleteMany({ artwork: mongoose.trusted({ $in: artworkIds }) });
     }
     await Archive.create({ entityType: 'artist', entityId: artist._id, snapshot: artist.toObject(), deletedBy: req.user._id });
     // Administrator removals intentionally keep the Supabase Auth identity.

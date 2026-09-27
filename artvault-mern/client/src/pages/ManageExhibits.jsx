@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import PageLoadState from '../components/PageLoadState';
 
 function monthDay(dateStr) {
   const d = new Date(dateStr);
@@ -18,6 +19,7 @@ export default function ManageExhibits() {
   const [exhibits, setExhibits] = useState([]);
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -26,11 +28,13 @@ export default function ManageExhibits() {
 
   function load() {
     setLoading(true);
+    setError('');
     Promise.all([api.get('/exhibits'), api.get('/artworks', { params: { limit: 100 } })])
       .then(([exRes, artRes]) => {
         setExhibits(exRes.data.exhibits);
         setArtworks(artRes.data.artworks);
       })
+      .catch((err) => setError(err.response?.data?.message || 'Could not load exhibit management.'))
       .finally(() => setLoading(false));
   }
   useEffect(load, []);
@@ -133,9 +137,9 @@ export default function ManageExhibits() {
         <div className="stat-box"><div className="num">{artworks.length}</div><div className="lbl">Published artworks</div></div>
       </div>
 
-      {loading && <div className="empty">Loading…</div>}
-      {!loading && exhibits.length === 0 && <div className="empty">No exhibits yet. Create your first one.</div>}
-      {!loading && exhibits.length > 0 && (
+      <PageLoadState loading={loading} error={error} onRetry={load} label="exhibit management…" />
+      {!loading && !error && exhibits.length === 0 && <div className="empty">No exhibits yet. Create your first one.</div>}
+      {!loading && !error && exhibits.length > 0 && (
         <div className="exhibit-list">
           {exhibits.map((ex) => {
             const md = monthDay(ex.event_date);

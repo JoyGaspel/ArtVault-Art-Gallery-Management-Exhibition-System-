@@ -13,18 +13,28 @@ function emojiFor(categories = []) {
   return '🖼️';
 }
 
-export default function ArtCard({ artwork, height }) {
+const prefetchedArtworkDetails = new Set();
+
+export default function ArtCard({ artwork, height, priority = false }) {
   const [imageFailed, setImageFailed] = useState(false);
   const artistName = artwork.artist?.name || 'Unknown artist';
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
+  const imageVersion = artwork.updated_at ? `?v=${encodeURIComponent(artwork.updated_at)}` : '';
   // Prefer the same-origin/API image endpoint. Older API responses may omit
   // `has_image`, so only skip the request when the server explicitly says
   // there is no stored image. This also prevents mixed-content HTTP URLs.
-  const imageSrc = artwork.image_path || (artwork.has_image !== false ? `${apiBase}/artworks/${artwork._id}/image` : '');
+  const imageSrc = artwork.thumbnail_url || artwork.image_path || (artwork.has_image !== false ? `${apiBase}/artworks/${artwork._id}/thumbnail${imageVersion}` : '');
+  function prefetchDetails() {
+    if (!artwork._id || prefetchedArtworkDetails.has(String(artwork._id))) return;
+    prefetchedArtworkDetails.add(String(artwork._id));
+    api.get(`/artworks/${artwork._id}`).catch(() => {
+      prefetchedArtworkDetails.delete(String(artwork._id));
+    });
+  }
   return (
-    <Link to={`/artworks/${artwork._id}`} className="art-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+    <Link to={`/artworks/${artwork._id}`} className="art-card" style={{ textDecoration: 'none', color: 'inherit' }} onMouseEnter={prefetchDetails} onFocus={prefetchDetails}>
       <div className={`art-thumb${imageSrc && !imageFailed ? ' has-image' : ''}`} style={height ? { height } : undefined}>
-        {imageSrc && !imageFailed ? <img src={imageSrc} alt={artwork.title} loading="lazy" decoding="async" onError={() => setImageFailed(true)} /> : <span className="art-placeholder" role="img" aria-label="Artwork placeholder">{emojiFor(artwork.categories)}</span>}
+        {imageSrc && !imageFailed ? <img src={imageSrc} alt={artwork.title} sizes="(max-width: 620px) 50vw, (max-width: 1000px) 33vw, 240px" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'} decoding="async" onError={() => setImageFailed(true)} /> : <span className="art-placeholder" role="img" aria-label="Artwork placeholder">{emojiFor(artwork.categories)}</span>}
       </div>
       <div className="art-info">
         <div className="t">{artwork.title}</div>

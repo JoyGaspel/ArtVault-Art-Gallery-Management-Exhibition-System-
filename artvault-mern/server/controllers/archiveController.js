@@ -10,7 +10,16 @@ const supabase = require('../config/supabase');
 async function listArchives(req, res, next) {
   try {
     const filter = req.user.role === 'main_admin' ? {} : { entityType: mongoose.trusted({ $ne: 'artist' }) };
-    res.json({ archives: await Archive.find(filter).sort({ deletedAt: -1 }).populate('deletedBy', 'name email') });
+    // Archive snapshots retain image data for restoration, but the archive
+    // list only needs labels and timestamps. Excluding base64 image fields
+    // prevents the admin page from downloading megabytes unnecessarily.
+    const archives = await Archive.find(filter)
+      .select('-snapshot.image_path -snapshot.avatar_path -snapshot.password')
+      .sort({ deletedAt: -1 })
+      .populate('deletedBy', 'name email')
+      .lean();
+    res.set('Cache-Control', 'no-store');
+    res.json({ archives });
   } catch (err) { next(err); }
 }
 

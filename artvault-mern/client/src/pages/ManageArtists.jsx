@@ -147,8 +147,8 @@ export default function ManageArtists() {
         <div className="admin-list">
           {visibleArtists.map((artist) => (
             <article className="admin-artist-card" key={artist._id}>
-              {artist.avatar_path
-                ? <img className="admin-artist-avatar admin-artist-avatar-image" src={artist.avatar_path} alt={`${artist.name} profile`} loading="lazy" />
+              {artist.avatar_url
+                ? <img className="admin-artist-avatar admin-artist-avatar-image" src={artist.avatar_url} alt={`${artist.name} profile`} loading="lazy" decoding="async" />
                 : <div className="admin-artist-avatar">{artist.name.slice(0, 1).toUpperCase()}</div>}
               <div className="admin-artist-info">
                 <h2>{artist.name}</h2>

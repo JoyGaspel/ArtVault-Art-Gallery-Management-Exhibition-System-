@@ -4,6 +4,7 @@ import api from '../api';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import useAutoRefresh from '../hooks/useAutoRefresh';
+import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
 
 const categories = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -15,7 +16,7 @@ const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif
 function ModerationThumbnail({ artwork }) {
   const [failed, setFailed] = useState(false);
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
-  const imageSrc = artwork.image_path || (artwork.has_image !== false ? `${apiBase}/artworks/${artwork._id}/image` : '');
+  const imageSrc = artwork.thumbnail_url || artwork.image_path || (artwork.has_image !== false ? `${apiBase}/artworks/${artwork._id}/thumbnail` : '');
 
   return (
     <div className="moderation-art-preview">
@@ -119,12 +120,8 @@ export default function ManageGallery() {
         materials: form.materials.split(',').map((item) => item.trim()).filter(Boolean),
       };
       if (image) {
-        payload.image_path = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error('Could not read the replacement image.'));
-          reader.readAsDataURL(image);
-        });
+        payload.image_path = await fileToDataUrl(image);
+        payload.thumbnail_path = await createGalleryThumbnail(image);
       }
       const response = await api.put(`/artworks/${editing._id}`, payload);
       showToast(`"${form.title}" updated.`);

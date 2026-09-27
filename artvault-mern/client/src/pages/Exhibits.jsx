@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 
+const prefetchedExhibits = new Set();
+
 function monthDay(dateStr) {
   const d = new Date(dateStr);
   const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -32,6 +34,12 @@ export default function Exhibits() {
   useAutoRefresh(load);
 
   const visibleExhibits = search ? exhibits.filter((exhibit) => [exhibit.name, exhibit.description].filter(Boolean).some((value) => String(value).toLowerCase().includes(search))) : exhibits;
+  function prefetchExhibit(id) {
+    const key = String(id);
+    if (!key || prefetchedExhibits.has(key)) return;
+    prefetchedExhibits.add(key);
+    api.get(`/exhibits/${key}`).catch(() => prefetchedExhibits.delete(key));
+  }
 
   return (
     <section>
@@ -51,7 +59,7 @@ export default function Exhibits() {
             const md = monthDay(e.event_date);
             const status = exhibitStatus(e.event_date);
             return (
-              <Link to={`/exhibits/${e._id}`} className={`exhibit-card${index === 0 ? ' exhibit-card-featured' : ''}`} key={e._id}>
+              <Link to={`/exhibits/${e._id}`} className={`exhibit-card${index === 0 ? ' exhibit-card-featured' : ''}`} key={e._id} onMouseEnter={() => prefetchExhibit(e._id)} onFocus={() => prefetchExhibit(e._id)}>
                 <div className="exhibit-date">
                   <div className="day">{md.day}</div>
                   <div className="mon">{md.mon}</div>

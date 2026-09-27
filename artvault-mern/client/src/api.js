@@ -15,7 +15,9 @@ const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(
 // breaking artwork image requests while the rest of the API still appears to load.
 const apiBaseUrl = isLocal ? '/api' : deployedApiUrl;
 
-const api = axios.create({ baseURL: apiBaseUrl });
+// Fail predictably when the API is offline instead of leaving pages on an
+// indefinite loading state.
+const api = axios.create({ baseURL: apiBaseUrl, timeout: 12000 });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('artvault_token');

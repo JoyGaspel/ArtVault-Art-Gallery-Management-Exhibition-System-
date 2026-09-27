@@ -13,7 +13,14 @@ export default function ManageSubAdmins() {
   const [pending, setPending] = useState(null);
   function load() {
     setLoading(true);
-    api.get('/artists/admin').then((response) => setAccounts((response.data.artists || []).filter((artist) => artist.role === 'sub_admin')))
+    api.get('/admin-profiles').then((response) => {
+      const profiles = response.data.profiles || [];
+      // Keep the current artist directory as a compatibility fallback while
+      // existing accounts are being backfilled into admin_profiles.
+      if (!profiles.length) return api.get('/artists/admin').then((fallback) => setAccounts((fallback.data.artists || []).filter((artist) => artist.role === 'sub_admin')));
+      setAccounts(profiles.filter((profile) => profile.role === 'sub_admin').map((profile) => ({ ...profile.artistId, _adminProfileId: profile._id })));
+    })
+      .catch(() => api.get('/artists/admin').then((response) => setAccounts((response.data.artists || []).filter((artist) => artist.role === 'sub_admin'))))
       .catch((error) => toast(error.response?.data?.message || 'Could not load sub-admins.', true)).finally(() => setLoading(false));
   }
   useEffect(load, []);

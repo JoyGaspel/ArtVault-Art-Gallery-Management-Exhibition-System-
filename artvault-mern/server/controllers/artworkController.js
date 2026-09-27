@@ -23,13 +23,13 @@ function cleanList(value, maxItems, maxItemLength) {
   return [...new Set(value.map((item) => cleanText(item, maxItemLength)).filter(Boolean))].slice(0, maxItems);
 }
 
-function validateImageData(imagePath) {
+function validateImageData(imagePath, maxBytes = MAX_IMAGE_BYTES) {
   if (!imagePath) return '';
   if (typeof imagePath !== 'string') throw Object.assign(new Error('Artwork image must be a valid file.'), { status: 400 });
   const match = /^data:([^;]+);base64,([a-z0-9+/=\s]+)$/i.exec(imagePath);
   if (!match) throw Object.assign(new Error('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.'), { status: 400 });
   const buffer = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
-  if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) throw Object.assign(new Error('Image must be between 1 byte and 10 MB.'), { status: 400 });
+  if (!buffer.length || buffer.length > maxBytes) throw Object.assign(new Error(`Image must be between 1 byte and ${Math.round(maxBytes / (1024 * 1024))} MB.`), { status: 400 });
   // Detect the actual file type from its bytes. Some browsers and edited JPG
   // files report a generic or stale MIME type even though the image is valid.
   const signature = buffer.subarray(0, 12).toString('hex');
@@ -49,7 +49,9 @@ async function listArtworks(req, res, next) {
   try {
     // Artwork uploads should appear immediately in the deployed gallery;
     // do not let a browser/CDN serve an older list response.
-    res.set('Cache-Control', 'no-store');
+    // Keep the public catalog briefly cacheable so repeat visits render
+    // immediately while still reflecting uploads and edits within seconds.
+    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
     const { category, artist } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     // Keep the public gallery responsive while still allowing management pages
@@ -73,6 +75,7 @@ async function listArtworks(req, res, next) {
           created_at: 1, updated_at: 1,
           artist: { $arrayElemAt: ['$artist', 0] },
           has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+          has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
         } },
       ]),
       Artwork.countDocuments(filter),
@@ -83,12 +86,34 @@ async function listArtworks(req, res, next) {
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const artworksWithImageUrls = artworks.map((artwork) => ({
       ...artwork,
-      image_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/image` : '',
+      image_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/image?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
+      thumbnail_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
     }));
     res.json({ artworks: artworksWithImageUrls, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
+}
+
+// GET /api/artworks/:id/thumbnail — optimized gallery image with legacy fallback
+async function getArtworkThumbnail(req, res, next) {
+  try {
+    const artwork = await Artwork.findById(req.params.id).select('thumbnail_path').lean();
+    let imagePath = artwork?.thumbnail_path;
+    // Legacy artworks may not have a generated thumbnail. Only then read the
+    // original image field, avoiding a large base64 fetch for normal requests.
+    if (!imagePath) {
+      const legacyArtwork = await Artwork.findById(req.params.id).select('image_path').lean();
+      imagePath = legacyArtwork?.image_path;
+    }
+    if (!imagePath) return res.status(404).end();
+    res.removeHeader('Cross-Origin-Resource-Policy');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    const match = /^data:([^;]+);base64,(.+)$/s.exec(imagePath);
+    if (!match) return res.redirect(imagePath);
+    res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    res.type(match[1]).send(Buffer.from(match[2], 'base64'));
+  } catch (err) { next(err); }
 }
 
 // GET /api/artworks/mine (authenticated artist artwork picker)
@@ -119,7 +144,7 @@ async function getArtworkImage(req, res, next) {
 // POST /api/artworks  (auth required — artist uploads their own piece)
 async function createArtwork(req, res, next) {
   try {
-    const { title, description, image_path, categories, materials } = req.body;
+    const { title, description, image_path, thumbnail_path, categories, materials } = req.body;
     const cleanTitle = cleanText(title, 150);
     if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
     if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
@@ -131,6 +156,7 @@ async function createArtwork(req, res, next) {
       title: cleanTitle,
       description: cleanDescription,
       image_path: validateImageData(image_path),
+      thumbnail_path: thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '',
       categories: cleanList(categories, MAX_CATEGORIES, 40),
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
@@ -146,11 +172,34 @@ async function createArtwork(req, res, next) {
 // GET /api/artworks/:id
 async function getArtwork(req, res, next) {
   try {
-    const artwork = await Artwork.findById(req.params.id).populate('artist', 'name specializations bio');
-    if (!artwork) return res.status(404).json({ message: 'Artwork not found.' });
+    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    const [artworkRows] = await Artwork.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+      { $lookup: { from: 'artists', let: { artistId: '$artist' }, pipeline: [
+        { $match: { $expr: { $eq: ['$_id', '$$artistId'] } } },
+        { $project: { name: 1, specializations: 1, bio: 1 } },
+      ], as: 'artist' } },
+      { $project: {
+        title: 1, description: 1, categories: 1, materials: 1,
+        created_at: 1, updated_at: 1,
+        artist: { $arrayElemAt: ['$artist', 0] },
+        has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+        has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
+      } },
+    ]);
+    if (!artworkRows) return res.status(404).json({ message: 'Artwork not found.' });
 
-    const exhibits = await Exhibit.find({ artworks: artwork._id }).select('name event_date');
-    res.json({ artwork, exhibits });
+    const exhibits = await Exhibit.find({ artworks: artworkRows._id }).select('name event_date');
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
+    res.json({
+      artwork: {
+        ...artworkRows,
+        artist: artworkRows.artist ? { _id: artworkRows.artist._id, name: artworkRows.artist.name, specializations: artworkRows.artist.specializations || [], bio: artworkRows.artist.bio || '' } : null,
+        image_url: artworkRows.has_image ? `${imageOrigin}/api/artworks/${artworkRows._id}/image?v=${encodeURIComponent(artworkRows.updated_at || '')}` : '',
+        thumbnail_url: artworkRows.has_image ? `${imageOrigin}/api/artworks/${artworkRows._id}/thumbnail?v=${encodeURIComponent(artworkRows.updated_at || '')}` : '',
+      },
+      exhibits,
+    });
   } catch (err) {
     next(err);
   }
@@ -184,7 +233,7 @@ async function loadArtworkAndAuthorize(req, res, next) {
 async function updateArtwork(req, res, next) {
   try {
     const artwork = req.artwork;
-    const { title, description, image_path, categories, materials } = req.body;
+    const { title, description, image_path, thumbnail_path, categories, materials } = req.body;
     if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
       return res.status(400).json({ message: 'Artwork title cannot be empty.' });
     }
@@ -194,6 +243,7 @@ async function updateArtwork(req, res, next) {
     if (title !== undefined) artwork.title = cleanText(title, 50);
     if (description !== undefined) artwork.description = cleanText(description, 1000);
     if (image_path !== undefined) artwork.image_path = validateImageData(image_path);
+    if (thumbnail_path !== undefined) artwork.thumbnail_path = thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '';
     if (categories !== undefined) artwork.categories = cleanList(categories, MAX_CATEGORIES, 40);
     if (materials !== undefined) artwork.materials = cleanList(materials, MAX_MATERIALS, 80);
 
@@ -223,6 +273,7 @@ module.exports = {
   listArtworks,
   listMyArtworks,
   getArtworkImage,
+  getArtworkThumbnail,
   createArtwork,
   getArtwork,
   updateArtwork,

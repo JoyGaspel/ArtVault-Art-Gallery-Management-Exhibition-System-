@@ -26,7 +26,7 @@ function validateExhibitFields({ name, description, event_date }) {
 // GET /api/exhibits
 async function listExhibits(req, res, next) {
   try {
-    res.set('Cache-Control', 'no-store');
+    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
     const exhibits = await Exhibit.find()
       .populate({ path: 'artworks', select: 'title categories' })
       .sort({ event_date: 1 })
@@ -43,14 +43,28 @@ async function listExhibits(req, res, next) {
 // GET /api/exhibits/:id
 async function getExhibit(req, res, next) {
   try {
-    res.set('Cache-Control', 'no-store');
-    const exhibit = await Exhibit.findById(req.params.id).populate({
-      path: 'artworks',
-      select: '-image_path',
-      populate: { path: 'artist', select: 'name' },
-    }).lean();
+    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    const exhibit = await Exhibit.findById(req.params.id).lean();
     if (!exhibit) return res.status(404).json({ message: 'Exhibit not found.' });
-    exhibit.artworks = exhibit.artworks.map((artwork) => ({ ...artwork, has_image: true }));
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
+    const artworkIds = exhibit.artworks || [];
+    const artworks = artworkIds.length ? await Artwork.aggregate([
+      { $match: { _id: { $in: artworkIds } } },
+      { $addFields: { exhibit_order: { $indexOfArray: [artworkIds, '$_id'] } } },
+      { $sort: { exhibit_order: 1 } },
+      { $lookup: { from: 'artists', localField: 'artist', foreignField: '_id', as: 'artist' } },
+      { $project: {
+        title: 1, description: 1, categories: 1, materials: 1,
+        created_at: 1, updated_at: 1, artist: { $arrayElemAt: ['$artist', 0] },
+        has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+        has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
+      } },
+    ]) : [];
+    exhibit.artworks = artworks.map((artwork) => ({
+      ...artwork,
+      artist: artwork.artist ? { _id: artwork.artist._id, name: artwork.artist.name } : null,
+      thumbnail_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
+    }));
     res.json({ exhibit });
   } catch (err) {
     next(err);

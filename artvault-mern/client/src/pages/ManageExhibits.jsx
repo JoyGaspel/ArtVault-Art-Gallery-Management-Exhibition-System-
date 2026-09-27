@@ -9,6 +9,8 @@ function monthDay(dateStr) {
   return { day: d.getDate(), mon: months[d.getMonth()] };
 }
 
+const artworkId = (artwork) => String(artwork?._id || artwork || '');
+
 const emptyForm = { name: '', description: '', event_date: '', artworks: [] };
 
 export default function ManageExhibits() {
@@ -39,19 +41,35 @@ export default function ManageExhibits() {
     setModalOpen(true);
   }
   function openEdit(ex) {
+    // Open immediately from the lightweight list response so the button never
+    // feels unresponsive, then refresh the populated artwork IDs in place.
     setEditingId(ex._id);
     setForm({
       name: ex.name,
-      description: ex.description,
-      event_date: ex.event_date.slice(0, 10),
-      artworks: ex.artworks.map((w) => w._id),
+      description: ex.description || '',
+      event_date: String(ex.event_date).slice(0, 10),
+      artworks: (ex.artworks || []).map(artworkId).filter(Boolean),
     });
     setModalOpen(true);
+    api.get(`/exhibits/${ex._id}`).then((response) => {
+      const current = response.data.exhibit;
+      if (!current || current._id !== ex._id) return;
+      setForm((previous) => ({
+        ...previous,
+        artworks: (current.artworks || []).map(artworkId).filter(Boolean),
+      }));
+    }).catch(() => {
+      // The lightweight list data is already usable; keep the modal open if
+      // the optional refresh is unavailable.
+    });
   }
   function toggleArtwork(id) {
+    const normalizedId = artworkId(id);
     setForm((f) => ({
       ...f,
-      artworks: f.artworks.includes(id) ? f.artworks.filter((x) => x !== id) : [...f.artworks, id],
+      artworks: f.artworks.map(String).includes(normalizedId)
+        ? f.artworks.filter((x) => String(x) !== normalizedId)
+        : [...f.artworks.map(String), normalizedId],
     }));
   }
 
@@ -96,7 +114,7 @@ export default function ManageExhibits() {
     }
   }
 
-  const featuredCount = new Set(exhibits.flatMap((e) => e.artworks.map((w) => w._id))).size;
+  const featuredCount = new Set(exhibits.flatMap((e) => (e.artworks || []).map(artworkId))).size;
 
   return (
     <section>
@@ -140,7 +158,7 @@ export default function ManageExhibits() {
 
       {modalOpen && (
         <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}>
-          <div className="modal-box">
+          <div className="modal-box exhibit-modal-box">
             <div className="modal-head">
               <h2>{editingId ? 'Edit exhibit' : 'Create exhibit'}</h2>
               <button className="modal-close" onClick={() => setModalOpen(false)}>✕</button>
@@ -164,9 +182,16 @@ export default function ManageExhibits() {
                   <label className="checkbox-row" key={w._id}>
                     <input
                       type="checkbox"
-                      checked={form.artworks.includes(w._id)}
+                      checked={form.artworks.map(String).includes(artworkId(w))}
                       onChange={() => toggleArtwork(w._id)}
                     />
+                    <span className="exhibit-artwork-option">
+                      {w.thumbnail_url && <img src={w.thumbnail_url} alt="" loading="lazy" decoding="async" />}
+                      <span className="exhibit-artwork-copy">
+                        <strong>{w.title}</strong>
+                        <span className="exhibit-artwork-meta">{w.artist?.name || 'Unknown artist'} · {(w.categories || []).join(', ') || 'Uncategorized'}</span>
+                      </span>
+                    </span>
                     <span>{w.title} — <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{w.artist?.name}</span></span>
                   </label>
                 ))}

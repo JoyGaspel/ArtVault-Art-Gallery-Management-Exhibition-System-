@@ -3,6 +3,7 @@ const {
   listArtworks,
   listMyArtworks,
   getArtworkImage,
+  getArtworkThumbnail,
   createArtwork,
   getArtwork,
   updateArtwork,
@@ -17,6 +18,7 @@ router.get('/', listArtworks);                                  // GET  /api/art
 router.post('/', requireAuth, createArtwork);                    // POST /api/artworks
 router.get('/mine', requireAuth, listMyArtworks);                // GET /api/artworks/mine
 router.get('/:id/image', getArtworkImage);                       // GET  /api/artworks/:id/image
+router.get('/:id/thumbnail', getArtworkThumbnail);               // GET  /api/artworks/:id/thumbnail
 router.get('/:id', getArtwork);                                  // GET  /api/artworks/:id
 router.put('/:id', requireAuth, loadArtworkAndAuthorize, updateArtwork);    // PUT    /api/artworks/:id
 router.delete('/:id', requireAuth, loadArtworkAndAuthorize, deleteArtwork); // DELETE /api/artworks/:id

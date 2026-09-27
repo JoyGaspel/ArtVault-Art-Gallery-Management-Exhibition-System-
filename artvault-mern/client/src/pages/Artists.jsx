@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 
+const prefetchedArtistProfiles = new Set();
+
 export default function Artists() {
   const [artists, setArtists] = useState([]);
   const [params] = useSearchParams();
@@ -18,6 +20,12 @@ export default function Artists() {
   useAutoRefresh(load);
 
   const visibleArtists = search ? artists.filter((artist) => [artist.name, artist.bio, ...(artist.specializations || [])].filter(Boolean).some((value) => value.toLowerCase().includes(search))) : artists;
+  function prefetchProfile(id) {
+    const key = String(id);
+    if (!key || prefetchedArtistProfiles.has(key)) return;
+    prefetchedArtistProfiles.add(key);
+    api.get(`/artists/${key}`).catch(() => prefetchedArtistProfiles.delete(key));
+  }
 
   return (
     <section>
@@ -33,7 +41,7 @@ export default function Artists() {
       {!loading && (
         <div className="artist-grid">
           {visibleArtists.map((a) => (
-            <Link to={`/artists/${a._id}`} className="artist-card" key={a._id} onMouseEnter={() => setHoveredArtist(a._id)} onMouseLeave={() => setHoveredArtist(null)}>
+            <Link to={`/artists/${a._id}`} className="artist-card" key={a._id} onMouseEnter={() => { setHoveredArtist(a._id); prefetchProfile(a._id); }} onFocus={() => prefetchProfile(a._id)} onMouseLeave={() => setHoveredArtist(null)}>
               {hoveredArtist === a._id && a.latestArtwork?.image_url && <div className="artist-hover-art"><img src={a.latestArtwork.image_url} alt="" /><span>Latest work · {a.latestArtwork.title}</span></div>}
               {a.avatar_url && <img className="av-lg artist-avatar-image" src={a.avatar_url} alt={`${a.name} profile`} loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling.style.display = 'flex'; }} />}
               <div className="av-lg" style={{ display: a.avatar_url ? 'none' : 'flex' }}>{(a.name || '?').slice(0, 2).toUpperCase()}</div>

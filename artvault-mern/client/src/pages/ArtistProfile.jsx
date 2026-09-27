@@ -12,16 +12,19 @@ export default function ArtistProfile() {
   const [artist, setArtist] = useState(null);
   const [artworks, setArtworks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [columnCount, setColumnCount] = useState(() => profileColumnCount());
 
   function loadProfile() {
     setLoading(true);
+    setError('');
     return api
       .get(`/artists/${id}`)
       .then((res) => {
         setArtist(res.data.artist);
         setArtworks(res.data.artworks);
       })
+      .catch((err) => setError(err.response?.data?.message || 'Could not load this artist profile.'))
       .finally(() => setLoading(false));
   }
 
@@ -37,6 +40,7 @@ export default function ArtistProfile() {
   }, []);
 
   if (loading) return <div className="empty">Loading…</div>;
+  if (error) return <div className="empty">{error}<br /><button className="btn btn-ghost btn-sm" type="button" onClick={loadProfile}>Try again</button></div>;
   if (!artist) return <div className="empty">Artist not found.</div>;
 
   return (
@@ -44,7 +48,7 @@ export default function ArtistProfile() {
       <button className="back-link" onClick={() => navigate(-1)}>← Back</button>
       <div className="profile-hero">
       <div className="profile-head">
-        {artist.avatar_path ? <img className="profile-avatar-xl" src={artist.avatar_path} alt={`${artist.name} profile`} /> : <div className="av-xl">{artist.name.slice(0, 2).toUpperCase()}</div>}
+        {artist.avatar_url ? <img className="profile-avatar-xl" src={artist.avatar_url} alt={`${artist.name} profile`} loading="eager" fetchPriority="high" decoding="async" /> : <div className="av-xl">{artist.name.slice(0, 2).toUpperCase()}</div>}
         <div>
           <div className="eyebrow">Artist profile</div>
           <h1>{artist.name}</h1>
@@ -70,7 +74,7 @@ export default function ArtistProfile() {
           {Array.from({ length: columnCount }, (_, column) => (
             <div className="gallery-masonry-column" key={column}>
               {artworks.filter((_, index) => index % columnCount === column).map((w) => (
-                <ArtCard key={w._id} artwork={{ ...w, artist }} />
+                <ArtCard key={w._id} artwork={{ ...w, artist }} priority={artworks.indexOf(w) < 2} />
               ))}
             </div>
           ))}

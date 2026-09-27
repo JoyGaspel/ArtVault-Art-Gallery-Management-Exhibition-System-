@@ -103,7 +103,7 @@ export default function Gallery() {
       {!err && !loading && visible.length > 0 && (
         <>
           <div className={`gallery-masonry${search || active !== 'All' ? ' filtered-results' : ''}`} style={{ '--gallery-columns': renderedColumnCount }}>
-            {visible.map((w) => <ArtCard key={w._id} artwork={w} />)}
+            {visible.map((w, index) => <ArtCard key={w._id} artwork={w} priority={index < 4} />)}
           </div>
           <div className="gallery-end-marker" role="status">You&apos;ve reached the end of the gallery.</div>
         </>

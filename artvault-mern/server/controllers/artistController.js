@@ -6,6 +6,19 @@ const Archive = require('../models/Archive');
 const supabase = require('../config/supabase');
 const { ALL_SPECIALIZATIONS } = require('../models/Artist');
 const { recordAudit } = require('../utils/audit');
+const AdminProfile = require('../models/AdminProfile');
+
+async function syncAdminProfile(artist) {
+  const isAdmin = ['sub_admin', 'main_admin'].includes(artist.role);
+  if (isAdmin) {
+    return AdminProfile.updateOne(
+      { artistId: artist._id },
+      { $set: { role: artist.role, status: artist.status === 'suspended' ? 'suspended' : 'active' }, $setOnInsert: { promotedAt: new Date() } },
+      { upsert: true },
+    );
+  }
+  return AdminProfile.updateOne({ artistId: artist._id }, { $set: { status: 'inactive', role: 'sub_admin' } });
+}
 
 function cleanProfileText(value, maxLength) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
@@ -40,15 +53,15 @@ function cleanAvatar(value) {
 // GET /api/artists
 async function listArtists(req, res, next) {
   try {
-    res.set('Cache-Control', 'no-store');
+    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
     const { specialization } = req.query;
     const filter = { role: 'artist' };
     if (specialization) filter.specializations = specialization;
 
-    const artists = await Artist.find(filter).select('name specializations bio createdAt').lean();
+    const artists = await Artist.find(filter).select('name specializations bio createdAt updatedAt').lean();
     const withAvatarUrls = artists.map((artist) => ({
       ...artist,
-      avatar_url: `${req.protocol}://${req.get('host')}/api/artists/${artist._id}/avatar`,
+      avatar_url: `${req.protocol}://${req.get('host')}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}`,
     }));
     res.json({ artists: withAvatarUrls });
   } catch (err) {
@@ -73,16 +86,29 @@ async function getArtistAvatar(req, res, next) {
 // GET /api/artists/:id
 async function getArtist(req, res, next) {
   try {
-    res.set('Cache-Control', 'no-store');
-    const artist = await Artist.findById(req.params.id).select('name avatar_path specializations bio role createdAt');
+    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    const artist = await Artist.findById(req.params.id).select('name avatar_path specializations bio role createdAt updatedAt');
     if (!artist) return res.status(404).json({ message: 'Artist not found.' });
 
-    const artworks = (await Artwork.find({ artist: artist._id })
-      .select('-image_path')
-      .sort({ created_at: -1 })
-      .lean())
-      .map((artwork) => ({ ...artwork, has_image: true }));
-    res.json({ artist, artworks });
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
+    const avatarUrl = artist.avatar_path ? `${imageOrigin}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}` : '';
+    const artistData = artist.toObject();
+    delete artistData.avatar_path;
+    delete artistData.updatedAt;
+    const artworks = (await Artwork.aggregate([
+      { $match: { artist: artist._id } },
+      { $sort: { created_at: -1 } },
+      { $project: {
+        title: 1, description: 1, categories: 1, materials: 1,
+        created_at: 1, updated_at: 1, artist: 1,
+        has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+        has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
+      } },
+    ])).map((artwork) => ({
+      ...artwork,
+      thumbnail_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
+    }));
+    res.json({ artist: { ...artistData, avatar_url: avatarUrl }, artworks });
   } catch (err) {
     next(err);
   }
@@ -118,7 +144,9 @@ async function updateMyProfile(req, res, next) {
     if (avatar_path !== undefined) artist.avatar_path = cleanAvatar(avatar_path);
 
     await artist.save();
-    recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { fields: ['profile'] } });
+    const changedFields = ['name', 'bio', 'specializations'];
+    if (avatar_path !== undefined) changedFields.push('profile_picture');
+    await recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { fields: changedFields } });
     res.json({ artist: artist.toSafeObject() });
   } catch (err) {
     next(err);
@@ -154,9 +182,19 @@ async function deleteMyAccount(req, res, next) {
 async function listAdminArtists(req, res, next) {
   try {
     const artists = await Artist.find({ role: mongoose.trusted({ $in: ['artist', 'sub_admin'] }) })
-      .select('name email specializations bio avatar_path role status createdAt')
-      .sort({ createdAt: -1 });
-    res.json({ artists });
+      .select('name email specializations bio avatar_path role status createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .lean();
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
+    const safeArtists = artists.map((artist) => {
+      const hasAvatar = Boolean(artist.avatar_path);
+      delete artist.avatar_path;
+      return {
+        ...artist,
+        avatar_url: hasAvatar ? `${imageOrigin}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}` : '',
+      };
+    });
+    res.json({ artists: safeArtists });
   } catch (err) {
     next(err);
   }
@@ -178,6 +216,7 @@ async function setArtistStatus(req, res, next) {
     artist.status = status;
     artist.suspendedAt = status === 'suspended' ? new Date() : null;
     await artist.save();
+    await syncAdminProfile(artist);
     recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { status, administered: true } });
     res.json({ artist: artist.toSafeObject() });
   } catch (err) {
@@ -199,6 +238,7 @@ async function setArtistRole(req, res, next) {
     if (!artist) return res.status(404).json({ message: 'Artist account not found.' });
     artist.role = role;
     await artist.save();
+    await syncAdminProfile(artist);
     recordAudit({ req, action: 'role_change', entityType: 'artist', entityId: artist._id, details: { role } });
     res.json({ artist: artist.toSafeObject() });
   } catch (err) {

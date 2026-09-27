@@ -8,13 +8,18 @@ export default function ExhibitDetail() {
   const navigate = useNavigate();
   const [exhibit, setExhibit] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setLoading(true);
-    api.get(`/exhibits/${id}`).then((res) => setExhibit(res.data.exhibit)).finally(() => setLoading(false));
+    setError('');
+    api.get(`/exhibits/${id}`).then((res) => setExhibit(res.data.exhibit))
+      .catch((err) => setError(err.response?.data?.message || 'Could not load this exhibit.'))
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return <div className="empty">Loading…</div>;
+  if (error) return <div className="empty">{error}<br /><button className="btn btn-ghost btn-sm" type="button" onClick={() => window.location.reload()}>Try again</button></div>;
   if (!exhibit) return <div className="empty">Exhibit not found.</div>;
 
   return (
@@ -31,7 +36,7 @@ export default function ExhibitDetail() {
       ) : (
         <div className="gallery-grid exhibit-art-gallery">
           {exhibit.artworks.map((w, i) => (
-            <ArtCard key={w._id} artwork={w} height={150 + ((i * 39) % 110)} />
+            <ArtCard key={w._id} artwork={w} priority={i < 2} />
           ))}
         </div>
       )}

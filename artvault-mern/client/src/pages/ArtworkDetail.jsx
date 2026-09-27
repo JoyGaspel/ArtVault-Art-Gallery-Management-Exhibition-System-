@@ -24,6 +24,7 @@ export default function ArtworkDetail() {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [displayImage, setDisplayImage] = useState('');
 
   function load() {
     setLoading(true);
@@ -44,6 +45,16 @@ export default function ArtworkDetail() {
   }
 
   useEffect(load, [id]);
+  useEffect(() => {
+    const thumbnail = artwork?.thumbnail_url || '';
+    const full = artwork?.image_url || '';
+    setDisplayImage(thumbnail || full);
+    if (!full || full === thumbnail) return undefined;
+    const preload = new Image();
+    preload.onload = () => setDisplayImage(full);
+    preload.src = full;
+    return () => { preload.onload = null; };
+  }, [artwork]);
   useEffect(() => setZoom(1), [id]);
   useEffect(() => {
     document.documentElement.style.setProperty('--detail-zoom', String(zoom));
@@ -51,6 +62,7 @@ export default function ArtworkDetail() {
   }, [zoom]);
 
   const canManage = user && artwork && (['admin', 'sub_admin', 'main_admin'].includes(user.role) || user.id === artwork.artist?._id);
+  const detailImage = displayImage;
 
   function toggleCategory(cat) {
     setForm((f) => ({
@@ -99,7 +111,7 @@ export default function ArtworkDetail() {
     <section>
       <button className="back-link" onClick={() => navigate(-1)}>← Back</button>
 
-      {artwork.image_path && (
+      {artwork.has_image && (
         <div className="image-zoom-controls" aria-label="Artwork image zoom controls">
           <button type="button" onClick={() => setZoom((value) => Math.max(1, value - 0.25))} disabled={zoom <= 1} aria-label="Zoom out">−</button>
           <span>{Math.round(zoom * 100)}%</span>
@@ -108,7 +120,7 @@ export default function ArtworkDetail() {
         </div>
       )}
       <div className="detail-layout">
-        <div className="detail-hero">{artwork.image_path ? <img src={artwork.image_path} alt={artwork.title} /> : '🖼️'}</div>
+              <div className="detail-hero">{detailImage ? <img src={detailImage} alt={artwork.title} loading="eager" decoding="async" fetchPriority="high" /> : '🖼️'}</div>
         <div className="detail-body">
           {!editing ? (
             <>

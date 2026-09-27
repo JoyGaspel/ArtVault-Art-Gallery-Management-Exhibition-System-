@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
+import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -69,19 +70,16 @@ export default function Upload() {
     try {
       let image_path = '';
       if (image) {
-        image_path = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error('Could not read the image file.'));
-          reader.readAsDataURL(image);
-        });
+        image_path = await fileToDataUrl(image);
       }
+      const thumbnail_path = image ? await createGalleryThumbnail(image) : '';
       const cleanTitle = title.trim().replace(/\s+/g, ' ');
       const cleanDescription = description.trim().replace(/\s+/g, ' ');
       const res = await api.post('/artworks', {
         title: cleanTitle,
         description: cleanDescription,
         image_path,
+        thumbnail_path,
         materials: materials.split(',').map((s) => s.trim()).filter(Boolean),
         categories,
       });

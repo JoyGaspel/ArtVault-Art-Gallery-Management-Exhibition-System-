@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const compression = require('compression');
 const helmet = require('helmet');
 const { rateLimit } = require('express-rate-limit');
 const connectDB = require('./config/db');
@@ -14,6 +15,7 @@ const exhibitRoutes = require('./routes/exhibitRoutes');
 const exhibitEntryRoutes = require('./routes/exhibitEntryRoutes');
 const archiveRoutes = require('./routes/archiveRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const adminProfileRoutes = require('./routes/adminProfileRoutes');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -26,6 +28,9 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 // Apply standard HTTP security headers before handling API requests.
 // The frontend is deployed separately, so CSP is managed by the client host.
 app.use(helmet({ contentSecurityPolicy: false }));
+// Compress JSON/API responses so gallery metadata and page payloads transfer
+// quickly. Image responses are already encoded and are not recompressed.
+app.use(compression());
 
 // Render terminates TLS at its proxy. Redirect any insecure forwarded request
 // so API links and browser clients consistently use HTTPS in production.
@@ -99,6 +104,7 @@ app.use('/api/exhibits', exhibitRoutes);
 app.use('/api/exhibit-entries', exhibitEntryRoutes);
 app.use('/api/archives', archiveRoutes);
 app.use('/api/audit-logs', auditRoutes);
+app.use('/api/admin-profiles', adminProfileRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

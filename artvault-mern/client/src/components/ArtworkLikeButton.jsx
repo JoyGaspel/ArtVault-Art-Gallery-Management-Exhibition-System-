@@ -10,24 +10,55 @@ export default function ArtworkLikeButton({ artworkId, initialCount = 0, compact
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(Number(initialCount) || 0);
   const [saving, setSaving] = useState(false);
-  const [statusLoaded, setStatusLoaded] = useState(!canLike || compact);
+  const [statusLoaded, setStatusLoaded] = useState(!canLike);
+  const likeCacheKey = canLike && user?.id ? `artvault:liked:${user.id}:${artworkId}` : '';
 
   useEffect(() => setCount(Number(initialCount) || 0), [initialCount]);
 
   useEffect(() => {
+    // Reset account-specific state whenever the signed-in artist changes.
+    // The cache key includes the artist id, so one account can never inherit
+    // another account's red liked state after logout/login.
+    setLiked(false);
+    setStatusLoaded(!canLike);
+    if (!likeCacheKey) return;
+    try {
+      const cached = localStorage.getItem(likeCacheKey);
+      if (cached !== null) setLiked(cached === '1');
+    } catch { /* Local storage is optional. */ }
+    // The API remains authoritative; the cached value only prevents a
+    // visible flash while the account-specific status is being fetched.
+  }, [likeCacheKey]);
+
+  useEffect(() => {
+    const onLikesChanged = (event) => {
+      const detail = event.detail || {};
+      if (String(detail.artworkId) === String(artworkId) && Number.isFinite(Number(detail.likeCount))) {
+        setCount(Number(detail.likeCount));
+        if (typeof detail.liked === 'boolean') setLiked(detail.liked);
+      }
+    };
+    window.addEventListener('artvault:likes-changed', onLikesChanged);
+    return () => window.removeEventListener('artvault:likes-changed', onLikesChanged);
+  }, [artworkId]);
+
+  useEffect(() => {
     let cancelled = false;
-    if (!canLike || !artworkId || compact) return undefined;
+    if (!canLike || !artworkId) return undefined;
     api.get(`/artworks/${artworkId}/likes/me`)
       .then((response) => {
         if (!cancelled) {
-          setLiked(Boolean(response.data?.liked));
-          setCount(Number(response.data?.likeCount) || 0);
+          const likeCount = Number(response.data?.likeCount) || 0;
+          const serverLiked = Boolean(response.data?.liked);
+          setLiked(serverLiked);
+          setCount(likeCount);
+          try { if (likeCacheKey) localStorage.setItem(likeCacheKey, serverLiked ? '1' : '0'); } catch { /* Local storage is optional. */ }
           setStatusLoaded(true);
         }
       })
       .catch(() => null);
     return () => { cancelled = true; };
-  }, [artworkId, canLike]);
+  }, [artworkId, canLike, likeCacheKey]);
 
   async function toggle(event) {
     event.preventDefault();
@@ -45,6 +76,7 @@ export default function ArtworkLikeButton({ artworkId, initialCount = 0, compact
         currentCount = Number(status.data?.likeCount) || currentCount;
         setLiked(currentLiked);
         setCount(currentCount);
+        try { if (likeCacheKey) localStorage.setItem(likeCacheKey, currentLiked ? '1' : '0'); } catch { /* Local storage is optional. */ }
         setStatusLoaded(true);
       }
     } catch (error) {
@@ -60,7 +92,11 @@ export default function ArtworkLikeButton({ artworkId, initialCount = 0, compact
         ? await api.post(`/artworks/${artworkId}/likes`)
         : await api.delete(`/artworks/${artworkId}/likes`);
       setLiked(Boolean(response.data?.liked));
-      setCount(Number(response.data?.likeCount) || 0);
+      const likeCount = Number(response.data?.likeCount) || 0;
+      setCount(likeCount);
+      try { if (likeCacheKey) localStorage.setItem(likeCacheKey, nextLiked ? '1' : '0'); } catch { /* Local storage is optional. */ }
+      window.dispatchEvent(new CustomEvent('artvault:likes-changed', { detail: { artworkId, likeCount, liked: Boolean(response.data?.liked) } }));
+      if (nextLiked) window.setTimeout(() => window.dispatchEvent(new Event('artvault:notifications-changed')), 350);
     } catch (error) {
       setLiked(!nextLiked);
       setCount((value) => Math.max(0, value + (nextLiked ? -1 : 1)));

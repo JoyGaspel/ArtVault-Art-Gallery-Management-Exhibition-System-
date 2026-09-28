@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const Artwork = require('../models/Artwork');
 const ArtworkLike = require('../models/ArtworkLike');
+const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
+const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
 
 async function countLikes(artworkId) {
   return ArtworkLike.countDocuments({ artwork: artworkId });
@@ -10,12 +12,24 @@ async function countLikes(artworkId) {
 // POST /api/artworks/:id/likes (artists only)
 async function likeArtwork(req, res, next) {
   try {
-    const artwork = await Artwork.findById(req.params.id).select('_id');
+    const artwork = await Artwork.findById(req.params.id).select('_id artist title');
     if (!artwork) return res.status(404).json({ message: 'Artwork not found.' });
+    let created = false;
     try {
       await ArtworkLike.create({ artwork: artwork._id, artist: req.user._id });
+      created = true;
     } catch (error) {
       if (error?.code !== 11000) throw error;
+    }
+    if (created && String(artwork.artist) !== String(req.user._id)) {
+      Notification.create({
+        recipient: artwork.artist,
+        type: 'like',
+        title: 'Your artwork received a like',
+        message: `${req.user.name || 'An artist'} liked “${artwork.title}”.`,
+        artwork: artwork._id,
+      }).then((notification) => sendNotificationEmailInBackground(notification))
+        .catch((error) => console.error('Like notification could not be created:', error.message));
     }
     res.json({ liked: true, likeCount: await countLikes(artwork._id) });
   } catch (error) {

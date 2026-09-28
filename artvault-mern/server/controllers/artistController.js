@@ -59,10 +59,31 @@ async function listArtists(req, res, next) {
     const filter = { role: 'artist' };
     if (specialization) filter.specializations = specialization;
 
-    const artists = await Artist.find(filter).select('name specializations bio createdAt updatedAt').lean();
+    const artists = await Artist.aggregate([
+      { $match: filter },
+      { $sort: { createdAt: 1 } },
+      { $lookup: {
+        from: 'artworks',
+        let: { artistId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$artist', '$$artistId'] } } },
+          { $sort: { created_at: -1 } },
+          { $limit: 1 },
+          { $project: { title: 1, updated_at: 1, has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] } } },
+        ],
+        as: 'latestArtwork',
+      } },
+      { $project: { name: 1, specializations: 1, bio: 1, createdAt: 1, updatedAt: 1, latestArtwork: { $arrayElemAt: ['$latestArtwork', 0] } } },
+    ]);
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const withAvatarUrls = artists.map((artist) => ({
       ...artist,
       avatar_url: `${req.protocol}://${req.get('host')}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}`,
+      latestArtwork: artist.latestArtwork?.has_image ? {
+        _id: artist.latestArtwork._id,
+        title: artist.latestArtwork.title,
+        thumbnail_url: `${imageOrigin}/api/artworks/${artist.latestArtwork._id}/thumbnail?v=${encodeURIComponent(artist.latestArtwork.updated_at || '')}`,
+      } : null,
     }));
     res.json({ artists: withAvatarUrls });
   } catch (err) {
@@ -123,7 +144,7 @@ async function getArtist(req, res, next) {
 // PUT /api/artists/me  (the signed-in artist updates their own profile)
 async function updateMyProfile(req, res, next) {
   try {
-    const { name, firstName, lastName, bio, specializations, avatar_path } = req.body;
+    const { name, firstName, lastName, bio, specializations, avatar_path, emailLikes, emailSubmissionStatus, emailExhibits } = req.body;
     const artist = req.user;
 
     if (firstName !== undefined || lastName !== undefined) {
@@ -148,6 +169,9 @@ async function updateMyProfile(req, res, next) {
     }
     if (specializations !== undefined && artist.role === 'artist') artist.specializations = cleanSpecializations(specializations);
     if (avatar_path !== undefined) artist.avatar_path = cleanAvatar(avatar_path);
+    if (emailLikes !== undefined) artist.emailLikes = emailLikes === true;
+    if (emailSubmissionStatus !== undefined) artist.emailSubmissionStatus = emailSubmissionStatus === true;
+    if (emailExhibits !== undefined) artist.emailExhibits = emailExhibits === true;
 
     await artist.save();
     const changedFields = ['name', 'bio', 'specializations'];

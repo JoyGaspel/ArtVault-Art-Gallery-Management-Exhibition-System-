@@ -2,7 +2,10 @@ const Exhibit = require('../models/Exhibit');
 const mongoose = require('mongoose');
 const Archive = require('../models/Archive');
 const Artwork = require('../models/Artwork');
+const Artist = require('../models/Artist');
+const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
+const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
 
 function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
@@ -93,6 +96,34 @@ async function createExhibit(req, res, next) {
       ...fields,
       artworks: validArtworks,
     });
+    // Notify active artists in the background so creating an exhibit remains
+    // fast and a notification failure cannot block the admin action.
+    Artist.find({ role: 'artist', status: 'active' }).select('_id').lean()
+      .then(async (artists) => {
+        if (!artists.length) return;
+        const eventDate = new Date(exhibit.event_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const selectedWorks = validArtworks.length
+          ? await Artwork.find({ _id: mongoose.trusted({ $in: validArtworks }) }).select('_id artist title').lean()
+          : [];
+        const selectedByArtist = new Map();
+        selectedWorks.forEach((work) => {
+          const key = String(work.artist);
+          if (!selectedByArtist.has(key)) selectedByArtist.set(key, []);
+          selectedByArtist.get(key).push(work.title);
+        });
+        return Notification.insertMany(artists.map((artist) => ({
+          recipient: artist._id,
+          type: 'exhibit',
+          title: 'New exhibit opportunity',
+          message: `“${exhibit.name}” is scheduled for ${eventDate}. View the exhibit to learn more or submit your artwork.`,
+          exhibit: exhibit._id,
+          ...(selectedByArtist.has(String(artist._id)) ? {
+            title: 'Your artwork was selected',
+            message: `Your artwork${selectedByArtist.get(String(artist._id)).length > 1 ? 's' : ''} ${selectedByArtist.get(String(artist._id)).map((title) => `“${title}”`).join(', ')} ${selectedByArtist.get(String(artist._id)).length > 1 ? 'were' : 'was'} selected for “${exhibit.name}”. The exhibit is scheduled for ${eventDate}.`,
+          } : {}),
+        }))).then((notifications) => Promise.allSettled(notifications.map((notification) => sendNotificationEmailInBackground(notification))));
+      })
+      .catch((error) => console.error('Exhibit notifications could not be created:', error.message));
     recordAudit({ req, action: 'create', entityType: 'exhibit', entityId: exhibit._id, details: { name: exhibit.name } });
     res.status(201).json({ exhibit });
   } catch (err) {

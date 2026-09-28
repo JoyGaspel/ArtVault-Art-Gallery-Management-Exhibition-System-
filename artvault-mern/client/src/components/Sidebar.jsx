@@ -93,7 +93,7 @@ export default function Sidebar() {
               <div className="role">{user.role === 'main_admin' ? 'Main administrator' : user.role === 'sub_admin' ? 'Sub administrator' : isAdmin ? 'Administrator' : 'Artist account'}</div>
             </div>
           </NavLink>
-          <button className="signout-btn" type="button" title="Sign out" aria-label="Sign out" onClick={signOut}>Sign out</button>
+          <button className="signout-btn" type="button" title="Sign out" aria-label="Sign out" onClick={signOut}><Icon name="logout" size={16} /><span>Sign out</span></button>
         </div>
       ) : (
         <div className="guest-panel">

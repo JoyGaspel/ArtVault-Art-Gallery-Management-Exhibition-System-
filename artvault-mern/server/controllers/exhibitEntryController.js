@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const SubmitExhibitEntry = require('../models/SubmitExhibitEntry');
 const Exhibit = require('../models/Exhibit');
 const Artwork = require('../models/Artwork');
+const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
+const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -110,7 +112,9 @@ async function decideEntry(req, res, next) {
     if (!['approved', 'denied'].includes(status)) return res.status(400).json({ message: 'Decision must be approved or denied.' });
     const reason = typeof denial_reason === 'string' ? denial_reason.trim().slice(0, 500) : '';
     if (status === 'denied' && !reason) return res.status(400).json({ message: 'A reason is required when denying a submission.' });
-    const entry = await SubmitExhibitEntry.findById(req.params.id).populate('exhibit', 'name event_date');
+    const entry = await SubmitExhibitEntry.findById(req.params.id)
+      .populate('exhibit', 'name event_date')
+      .populate('artwork', 'title');
     if (!entry) return res.status(404).json({ message: 'Submission not found.' });
     if (entry.status !== 'pending') return res.status(400).json({ message: `This submission is already ${entry.status}.` });
     entry.status = status;
@@ -118,11 +122,23 @@ async function decideEntry(req, res, next) {
     entry.decided_at = new Date();
     entry.decided_by = req.user._id;
     await entry.save();
+    const artworkId = entry.artwork?._id || entry.artwork;
     if (status === 'approved') {
       // Approval is the only submission action that changes the existing
       // exhibit document, matching the original exhibit API behavior.
-      await Exhibit.updateOne({ _id: entry.exhibit._id }, { $addToSet: { artworks: entry.artwork } });
+      await Exhibit.updateOne({ _id: entry.exhibit._id }, { $addToSet: { artworks: artworkId } });
     }
+    const decisionText = status === 'approved' ? 'approved' : 'denied';
+    const reasonText = status === 'denied' ? ` Reason: ${reason}` : '';
+    Notification.create({
+      recipient: entry.artist,
+      type: 'submission_status',
+      title: `Exhibit submission ${decisionText}`,
+      message: `Your submission “${entry.artwork?.title || 'Artwork'}” for “${entry.exhibit.name}” was ${decisionText}.${reasonText}`,
+      artwork: artworkId,
+      exhibit: entry.exhibit._id,
+    }).then((notification) => sendNotificationEmailInBackground(notification))
+      .catch((error) => console.error('Submission notification could not be created:', error.message));
     recordAudit({ req, action: 'update', entityType: 'exhibit_entry', entityId: entry._id, details: { status, exhibit: entry.exhibit.name, denial_reason: reason || undefined } });
     res.json({ entry: await populateEntry(SubmitExhibitEntry.findById(entry._id)) });
   } catch (err) { next(err); }

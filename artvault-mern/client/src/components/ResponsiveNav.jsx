@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
+import NotificationBell from './NotificationBell';
 
 function initials(name = '') {
   return name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase() || '?';
@@ -89,12 +90,13 @@ export default function ResponsiveNav() {
           {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/audit-logs" icon="activity">{isMainAdmin ? 'Activity logs' : 'Artist activity'}</LinkItem>}
           {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/artwork-likes" icon="likes">Artwork likes</LinkItem>}
         </>}
-        {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out">Sign out</button>}
+        {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} /><span>Sign out</span></button>}
       </div>
 
       <button className="responsive-menu-toggle" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen}>
         <span aria-hidden="true"><Icon name="menu" size={21} /></span>
       </button>
+      <NotificationBell />
 
       <div className="responsive-account">
         {user ? <>

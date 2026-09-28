@@ -37,6 +37,9 @@ const artistSchema = new mongoose.Schema(
     // STEP 2 of the login flowchart — rate limiting / lockout
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
+    emailLikes: { type: Boolean, default: true },
+    emailSubmissionStatus: { type: Boolean, default: true },
+    emailExhibits: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
@@ -72,6 +75,9 @@ artistSchema.methods.toSafeObject = function toSafeObject() {
     specializations: this.specializations,
     bio: this.bio,
     avatar_path: this.avatar_path || '',
+    emailLikes: this.emailLikes !== false,
+    emailSubmissionStatus: this.emailSubmissionStatus !== false,
+    emailExhibits: this.emailExhibits !== false,
   };
 };
 

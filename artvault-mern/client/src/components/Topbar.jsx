@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
+import NotificationBell from './NotificationBell';
 
 export default function Topbar() {
   const navigate = useNavigate();
@@ -43,6 +44,7 @@ export default function Topbar() {
         />
       </form>
       <div className="topbar-spacer" />
+      <NotificationBell />
       {isArtist && <button className="btn btn-primary" type="button" onClick={() => navigate('/upload')}>Upload artwork</button>}
       {isAdmin && <>
         <button className="btn btn-primary" type="button" onClick={() => navigate('/manage-gallery')}>Manage gallery</button>

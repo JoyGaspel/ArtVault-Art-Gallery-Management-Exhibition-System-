@@ -14,6 +14,7 @@ const PATHS = {
   archives: <><path d="M3 6h18M5 6v14h14V6M4 3h16v3H4zM9 10h6" /></>,
   activity: <><path d="M3 12h4l2-7 4 14 2-7h6" /></>,
   likes: <path d="M20.8 8.7c0 5.5-8.8 10.3-8.8 10.3S3.2 14.2 3.2 8.7A4.7 4.7 0 0 1 12 6.3a4.7 4.7 0 0 1 8.8 2.4Z" />,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
   edit: <><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 18zM13.5 6.5l4 4" /></>,
   delete: <><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" /></>,
@@ -25,7 +26,7 @@ const PATHS = {
   calendar: <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
   home: <path d="m3 11 9-8 9 8v9H3zM9 20v-6h6v6" />,
-  logout: <path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6" />,
+  logout: <><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8" /><path d="M10 12h10M17 8l4 4-4 4" /></>,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   photo: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></>,
 };

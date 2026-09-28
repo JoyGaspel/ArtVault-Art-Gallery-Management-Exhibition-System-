@@ -17,6 +17,7 @@ const archiveRoutes = require('./routes/archiveRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const adminProfileRoutes = require('./routes/adminProfileRoutes');
 const likeRoutes = require('./routes/likeRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -107,6 +108,7 @@ app.use('/api/archives', archiveRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/admin-profiles', adminProfileRoutes);
 app.use('/api', likeRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

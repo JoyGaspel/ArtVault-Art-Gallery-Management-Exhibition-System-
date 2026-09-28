@@ -33,6 +33,11 @@ export default function Settings() {
   const [accountSaving, setAccountSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [avatarPath, setAvatarPath] = useState('');
+  const [emailLikes, setEmailLikes] = useState(true);
+  const [emailSubmissionStatus, setEmailSubmissionStatus] = useState(true);
+  const [emailExhibits, setEmailExhibits] = useState(true);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -42,6 +47,9 @@ export default function Settings() {
       setBio(user.bio || '');
       setSpecializations(user.specializations || []);
       setAvatarPath(user.avatar_path || '');
+      setEmailLikes(user.emailLikes !== false);
+      setEmailSubmissionStatus(user.emailSubmissionStatus !== false);
+      setEmailExhibits(user.emailExhibits !== false);
     }
   }, [user]);
 
@@ -56,7 +64,11 @@ export default function Settings() {
     const cleanBio = bio.trim().replace(/\s+/g, ' ');
     setSaving(true);
     try {
-      const payload = { firstName: cleanFirstName, lastName: cleanLastName, avatar_path: avatarPath };
+      const payload = {
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        avatar_path: avatarPath,
+      };
       if (!isAdmin) Object.assign(payload, { bio: cleanBio, specializations });
       const res = await api.put('/artists/me', payload);
       updateUser(res.data.artist);
@@ -71,6 +83,20 @@ export default function Settings() {
       showToast(err.response?.data?.message || 'Could not save changes.', true);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveEmailPreferences() {
+    setEmailSaving(true);
+    try {
+      const res = await api.put('/artists/me', { emailLikes, emailSubmissionStatus, emailExhibits });
+      updateUser(res.data.artist);
+      setEmailSaved(true);
+      showToast('Email notification preferences updated.');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Could not save email preferences.', true);
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -221,6 +247,21 @@ export default function Settings() {
             {!isAdmin && <><div className="bio">{bio}</div><div className="tags">
               {specializations.map((s) => <span className="tiny-tag" key={s}>{s}</span>)}
             </div></>}
+          </div>
+          <div className="form-card notification-preferences" style={{ marginTop: 18 }}>
+            <div className="eyebrow">Notifications</div>
+            <h2 style={{ margin: '4px 0 8px' }}>Email notifications</h2>
+            <div className="hint">Choose which ArtVault activity should also arrive by email. In-app notifications remain enabled.</div>
+            <label className="checkbox-row"><input type="checkbox" checked={emailLikes} onChange={(e) => { setEmailLikes(e.target.checked); setEmailSaved(false); }} /> Artwork likes</label>
+            <label className="checkbox-row"><input type="checkbox" checked={emailSubmissionStatus} onChange={(e) => { setEmailSubmissionStatus(e.target.checked); setEmailSaved(false); }} /> Exhibit submission decisions</label>
+            <label className="checkbox-row"><input type="checkbox" checked={emailExhibits} onChange={(e) => { setEmailExhibits(e.target.checked); setEmailSaved(false); }} /> New exhibit opportunities</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+              <button className="btn btn-primary" type="button" onClick={saveEmailPreferences} disabled={emailSaving}>
+                {emailSaving ? <span className="spinner" /> : null}
+                {emailSaving ? 'Saving…' : 'Save email preferences'}
+              </button>
+              {emailSaved && <span style={{ fontSize: 12.5, color: '#3F8452' }}>✓ Saved</span>}
+            </div>
           </div>
         </div>
       </div>

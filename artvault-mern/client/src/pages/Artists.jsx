@@ -53,7 +53,7 @@ export default function Artists() {
       {!loading && !error && (
         <div className="artist-grid">
           {visibleArtists.map((a) => (
-            <Link to={`/artists/${a._id}`} className="artist-card" key={a._id} onMouseEnter={() => { setHoveredArtist(a._id); prefetchProfile(a._id); }} onFocus={() => { setHoveredArtist(a._id); prefetchProfile(a._id); }} onMouseLeave={() => setHoveredArtist(null)}>
+            <Link to={`/artists/${a._id}`} className="artist-card" key={a._id} onPointerEnter={() => { setHoveredArtist(a._id); prefetchProfile(a._id); }} onFocus={() => { setHoveredArtist(a._id); prefetchProfile(a._id); }} onPointerLeave={() => setHoveredArtist(null)}>
               {hoveredArtist === a._id && (latestArtworks[a._id] || a.latestArtwork)?.thumbnail_url && <div className="artist-hover-art"><img src={(latestArtworks[a._id] || a.latestArtwork).thumbnail_url} alt="" loading="lazy" decoding="async" /><span>Latest work · {(latestArtworks[a._id] || a.latestArtwork).title}</span></div>}
               {a.avatar_url && <img className="av-lg artist-avatar-image" src={a.avatar_url} alt={`${a.name} profile`} loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling.style.display = 'flex'; }} />}
               <div className="av-lg" style={{ display: a.avatar_url ? 'none' : 'flex' }}>{(a.name || '?').slice(0, 2).toUpperCase()}</div>

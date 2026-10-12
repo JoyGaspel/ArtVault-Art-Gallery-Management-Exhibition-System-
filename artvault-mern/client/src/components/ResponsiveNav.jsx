@@ -32,10 +32,11 @@ export default function ResponsiveNav() {
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
   const isMainAdmin = user?.role === 'main_admin';
   const isArtist = user?.role === 'artist';
-  const canEditProfile = ['artist', 'admin', 'sub_admin', 'main_admin'].includes(user?.role);
+  const hasAdminActivity = ['sub_admin', 'main_admin'].includes(user?.role);
 
   useEffect(() => {
     setQuery(new URLSearchParams(location.search).get('search') || '');
+    setMenuOpen(false);
   }, [location.pathname, location.search]);
 
   function signOut() {
@@ -60,7 +61,7 @@ export default function ResponsiveNav() {
   }
 
   return (
-    <nav className={`responsive-nav${isAdmin ? ' admin-responsive-nav' : ''}${menuOpen ? ' menu-open' : ''}`} aria-label="Main navigation">
+    <nav className={`responsive-nav${isAdmin ? ' admin-responsive-nav' : ''}${isArtist ? ' artist-responsive-nav' : ''}${menuOpen ? ' menu-open' : ''}`} aria-label="Main navigation">
       <NavLink to="/" className="responsive-brand" aria-label="ArtVault home">
         <img className="responsive-brand-mark" src="/artvault-logos/artvault_logo_lightbg.png" alt="" />
         <span>ArtVault</span>
@@ -72,23 +73,39 @@ export default function ResponsiveNav() {
       </form>
 
       <div className="responsive-nav-links">
+        {(isArtist || isAdmin) && <span className="responsive-menu-heading">Discover</span>}
         <LinkItem to="/" icon="gallery" end>Gallery</LinkItem>
         <LinkItem to="/artists" icon="artists">Artists</LinkItem>
         <LinkItem to="/exhibits" icon="exhibits">Exhibits</LinkItem>
         {isArtist && <>
+          <span className="responsive-menu-heading">My studio</span>
           <LinkItem to="/upload" icon="upload">Upload</LinkItem>
+          <LinkItem to="/my-artworks" icon="photo">My artworks</LinkItem>
+          <LinkItem to="/vault" icon="vault">My Vault</LinkItem>
+          <span className="responsive-menu-heading">Submissions</span>
+          <LinkItem to="/exhibit-submissions" icon="submissions">Exhibit submissions</LinkItem>
+          <LinkItem to="/exhibit-submission-status" icon="status">Submission status</LinkItem>
+          <span className="responsive-menu-heading">Account</span>
           <LinkItem to={`/artists/${user.id}`} icon="profile">My profile</LinkItem>
           <LinkItem to="/settings" icon="settings">Settings</LinkItem>
         </>}
-        {canEditProfile && !isArtist && <LinkItem to="/settings" icon="settings">Settings</LinkItem>}
         {isAdmin && <>
+          <span className="responsive-menu-heading">Curation</span>
           <LinkItem to="/manage-gallery" icon="manageGallery">Manage gallery</LinkItem>
+          {isMainAdmin && <LinkItem to="/manage-vault" icon="vault">Artist Vaults</LinkItem>}
           <LinkItem to="/manage-exhibits" icon="manageExhibits">Manage exhibits</LinkItem>
+          <LinkItem to="/manage-exhibit-entries" icon="entries">Exhibit entries</LinkItem>
           <LinkItem to="/manage-artists" icon="artists">Manage artists</LinkItem>
-          {isMainAdmin && <LinkItem to="/manage-sub-admins" icon="admins">Manage sub-admins</LinkItem>}
+          {isMainAdmin && <>
+            <span className="responsive-menu-heading">Administration</span>
+            <LinkItem to="/manage-sub-admins" icon="admins">Manage sub-admins</LinkItem>
+          </>}
+          <span className="responsive-menu-heading">Activity &amp; records</span>
           <LinkItem to="/archives" icon="archives">Archives</LinkItem>
-          {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/audit-logs" icon="activity">{isMainAdmin ? 'Activity logs' : 'Artist activity'}</LinkItem>}
-          {['sub_admin', 'main_admin'].includes(user?.role) && <LinkItem to="/artwork-likes" icon="likes">Artwork likes</LinkItem>}
+          {hasAdminActivity && <LinkItem to="/audit-logs" icon="activity">{isMainAdmin ? 'Activity logs' : 'Artist activity'}</LinkItem>}
+          {hasAdminActivity && <LinkItem to="/artwork-likes" icon="likes">Artwork likes</LinkItem>}
+          <span className="responsive-menu-heading">Account</span>
+          <LinkItem to="/settings" icon="settings">Settings</LinkItem>
         </>}
         {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} /><span>Sign out</span></button>}
       </div>

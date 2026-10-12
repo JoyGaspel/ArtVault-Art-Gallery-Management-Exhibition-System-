@@ -9,7 +9,10 @@ const supabase = require('../config/supabase');
 
 async function listArchives(req, res, next) {
   try {
-    const filter = req.user.role === 'main_admin' ? {} : { entityType: mongoose.trusted({ $ne: 'artist' }) };
+    const filter = req.user.role === 'main_admin' ? {} : {
+      entityType: mongoose.trusted({ $ne: 'artist' }),
+      'snapshot.visibility': mongoose.trusted({ $ne: 'private' }),
+    };
     // Archive snapshots retain image data for restoration, but the archive
     // list only needs labels and timestamps. Excluding base64 image fields
     // prevents the admin page from downloading megabytes unnecessarily.
@@ -27,6 +30,7 @@ async function restoreArchive(req, res, next) {
   try {
     const archive = await Archive.findById(req.params.id);
     if (!archive) return res.status(404).json({ message: 'Archive item not found.' });
+    if (req.user.role !== 'main_admin' && archive.entityType === 'artwork' && archive.snapshot?.visibility === 'private') return res.status(404).json({ message: 'Archive item not found.' });
     if (archive.entityType === 'artist' && req.user.role !== 'main_admin') {
       return res.status(403).json({ message: 'Only the main administrator can review suspended artist accounts.' });
     }
@@ -98,6 +102,7 @@ async function requestArchiveDeletion(req, res, next) {
   try {
     const archive = await Archive.findById(req.params.id);
     if (!archive) return res.status(404).json({ message: 'Archive item not found.' });
+    if (req.user.role !== 'main_admin' && archive.entityType === 'artwork' && archive.snapshot?.visibility === 'private') return res.status(404).json({ message: 'Archive item not found.' });
     if (archive.entityType === 'artist') return res.status(403).json({ message: 'Suspended artist accounts are reviewed by the main administrator.' });
     if (archive.status === 'pending') return res.status(409).json({ message: 'This deletion is already awaiting main-admin review.' });
     archive.status = 'pending';

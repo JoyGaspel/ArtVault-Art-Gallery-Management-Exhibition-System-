@@ -4,6 +4,7 @@ import useAutoRefresh from '../hooks/useAutoRefresh';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import PageLoadState from '../components/PageLoadState';
+import ArtworkThumbnail from '../components/ArtworkThumbnail';
 
 export default function ArtworkLikes() {
   const { user } = useAuth();
@@ -52,9 +53,8 @@ export default function ArtworkLikes() {
       <PageLoadState loading={loading} error={error} onRetry={() => load()} label="likes…" />
       {!error && !loading && likes.length === 0 && <div className="empty">No artwork likes yet.</div>}
       {!error && !loading && likes.length > 0 && <div className="likes-activity-list">{likes.map((like) => {
-        const image = like.artwork?.thumbnail_url || like.artwork?.image_url;
         return <article className="like-activity-card" key={like._id}>
-          <div className="like-activity-image">{image ? <img src={image} alt="" loading="lazy" /> : '♡'}</div>
+          <div className="like-activity-image"><ArtworkThumbnail artwork={like.artwork} alt={like.artwork?.title || 'Artwork'} /></div>
           <div className="like-activity-details"><h2>{like.artwork?.title || 'Artwork unavailable'}</h2><div className="like-activity-artist">Liked by {like.artist?.name || 'Artist'}</div><div className="like-activity-meta">{(like.artwork?.categories || []).join(' · ') || 'Uncategorized'} · {new Date(like.createdAt).toLocaleString()}</div></div>
           {user.role === 'main_admin' && <button className="btn btn-danger btn-sm" type="button" disabled={removing === like._id} onClick={() => removeLike(like)}>{removing === like._id ? 'Removing…' : 'Remove like'}</button>}
         </article>;

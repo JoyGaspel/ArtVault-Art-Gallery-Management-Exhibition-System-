@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import ArtworkLikeButton from './ArtworkLikeButton';
+import ArtworkCardDetails from './ArtworkCardDetails';
 
 const EMOJI_BY_CATEGORY = {
   'Digital Art': '🎨', Illustration: '✒️', Photography: '📷', Sculpture: '🗿',
@@ -18,7 +19,6 @@ const prefetchedArtworkDetails = new Set();
 
 export default function ArtCard({ artwork, height, priority = false, to }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const artistName = artwork.artist?.name || 'Unknown artist';
   const apiBase = (api.defaults.baseURL || '/api').replace(/\/$/, '');
   const imageVersion = artwork.updated_at ? `?v=${encodeURIComponent(artwork.updated_at)}` : '';
   // Prefer the same-origin/API image endpoint. Older API responses may omit
@@ -40,12 +40,7 @@ export default function ArtCard({ artwork, height, priority = false, to }) {
       </div>
       <div className="art-info">
         <div className="art-title-row"><div className="t">{artwork.title}</div><div className="art-card-like"><ArtworkLikeButton artworkId={artwork._id} initialCount={artwork.like_count} compact /></div></div>
-        <div className="a">by {artistName}</div>
-        <div className="tags">
-          {(artwork.categories || []).map((c) => (
-            <span className="tiny-tag" key={c}>{c}</span>
-          ))}
-        </div>
+        <ArtworkCardDetails artwork={artwork} />
       </div>
       </Link>
     </article>

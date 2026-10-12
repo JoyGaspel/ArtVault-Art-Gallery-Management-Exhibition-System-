@@ -31,7 +31,7 @@ export default function Sidebar() {
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
   const isMainAdmin = user?.role === 'main_admin';
   const isArtist = user?.role === 'artist';
-  const canEditProfile = ['artist', 'admin', 'sub_admin', 'main_admin'].includes(user?.role);
+  const hasAdminActivity = ['sub_admin', 'main_admin'].includes(user?.role);
 
   function signOut() {
     logout();
@@ -51,38 +51,50 @@ export default function Sidebar() {
           {browseLinks.map((link) => <NavigationLink key={link.to} {...link} />)}
         </div>
 
-        {isArtist && (
+        {isArtist && <>
           <div className="nav-group">
             <div className="nav-heading">My studio</div>
             <NavigationLink to="/upload" label="Upload artwork" icon="upload" />
+            <NavigationLink to="/my-artworks" label="My artworks" icon="photo" />
+            <NavigationLink to="/vault" label="My artwork Vault" icon="vault" />
+          </div>
+          <div className="nav-group">
+            <div className="nav-heading">Submissions</div>
             <NavigationLink to="/exhibit-submissions" label="Exhibit submissions" icon="submissions" />
             <NavigationLink to="/exhibit-submission-status" label="Submission status" icon="status" />
+          </div>
+          <div className="nav-group">
+            <div className="nav-heading">Account</div>
             <NavigationLink to={`/artists/${user.id}`} label="My public profile" icon="profile" />
             <NavigationLink to="/settings" label="Profile settings" icon="settings" />
           </div>
-        )}
+        </>}
 
-        {canEditProfile && !isArtist && <div className="nav-group">
-          <div className="nav-heading">Account</div>
-          <NavigationLink to="/settings" label="Profile settings" icon="settings" />
-        </div>}
-
-        {isAdmin && (
+        {isAdmin && <>
           <div className="nav-group">
             <div className="nav-heading">Curation</div>
             <NavigationLink to="/manage-gallery" label="Manage gallery" icon="manageGallery" />
+            {isMainAdmin && <NavigationLink to="/manage-vault" label="Artist Vaults" icon="vault" />}
             <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="manageExhibits" />
             <NavigationLink to="/manage-exhibit-entries" label="Exhibit entries" icon="entries" />
             <NavigationLink to="/manage-artists" label="Manage artists" icon="artists" />
-            {isMainAdmin && <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="admins" />}
-            <NavigationLink to="/archives" label="Archives" icon="archives" />
-            {['sub_admin', 'main_admin'].includes(user?.role) && <NavigationLink to="/audit-logs" label={isMainAdmin ? 'Activity logs' : 'Artist activity'} icon="activity" />}
-            {['sub_admin', 'main_admin'].includes(user?.role) && <NavigationLink to="/artwork-likes" label="Artwork likes" icon="likes" />}
           </div>
-        )}
+          {isMainAdmin && <div className="nav-group">
+            <div className="nav-heading">Administration</div>
+            <NavigationLink to="/manage-sub-admins" label="Manage sub-admins" icon="admins" />
+          </div>}
+          <div className="nav-group">
+            <div className="nav-heading">Activity &amp; records</div>
+            <NavigationLink to="/archives" label="Archives" icon="archives" />
+            {hasAdminActivity && <NavigationLink to="/audit-logs" label={isMainAdmin ? 'Activity logs' : 'Artist activity'} icon="activity" />}
+            {hasAdminActivity && <NavigationLink to="/artwork-likes" label="Artwork likes" icon="likes" />}
+          </div>
+          <div className="nav-group">
+            <div className="nav-heading">Account</div>
+            <NavigationLink to="/settings" label="Profile settings" icon="settings" />
+          </div>
+        </>}
       </nav>
-
-      <div className="side-spacer" />
 
       {user ? (
         <div className="account-panel">

@@ -4,6 +4,8 @@ const Archive = require('../models/Archive');
 const ArtworkLike = require('../models/ArtworkLike');
 const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
+const { requireAuth } = require('../middleware/auth');
+const { isPrivateArtwork, publicArtworkFilter, canViewArtwork } = require('../utils/artworkVisibility');
 
 const ALLOWED_IMAGE_TYPES = new Map([
   ['image/png', '89504e470d0a1a0a'],
@@ -14,6 +16,24 @@ const ALLOWED_IMAGE_TYPES = new Map([
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CATEGORIES = 5;
 const MAX_MATERIALS = 20;
+// Small private thumbnails travel with the authenticated card list. This
+// avoids one extra token check and HTTP request per Vault card. Larger or
+// legacy images still use the protected thumbnail endpoint.
+const MAX_INLINE_PRIVATE_THUMBNAIL_CHARS = 180_000;
+
+function privateCardThumbnail() {
+  return {
+    $cond: [
+      { $and: [
+        { $eq: ['$visibility', 'private'] },
+        { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
+        { $lte: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, MAX_INLINE_PRIVATE_THUMBNAIL_CHARS] },
+      ] },
+      '$thumbnail_path',
+      '',
+    ],
+  };
+}
 
 function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
@@ -52,13 +72,13 @@ async function listArtworks(req, res, next) {
     // do not let a browser/CDN serve an older list response.
     // Keep the public catalog briefly cacheable so repeat visits render
     // immediately while still reflecting uploads and edits within seconds.
-    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const { category, artist } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     // Keep the public gallery responsive while still allowing management pages
     // to request a larger page explicitly.
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
-    const filter = {};
+    const filter = publicArtworkFilter();
     if (category) filter.categories = category;
     if (artist && mongoose.isValidObjectId(artist)) filter.artist = new mongoose.Types.ObjectId(artist);
 
@@ -76,7 +96,7 @@ async function listArtworks(req, res, next) {
           { $count: 'count' },
         ], as: 'like_stats' } },
         { $project: {
-          title: 1, description: 1, categories: 1, materials: 1,
+          title: 1, description: 1, categories: 1, materials: 1, visibility: 1,
           created_at: 1, updated_at: 1,
           artist: { $arrayElemAt: ['$artist', 0] },
           like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
@@ -101,6 +121,110 @@ async function listArtworks(req, res, next) {
   }
 }
 
+// Private media and detail routes use this before returning any content.
+// Public requests stay fast; only private artwork requires token verification.
+async function authorizeArtworkRead(req, res, next) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
+    const artwork = await Artwork.findById(req.params.id).select('artist visibility').lean();
+    if (!artwork) return res.status(404).json({ message: 'Artwork not found.' });
+    if (!isPrivateArtwork(artwork)) {
+      req.accessArtwork = artwork;
+      return next();
+    }
+    if (!req.headers.authorization) return res.status(404).json({ message: 'Artwork not found.' });
+    return requireAuth(req, res, () => {
+      if (!canViewArtwork(artwork, req.user)) return res.status(404).json({ message: 'Artwork not found.' });
+      req.accessArtwork = artwork;
+      return next();
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/artworks/vault or /api/artworks/admin/vault
+async function listVaultArtworks(req, res, next) {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
+    const filter = { visibility: 'private' };
+    if (req.user.role !== 'main_admin') filter.artist = req.user._id;
+    const [artworks, total] = await Promise.all([
+      Artwork.aggregate([
+        { $match: filter }, { $sort: { created_at: -1 } }, { $skip: (page - 1) * limit }, { $limit: limit },
+        { $lookup: { from: 'artists', localField: 'artist', foreignField: '_id', as: 'artist' } },
+        { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
+          { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } }, { $count: 'count' },
+        ], as: 'like_stats' } },
+        { $project: {
+          title: 1, description: 1, categories: 1, materials: 1, visibility: 1,
+          created_at: 1, updated_at: 1,
+          artist: {
+            _id: { $arrayElemAt: ['$artist._id', 0] },
+            name: { $arrayElemAt: ['$artist.name', 0] },
+            specializations: { $arrayElemAt: ['$artist.specializations', 0] },
+          },
+          like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
+          has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+          thumbnail_data: privateCardThumbnail(),
+        } },
+      ]),
+      Artwork.countDocuments(filter),
+    ]);
+    // Never issue public image URLs for vaulted works. Small thumbnails are
+    // included only in this authenticated, no-store response; others still
+    // use the authorization-checked thumbnail endpoint.
+    res.json({ artworks, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/artworks/mine/portfolio: owner's public and private artwork cards.
+// Keep /mine public-only for the exhibit-submission picker.
+async function listMyPortfolio(req, res, next) {
+  try {
+    res.set('Cache-Control', 'private, no-store');
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(48, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
+    const visibility = ['public', 'private'].includes(req.query.visibility) ? req.query.visibility : 'all';
+    const owner = req.user._id;
+    const publicFilter = { artist: owner, ...publicArtworkFilter() };
+    const privateFilter = { artist: owner, visibility: 'private' };
+    const filter = visibility === 'private' ? privateFilter : visibility === 'public' ? publicFilter : { artist: owner };
+    const [artworks, total, publicCount, privateCount] = await Promise.all([
+      Artwork.aggregate([
+        { $match: filter }, { $sort: { created_at: -1 } }, { $skip: (page - 1) * limit }, { $limit: limit },
+        { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
+          { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } }, { $count: 'count' },
+        ], as: 'like_stats' } },
+        { $project: {
+          title: 1, description: 1, categories: 1, visibility: { $ifNull: ['$visibility', 'public'] },
+          created_at: 1, updated_at: 1,
+          like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
+          has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
+          thumbnail_data: privateCardThumbnail(),
+        } },
+      ]),
+      Artwork.countDocuments(filter),
+      Artwork.countDocuments(publicFilter),
+      Artwork.countDocuments(privateFilter),
+    ]);
+    const imageOrigin = `${req.protocol}://${req.get('host')}`;
+    res.json({
+      artworks: artworks.map((artwork) => ({
+        ...artwork,
+        artist: { _id: req.user._id, name: req.user.name, specializations: req.user.specializations || [] },
+        thumbnail_url: artwork.visibility === 'public' && artwork.has_image
+          ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
+      })),
+      total, publicCount, privateCount, page, pages: Math.ceil(total / limit),
+    });
+  } catch (err) { next(err); }
+}
+
 // GET /api/artworks/:id/thumbnail — optimized gallery image with legacy fallback
 async function getArtworkThumbnail(req, res, next) {
   try {
@@ -116,8 +240,8 @@ async function getArtworkThumbnail(req, res, next) {
     res.removeHeader('Cross-Origin-Resource-Policy');
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     const match = /^data:([^;]+);base64,(.+)$/s.exec(imagePath);
-    if (!match) return res.redirect(imagePath);
-    res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    if (!match) return isPrivateArtwork(req.accessArtwork) ? res.status(404).end() : res.redirect(imagePath);
+    res.set('Cache-Control', isPrivateArtwork(req.accessArtwork) ? 'private, no-store' : 'public, no-cache, must-revalidate');
     res.type(match[1]).send(Buffer.from(match[2], 'base64'));
   } catch (err) { next(err); }
 }
@@ -139,8 +263,8 @@ async function getArtworkImage(req, res, next) {
     res.removeHeader('Cross-Origin-Resource-Policy');
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     const match = /^data:([^;]+);base64,(.+)$/s.exec(artwork.image_path);
-    if (!match) return res.redirect(artwork.image_path);
-    res.set('Cache-Control', 'public, max-age=3600, immutable');
+    if (!match) return isPrivateArtwork(req.accessArtwork) ? res.status(404).end() : res.redirect(artwork.image_path);
+    res.set('Cache-Control', isPrivateArtwork(req.accessArtwork) ? 'private, no-store' : 'public, no-cache, must-revalidate');
     res.type(match[1]).send(Buffer.from(match[2], 'base64'));
   } catch (err) {
     next(err);
@@ -150,7 +274,9 @@ async function getArtworkImage(req, res, next) {
 // POST /api/artworks  (auth required — artist uploads their own piece)
 async function createArtwork(req, res, next) {
   try {
-    const { title, description, image_path, thumbnail_path, categories, materials } = req.body;
+    const { title, description, image_path, thumbnail_path, categories, materials, visibility = 'public' } = req.body;
+    if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
+    if (visibility === 'private' && !['artist', 'sub_admin'].includes(req.user.role)) return res.status(403).json({ message: 'Only artists can save artworks to a vault.' });
     const cleanTitle = cleanText(title, 150);
     if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
     if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
@@ -166,8 +292,9 @@ async function createArtwork(req, res, next) {
       categories: cleanList(categories, MAX_CATEGORIES, 40),
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
+      visibility,
     });
-    recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
+    recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: visibility === 'private' ? { visibility } : { title: artwork.title } });
 
     res.status(201).json({ artwork });
   } catch (err) {
@@ -178,7 +305,7 @@ async function createArtwork(req, res, next) {
 // GET /api/artworks/:id
 async function getArtwork(req, res, next) {
   try {
-    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    res.set('Cache-Control', isPrivateArtwork(req.accessArtwork) ? 'private, no-store' : 'public, no-cache, must-revalidate');
     const [artworkRows] = await Artwork.aggregate([
       { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
       { $lookup: { from: 'artists', let: { artistId: '$artist' }, pipeline: [
@@ -190,7 +317,7 @@ async function getArtwork(req, res, next) {
         { $count: 'count' },
       ], as: 'like_stats' } },
       { $project: {
-        title: 1, description: 1, categories: 1, materials: 1,
+        title: 1, description: 1, categories: 1, materials: 1, visibility: 1,
         created_at: 1, updated_at: 1,
         artist: { $arrayElemAt: ['$artist', 0] },
         like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
@@ -206,8 +333,8 @@ async function getArtwork(req, res, next) {
       artwork: {
         ...artworkRows,
         artist: artworkRows.artist ? { _id: artworkRows.artist._id, name: artworkRows.artist.name, specializations: artworkRows.artist.specializations || [], bio: artworkRows.artist.bio || '' } : null,
-        image_url: artworkRows.has_image ? `${imageOrigin}/api/artworks/${artworkRows._id}/image?v=${encodeURIComponent(artworkRows.updated_at || '')}` : '',
-        thumbnail_url: artworkRows.has_image ? `${imageOrigin}/api/artworks/${artworkRows._id}/thumbnail?v=${encodeURIComponent(artworkRows.updated_at || '')}` : '',
+        image_url: artworkRows.has_image && !isPrivateArtwork(artworkRows) ? `${imageOrigin}/api/artworks/${artworkRows._id}/image?v=${encodeURIComponent(artworkRows.updated_at || '')}` : '',
+        thumbnail_url: artworkRows.has_image && !isPrivateArtwork(artworkRows) ? `${imageOrigin}/api/artworks/${artworkRows._id}/thumbnail?v=${encodeURIComponent(artworkRows.updated_at || '')}` : '',
       },
       exhibits,
     });
@@ -229,7 +356,7 @@ async function loadArtworkAndAuthorize(req, res, next) {
 
     const isOwner = String(artwork.artist) === String(req.user._id);
     const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(req.user.role);
-    if (!isOwner && !isAdmin) {
+    if ((!isOwner && !isAdmin) || (isPrivateArtwork(artwork) && !isOwner && req.user.role !== 'main_admin')) {
       return res.status(403).json({ message: 'You can only manage your own artwork.' });
     }
 
@@ -238,6 +365,28 @@ async function loadArtworkAndAuthorize(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+// Only the artist who owns a work can change its visibility.
+async function setArtworkVisibility(req, res, next) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
+    const { visibility } = req.body;
+    if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
+    const artwork = await Artwork.findOne({ _id: req.params.id, artist: req.user._id });
+    if (!artwork) return res.status(404).json({ message: 'Artwork not found.' });
+    const storedImage = /^data:image\/(?:png|jpeg|webp|gif);base64,/i;
+    if (visibility === 'private' && ((artwork.image_path && !storedImage.test(artwork.image_path)) || (artwork.thumbnail_path && !storedImage.test(artwork.thumbnail_path)))) {
+      return res.status(409).json({ message: 'This older artwork uses an external image URL. Re-upload its image before moving it to the Vault.' });
+    }
+    if ((artwork.visibility || 'public') !== visibility) {
+      artwork.visibility = visibility;
+      await artwork.save();
+      recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: { visibility } });
+    }
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ artwork: { _id: artwork._id, visibility: artwork.visibility, updated_at: artwork.updated_at } });
+  } catch (err) { next(err); }
 }
 
 // PUT /api/artworks/:id  (owner artist or admin only — see loadArtworkAndAuthorize)
@@ -259,7 +408,7 @@ async function updateArtwork(req, res, next) {
     if (materials !== undefined) artwork.materials = cleanList(materials, MAX_MATERIALS, 80);
 
     await artwork.save();
-    recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
+    recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: isPrivateArtwork(artwork) ? { visibility: 'private' } : { title: artwork.title } });
     res.json({ artwork });
   } catch (err) {
     next(err);
@@ -274,7 +423,7 @@ async function deleteArtwork(req, res, next) {
     await artwork.deleteOne();
     await ArtworkLike.deleteMany({ artwork: artwork._id });
     await Exhibit.updateMany({}, { $pull: { artworks: artwork._id } });
-    recordAudit({ req, action: 'delete', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title } });
+    recordAudit({ req, action: 'delete', entityType: 'artwork', entityId: artwork._id, details: isPrivateArtwork(artwork) ? { visibility: 'private' } : { title: artwork.title } });
     res.json({ message: 'Artwork removed.' });
   } catch (err) {
     next(err);
@@ -284,6 +433,10 @@ async function deleteArtwork(req, res, next) {
 module.exports = {
   listArtworks,
   listMyArtworks,
+  listVaultArtworks,
+  listMyPortfolio,
+  authorizeArtworkRead,
+  setArtworkVisibility,
   getArtworkImage,
   getArtworkThumbnail,
   createArtwork,

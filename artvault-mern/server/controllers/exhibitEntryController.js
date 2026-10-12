@@ -5,6 +5,7 @@ const Artwork = require('../models/Artwork');
 const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
 const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
+const { isPrivateArtwork, publicArtworkFilter } = require('../utils/artworkVisibility');
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -19,7 +20,7 @@ function cutoffFor(exhibit) {
 function populateEntry(query) {
   return query
     .populate({ path: 'artist', select: 'name email' })
-    .populate({ path: 'artwork', select: 'title description categories materials artist created_at', populate: { path: 'artist', select: 'name' } })
+    .populate({ path: 'artwork', select: 'title description categories materials artist created_at visibility', populate: { path: 'artist', select: 'name' } })
     .populate({ path: 'exhibit', select: 'name description event_date artworks' })
     .populate({ path: 'decided_by', select: 'name role' });
 }
@@ -54,7 +55,8 @@ async function listReviewEntries(req, res, next) {
     const filter = req.query.status && ['pending', 'approved', 'denied', 'withdrawn'].includes(req.query.status)
       ? { status: req.query.status } : {};
     const entries = await populateEntry(SubmitExhibitEntry.find(filter).sort({ createdAt: -1 }));
-    res.json({ entries: addAttemptMetadata(entries) });
+    const visible = req.user.role === 'main_admin' ? entries : entries.filter((entry) => !isPrivateArtwork(entry.artwork));
+    res.json({ entries: addAttemptMetadata(visible) });
   } catch (err) { next(err); }
 }
 
@@ -69,7 +71,7 @@ async function submitEntry(req, res, next) {
     if (new Date(exhibit.event_date) <= new Date()) return res.status(400).json({ message: 'This exhibit has already started.' });
     if (new Date() >= cutoffFor(exhibit)) return res.status(400).json({ message: 'Entries close three days before the exhibit date.' });
 
-    const artwork = await Artwork.findOne({ _id: artworkId, artist: req.user._id }).select('title artist');
+    const artwork = await Artwork.findOne({ _id: artworkId, artist: req.user._id, ...publicArtworkFilter() }).select('title artist');
     if (!artwork) return res.status(403).json({ message: 'You can only submit your own artwork.' });
 
     if (exhibit.artworks.some((includedId) => String(includedId) === String(artwork._id))) {
@@ -114,8 +116,9 @@ async function decideEntry(req, res, next) {
     if (status === 'denied' && !reason) return res.status(400).json({ message: 'A reason is required when denying a submission.' });
     const entry = await SubmitExhibitEntry.findById(req.params.id)
       .populate('exhibit', 'name event_date')
-      .populate('artwork', 'title');
+      .populate('artwork', 'title visibility');
     if (!entry) return res.status(404).json({ message: 'Submission not found.' });
+    if (isPrivateArtwork(entry.artwork)) return res.status(409).json({ message: 'This artwork is in the artist’s Vault and cannot be reviewed until it is public.' });
     if (entry.status !== 'pending') return res.status(400).json({ message: `This submission is already ${entry.status}.` });
     entry.status = status;
     entry.denial_reason = status === 'denied' ? reason : '';

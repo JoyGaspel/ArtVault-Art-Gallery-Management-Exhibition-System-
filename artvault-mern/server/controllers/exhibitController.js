@@ -6,6 +6,7 @@ const Artist = require('../models/Artist');
 const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
 const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
+const { publicArtworkFilter } = require('../utils/artworkVisibility');
 
 function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
@@ -29,13 +30,13 @@ function validateExhibitFields({ name, description, event_date }) {
 // GET /api/exhibits
 async function listExhibits(req, res, next) {
   try {
-    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const exhibits = await Exhibit.find()
-      .populate({ path: 'artworks', select: 'title categories' })
+      .populate({ path: 'artworks', select: 'title categories', match: publicArtworkFilter() })
       .sort({ event_date: 1 })
       .lean();
     exhibits.forEach((exhibit) => {
-      exhibit.artworks = exhibit.artworks.map((artwork) => ({ ...artwork, has_image: true }));
+      exhibit.artworks = exhibit.artworks.filter(Boolean).map((artwork) => ({ ...artwork, has_image: true }));
     });
     res.json({ exhibits });
   } catch (err) {
@@ -46,13 +47,13 @@ async function listExhibits(req, res, next) {
 // GET /api/exhibits/:id
 async function getExhibit(req, res, next) {
   try {
-    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const exhibit = await Exhibit.findById(req.params.id).lean();
     if (!exhibit) return res.status(404).json({ message: 'Exhibit not found.' });
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const artworkIds = exhibit.artworks || [];
     const artworks = artworkIds.length ? await Artwork.aggregate([
-      { $match: { _id: { $in: artworkIds } } },
+      { $match: { _id: { $in: artworkIds }, ...publicArtworkFilter() } },
       { $addFields: { exhibit_order: { $indexOfArray: [artworkIds, '$_id'] } } },
       { $sort: { exhibit_order: 1 } },
       { $lookup: { from: 'artists', localField: 'artist', foreignField: '_id', as: 'artist' } },
@@ -70,7 +71,7 @@ async function getExhibit(req, res, next) {
     ]) : [];
     exhibit.artworks = artworks.map((artwork) => ({
       ...artwork,
-      artist: artwork.artist ? { _id: artwork.artist._id, name: artwork.artist.name } : null,
+      artist: artwork.artist ? { _id: artwork.artist._id, name: artwork.artist.name, specializations: artwork.artist.specializations || [] } : null,
       thumbnail_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
     }));
     res.json({ exhibit });
@@ -89,7 +90,7 @@ async function createExhibit(req, res, next) {
     let validArtworks = [];
     const artworkIds = cleanArtworkIds(artworks);
     if (artworkIds.length) {
-      validArtworks = await Artwork.find({ _id: mongoose.trusted({ $in: artworkIds }) }).distinct('_id');
+      validArtworks = await Artwork.find({ _id: mongoose.trusted({ $in: artworkIds }), ...publicArtworkFilter() }).distinct('_id');
     }
 
     const exhibit = await Exhibit.create({
@@ -149,7 +150,7 @@ async function updateExhibit(req, res, next) {
     exhibit.event_date = fields.event_date;
     if (artworks !== undefined) {
       const artworkIds = cleanArtworkIds(artworks);
-    exhibit.artworks = await Artwork.find({ _id: mongoose.trusted({ $in: artworkIds }) }).distinct('_id');
+      exhibit.artworks = await Artwork.find({ _id: mongoose.trusted({ $in: artworkIds }), ...publicArtworkFilter() }).distinct('_id');
     }
 
     await exhibit.save();

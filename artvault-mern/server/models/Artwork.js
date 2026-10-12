@@ -7,6 +7,8 @@ const artworkSchema = new mongoose.Schema(
     image_path: { type: String, trim: true, default: '' },
     thumbnail_path: { type: String, trim: true, default: '' },
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true },
+    // Existing documents without this field remain public for compatibility.
+    visibility: { type: String, enum: ['public', 'private'], default: 'public', index: true },
     categories: { type: [String], default: [] },
     materials: { type: [String], default: [] },
   },
@@ -14,6 +16,7 @@ const artworkSchema = new mongoose.Schema(
 );
 
 artworkSchema.index({ artist: 1 });
+artworkSchema.index({ artist: 1, visibility: 1, created_at: -1 });
 artworkSchema.index({ categories: 1 });
 artworkSchema.index({ created_at: -1 });
 

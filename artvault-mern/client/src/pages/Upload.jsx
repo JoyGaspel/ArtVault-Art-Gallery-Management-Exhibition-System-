@@ -23,6 +23,7 @@ export default function Upload() {
   const [categories, setCategories] = useState(['Digital Art']);
   const [titleErr, setTitleErr] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [visibility, setVisibility] = useState('public');
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');
   const fileInputRef = useRef(null);
@@ -82,9 +83,10 @@ export default function Upload() {
         thumbnail_path,
         materials: materials.split(',').map((s) => s.trim()).filter(Boolean),
         categories,
+        visibility,
       });
-      showToast(`"${res.data.artwork.title}" published to the gallery.`);
-      navigate(`/artworks/${res.data.artwork._id}`);
+      showToast(visibility === 'private' ? `"${res.data.artwork.title}" saved to your Vault.` : `"${res.data.artwork.title}" published to the gallery.`);
+      navigate(visibility === 'private' ? '/vault' : `/artworks/${res.data.artwork._id}`);
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Could not publish this artwork.', true);
     } finally {
@@ -152,10 +154,15 @@ export default function Upload() {
           <div className="hint">Separate materials with commas.</div>
         </div>
 
+        <div className="vault-upload-choice" role="group" aria-label="Artwork visibility">
+            <label><input type="radio" name="artwork-visibility" checked={visibility === 'public'} onChange={() => setVisibility('public')} /> Public gallery</label>
+            <label><input type="radio" name="artwork-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} /> Save privately to my Vault</label>
+            <small>Vault artworks are visible only to you and the main administrator.</small>
+        </div>
         <div className="form-actions">
           <button className="btn btn-primary" onClick={publish} disabled={saving}>
             {saving ? <span className="spinner" /> : null}
-            {saving ? 'Publishing…' : 'Publish artwork'}
+            {saving ? 'Saving…' : visibility === 'private' ? 'Save to Vault' : 'Publish artwork'}
           </button>
           <button className="btn btn-ghost" onClick={() => navigate('/')}>Cancel</button>
         </div>

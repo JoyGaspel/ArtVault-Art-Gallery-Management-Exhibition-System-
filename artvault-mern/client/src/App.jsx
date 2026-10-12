@@ -24,6 +24,8 @@ import ExhibitSubmissions from './pages/ExhibitSubmissions';
 import ManageExhibitEntries from './pages/ManageExhibitEntries';
 import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
 import ArtworkLikes from './pages/ArtworkLikes';
+import Vault from './pages/Vault';
+import MyArtworks from './pages/MyArtworks';
 
 export default function App() {
   return (
@@ -42,6 +44,9 @@ export default function App() {
               <Route path="/exhibits" element={<Exhibits />} />
               <Route path="/exhibits/:id" element={<ExhibitDetail />} />
               <Route path="/upload" element={<ProtectedRoute role="artist"><Upload /></ProtectedRoute>} />
+              <Route path="/vault" element={<ProtectedRoute role="artist"><Vault /></ProtectedRoute>} />
+              <Route path="/my-artworks" element={<ProtectedRoute role="artist"><MyArtworks /></ProtectedRoute>} />
+              <Route path="/manage-vault" element={<ProtectedRoute role={['main_admin']}><Vault /></ProtectedRoute>} />
               <Route path="/exhibit-submissions" element={<ProtectedRoute role="artist"><ExhibitSubmissions /></ProtectedRoute>} />
               <Route path="/exhibit-submission-status" element={<ProtectedRoute role="artist"><ExhibitSubmissionStatus /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute role={['artist', 'admin', 'sub_admin', 'main_admin']}><Settings /></ProtectedRoute>} />

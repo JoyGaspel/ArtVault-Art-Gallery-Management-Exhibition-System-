@@ -4,9 +4,9 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const compression = require('compression');
 const helmet = require('helmet');
-const { rateLimit } = require('express-rate-limit');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
+const { createRateLimiters } = require('./middleware/rateLimits');
 
 const authRoutes = require('./routes/authRoutes');
 const artworkRoutes = require('./routes/artworkRoutes');
@@ -43,21 +43,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 300,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  message: { message: 'Too many requests. Please try again later.' },
-});
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-  message: { message: 'Too many sign-in attempts. Please try again later.' },
-});
+const { apiLimiter, authRouteLimiter, failedLoginLimiter } = createRateLimiters();
 
 // Render/Vercel environment variables are often entered as a comma-separated
 // list. Trim each value so an accidental space does not cause a CORS failure.
@@ -98,8 +84,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Mount auth first so ordinary gallery/API traffic cannot exhaust its budget.
+app.use('/api/auth', authRouteLimiter, failedLoginLimiter, authRoutes);
 app.use('/api', apiLimiter);
-app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/artworks', artworkRoutes);
 app.use('/api/artists', artistRoutes);
 app.use('/api/exhibits', exhibitRoutes);

@@ -8,6 +8,7 @@ const { ALL_SPECIALIZATIONS } = require('../models/Artist');
 const { recordAudit } = require('../utils/audit');
 const AdminProfile = require('../models/AdminProfile');
 const ArtworkLike = require('../models/ArtworkLike');
+const { publicArtworkFilter } = require('../utils/artworkVisibility');
 
 async function syncAdminProfile(artist) {
   const isAdmin = ['sub_admin', 'main_admin'].includes(artist.role);
@@ -54,7 +55,7 @@ function cleanAvatar(value) {
 // GET /api/artists
 async function listArtists(req, res, next) {
   try {
-    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const { specialization } = req.query;
     const filter = { role: 'artist' };
     if (specialization) filter.specializations = specialization;
@@ -67,22 +68,38 @@ async function listArtists(req, res, next) {
         let: { artistId: '$_id' },
         pipeline: [
           { $match: { $expr: { $eq: ['$artist', '$$artistId'] } } },
+          { $match: { visibility: { $ne: 'private' } } },
           { $sort: { created_at: -1 } },
           { $limit: 1 },
           { $project: { title: 1, updated_at: 1, has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] } } },
         ],
         as: 'latestArtwork',
       } },
-      { $project: { name: 1, specializations: 1, bio: 1, createdAt: 1, updatedAt: 1, latestArtwork: { $arrayElemAt: ['$latestArtwork', 0] } } },
+      { $lookup: {
+        from: 'artworks',
+        let: { artistId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$artist', '$$artistId'] } } },
+          { $match: publicArtworkFilter() },
+          { $count: 'count' },
+        ],
+        as: 'publishedArtworkStats',
+      } },
+      { $project: {
+        name: 1, specializations: 1, bio: 1, createdAt: 1, updatedAt: 1,
+        latestArtwork: { $arrayElemAt: ['$latestArtwork', 0] },
+        publishedArtworkCount: { $ifNull: [{ $arrayElemAt: ['$publishedArtworkStats.count', 0] }, 0] },
+        hasAvatar: { $gt: [{ $strLenCP: { $ifNull: ['$avatar_path', ''] } }, 0] },
+      } },
     ]);
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const withAvatarUrls = artists.map((artist) => ({
       ...artist,
-      avatar_url: `${req.protocol}://${req.get('host')}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}`,
-      latestArtwork: artist.latestArtwork?.has_image ? {
+      avatar_url: artist.hasAvatar ? `${req.protocol}://${req.get('host')}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}` : '',
+      latestArtwork: artist.latestArtwork ? {
         _id: artist.latestArtwork._id,
         title: artist.latestArtwork.title,
-        thumbnail_url: `${imageOrigin}/api/artworks/${artist.latestArtwork._id}/thumbnail?v=${encodeURIComponent(artist.latestArtwork.updated_at || '')}`,
+        thumbnail_url: artist.latestArtwork.has_image ? `${imageOrigin}/api/artworks/${artist.latestArtwork._id}/thumbnail?v=${encodeURIComponent(artist.latestArtwork.updated_at || '')}` : '',
       } : null,
     }));
     res.json({ artists: withAvatarUrls });
@@ -108,7 +125,7 @@ async function getArtistAvatar(req, res, next) {
 // GET /api/artists/:id
 async function getArtist(req, res, next) {
   try {
-    res.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=30');
+    res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const artist = await Artist.findById(req.params.id).select('name avatar_path specializations bio role createdAt updatedAt');
     if (!artist) return res.status(404).json({ message: 'Artist not found.' });
 
@@ -118,7 +135,7 @@ async function getArtist(req, res, next) {
     delete artistData.avatar_path;
     delete artistData.updatedAt;
     const artworks = (await Artwork.aggregate([
-      { $match: { artist: artist._id } },
+      { $match: { artist: artist._id, ...publicArtworkFilter() } },
       { $sort: { created_at: -1 } },
       { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
         { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } },
@@ -303,6 +320,9 @@ async function deleteArtistAsAdmin(req, res, next) {
   try {
     const artist = await Artist.findOne({ _id: req.params.id, role: mongoose.trusted({ $in: ['artist', 'sub_admin'] }) }).select('+supabaseUserId');
     if (!artist) return res.status(404).json({ message: 'Artist account not found.' });
+    if (req.user.role !== 'main_admin' && await Artwork.exists({ artist: artist._id, visibility: 'private' })) {
+      return res.status(403).json({ message: 'This artist has private Vault artworks. Only the main administrator can remove this account.' });
+    }
 
     const artworks = await Artwork.find({ artist: artist._id }).select('_id');
     const artworkIds = artworks.map((artwork) => artwork._id);

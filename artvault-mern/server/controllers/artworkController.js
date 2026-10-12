@@ -150,7 +150,7 @@ async function listVaultArtworks(req, res, next) {
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
     const filter = { visibility: 'private' };
-    if (req.user.role !== 'main_admin') filter.artist = req.user._id;
+    if (!['main_admin', 'sub_admin'].includes(req.user.role)) filter.artist = req.user._id;
     const [artworks, total] = await Promise.all([
       Artwork.aggregate([
         { $match: filter }, { $sort: { created_at: -1 } }, { $skip: (page - 1) * limit }, { $limit: limit },
@@ -276,7 +276,7 @@ async function createArtwork(req, res, next) {
   try {
     const { title, description, image_path, thumbnail_path, categories, materials, visibility = 'public' } = req.body;
     if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
-    if (visibility === 'private' && !['artist', 'sub_admin'].includes(req.user.role)) return res.status(403).json({ message: 'Only artists can save artworks to a vault.' });
+    if (visibility === 'private' && req.user.role !== 'artist') return res.status(403).json({ message: 'Only artists can save artworks to a vault.' });
     const cleanTitle = cleanText(title, 150);
     if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
     if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
@@ -356,6 +356,9 @@ async function loadArtworkAndAuthorize(req, res, next) {
 
     const isOwner = String(artwork.artist) === String(req.user._id);
     const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(req.user.role);
+    if (isPrivateArtwork(artwork) && req.user.role === 'sub_admin') {
+      return res.status(403).json({ message: 'Sub-admins can only view Artist Vaults.' });
+    }
     if ((!isOwner && !isAdmin) || (isPrivateArtwork(artwork) && !isOwner && req.user.role !== 'main_admin')) {
       return res.status(403).json({ message: 'You can only manage your own artwork.' });
     }
@@ -370,6 +373,7 @@ async function loadArtworkAndAuthorize(req, res, next) {
 // Only the artist who owns a work can change its visibility.
 async function setArtworkVisibility(req, res, next) {
   try {
+    if (req.user.role === 'sub_admin') return res.status(403).json({ message: 'Sub-admins can only view Artist Vaults.' });
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
     const { visibility } = req.body;
     if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });

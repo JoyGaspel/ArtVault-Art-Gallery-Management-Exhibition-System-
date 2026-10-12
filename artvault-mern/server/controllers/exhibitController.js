@@ -7,6 +7,8 @@ const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
 const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
 const { publicArtworkFilter } = require('../utils/artworkVisibility');
+const { eventDateKey, exhibitWindow, withExhibitWindow, parseExhibitTimes } = require('../utils/exhibitSchedule');
+const { queueExhibitLifecycleCheck } = require('../services/exhibitLifecycleService');
 
 function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
@@ -30,15 +32,16 @@ function validateExhibitFields({ name, description, event_date }) {
 // GET /api/exhibits
 async function listExhibits(req, res, next) {
   try {
+    queueExhibitLifecycleCheck();
     res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const exhibits = await Exhibit.find()
       .populate({ path: 'artworks', select: 'title categories', match: publicArtworkFilter() })
       .sort({ event_date: 1 })
       .lean();
-    exhibits.forEach((exhibit) => {
-      exhibit.artworks = exhibit.artworks.filter(Boolean).map((artwork) => ({ ...artwork, has_image: true }));
-    });
-    res.json({ exhibits });
+    res.json({ exhibits: exhibits.map((exhibit) => ({
+      ...withExhibitWindow(exhibit),
+      artworks: exhibit.artworks.filter(Boolean).map((artwork) => ({ ...artwork, has_image: true })),
+    })) });
   } catch (err) {
     next(err);
   }
@@ -74,7 +77,7 @@ async function getExhibit(req, res, next) {
       artist: artwork.artist ? { _id: artwork.artist._id, name: artwork.artist.name, specializations: artwork.artist.specializations || [] } : null,
       thumbnail_url: artwork.has_image ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
     }));
-    res.json({ exhibit });
+    res.json({ exhibit: withExhibitWindow(exhibit) });
   } catch (err) {
     next(err);
   }
@@ -83,9 +86,11 @@ async function getExhibit(req, res, next) {
 // POST /api/exhibits  (admin only)
 async function createExhibit(req, res, next) {
   try {
-    const { name, description, event_date, artworks } = req.body;
+    const { name, description, event_date, starts_at, ends_at, artworks } = req.body;
     const fields = validateExhibitFields({ name, description, event_date });
     if (fields.error) return res.status(400).json({ message: fields.error });
+    const times = parseExhibitTimes({ event_date: fields.event_date, starts_at, ends_at });
+    if (times.error) return res.status(400).json({ message: times.error });
 
     let validArtworks = [];
     const artworkIds = cleanArtworkIds(artworks);
@@ -95,7 +100,9 @@ async function createExhibit(req, res, next) {
 
     const exhibit = await Exhibit.create({
       ...fields,
+      ...times,
       artworks: validArtworks,
+      lifecycle_enabled: exhibitWindow({ ...fields, ...times }).ends_at > new Date(),
     });
     // Notify active artists in the background so creating an exhibit remains
     // fast and a notification failure cannot block the admin action.
@@ -126,7 +133,7 @@ async function createExhibit(req, res, next) {
       })
       .catch((error) => console.error('Exhibit notifications could not be created:', error.message));
     recordAudit({ req, action: 'create', entityType: 'exhibit', entityId: exhibit._id, details: { name: exhibit.name } });
-    res.status(201).json({ exhibit });
+    res.status(201).json({ exhibit: withExhibitWindow(exhibit.toObject()) });
   } catch (err) {
     next(err);
   }
@@ -138,24 +145,39 @@ async function updateExhibit(req, res, next) {
     const exhibit = await Exhibit.findById(req.params.id);
     if (!exhibit) return res.status(404).json({ message: 'Exhibit not found.' });
 
-    const { name, description, event_date, artworks } = req.body;
+    const { name, description, event_date, starts_at, ends_at, artworks } = req.body;
     const fields = validateExhibitFields({
       name: name === undefined ? exhibit.name : name,
       description: description === undefined ? exhibit.description : description,
       event_date: event_date === undefined ? exhibit.event_date : event_date,
     });
     if (fields.error) return res.status(400).json({ message: fields.error });
+    const timesProvided = starts_at !== undefined || ends_at !== undefined;
+    const times = timesProvided ? parseExhibitTimes({ event_date: fields.event_date, starts_at, ends_at }) : null;
+    if (times?.error) return res.status(400).json({ message: times.error });
+    const dateChanged = eventDateKey(fields.event_date) !== eventDateKey(exhibit.event_date);
     exhibit.name = fields.name;
     exhibit.description = fields.description;
     exhibit.event_date = fields.event_date;
+    if (timesProvided) {
+      exhibit.starts_at = times.starts_at;
+      exhibit.ends_at = times.ends_at;
+    } else if (dateChanged) {
+      // Older clients submit only event_date; do not keep times from the old date.
+      exhibit.starts_at = undefined;
+      exhibit.ends_at = undefined;
+    }
     if (artworks !== undefined) {
       const artworkIds = cleanArtworkIds(artworks);
       exhibit.artworks = await Artwork.find({ _id: mongoose.trusted({ $in: artworkIds }), ...publicArtworkFilter() }).distinct('_id');
     }
 
+    // A rescheduled legacy show can enter the lifecycle if it is still ahead.
+    if (!exhibit.lifecycle_enabled && exhibitWindow(exhibit).ends_at > new Date()) exhibit.lifecycle_enabled = true;
+
     await exhibit.save();
     recordAudit({ req, action: 'update', entityType: 'exhibit', entityId: exhibit._id, details: { name: exhibit.name } });
-    res.json({ exhibit });
+    res.json({ exhibit: withExhibitWindow(exhibit.toObject()) });
   } catch (err) {
     next(err);
   }

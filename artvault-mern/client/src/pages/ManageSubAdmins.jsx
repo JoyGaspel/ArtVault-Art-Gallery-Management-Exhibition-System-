@@ -13,10 +13,9 @@ export default function ManageSubAdmins() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(null);
-  function load() {
-    setLoading(true);
-    setError('');
-    api.get('/admin-profiles').then((response) => {
+  function load({ silent = false } = {}) {
+    if (!silent) { setLoading(true); setError(''); }
+    return api.get('/admin-profiles').then((response) => {
       const profiles = response.data.profiles || [];
       // Keep the current artist directory as a compatibility fallback while
       // existing accounts are being backfilled into admin_profiles.
@@ -24,10 +23,11 @@ export default function ManageSubAdmins() {
       setAccounts(profiles.filter((profile) => profile.role === 'sub_admin').map((profile) => ({ ...profile.artistId, _adminProfileId: profile._id })));
     })
       .catch(() => api.get('/artists/admin').then((response) => setAccounts((response.data.artists || []).filter((artist) => artist.role === 'sub_admin'))))
-      .catch((error) => { const message = error.response?.data?.message || 'Could not load sub-admins.'; setError(message); toast(message, true); }).finally(() => setLoading(false));
+      .then(() => setError(''))
+      .catch((error) => { const message = error.response?.data?.message || 'Could not load sub-admins.'; if (!silent) { setError(message); toast(message, true); } }).finally(() => { if (!silent) setLoading(false); });
   }
-  useEffect(load, []);
-  useAutoRefresh(load);
+  useEffect(() => { load(); }, []);
+  useAutoRefresh(() => load({ silent: true }));
   async function revoke() {
     const account = pending; setPending(null); if (!account) return;
     try { await api.put(`/artists/admin/${account._id}/role`, { role: 'artist' }); setAccounts((current) => current.filter((item) => item._id !== account._id)); toast(`${account.name} is now a regular artist.`); load(); }

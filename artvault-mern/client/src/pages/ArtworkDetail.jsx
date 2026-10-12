@@ -8,6 +8,7 @@ import ArtworkLikeButton from '../components/ArtworkLikeButton';
 import PageLoadState from '../components/PageLoadState';
 import ArtCard from '../components/ArtCard';
 import useArtworkMedia from '../hooks/useArtworkMedia';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -42,26 +43,29 @@ export default function ArtworkDetail() {
   const privateThumbnail = useArtworkMedia(artwork, 'thumbnail');
   const privateImage = useArtworkMedia(artwork, 'image');
 
-  function load() {
-    setLoading(true);
-    setError('');
-    api
+  function load({ silent = false } = {}) {
+    if (!silent) { setLoading(true); setError(''); }
+    return api
       .get(`/artworks/${id}`)
       .then((res) => {
         setArtwork(res.data.artwork);
         setExhibits(res.data.exhibits);
-        setForm({
-          title: res.data.artwork.title,
-          description: res.data.artwork.description,
-          materials: (res.data.artwork.materials || []).join(', '),
-          categories: res.data.artwork.categories || [],
-        });
+        setError('');
+        if (!silent || !editing) {
+          setForm({
+            title: res.data.artwork.title,
+            description: res.data.artwork.description,
+            materials: (res.data.artwork.materials || []).join(', '),
+            categories: res.data.artwork.categories || [],
+          });
+        }
       })
-      .catch((err) => { setArtwork(undefined); setError(err.response?.data?.message || 'Could not load this artwork.'); })
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!silent) { setArtwork(undefined); setError(err.response?.data?.message || 'Could not load this artwork.'); } })
+      .finally(() => { if (!silent) setLoading(false); });
   }
 
-  useEffect(load, [id]);
+  useEffect(() => { load(); }, [id]);
+  useAutoRefresh(() => { if (!editing && !lightboxOpen) load({ silent: true }); });
   useEffect(() => {
     if (!exhibitId) { setExhibitContext(null); return undefined; }
     let cancelled = false;
@@ -79,7 +83,7 @@ export default function ArtworkDetail() {
     preload.onload = () => setDisplayImage(full);
     preload.src = full;
     return () => { preload.onload = null; };
-  }, [artwork, privateThumbnail, privateImage]);
+  }, [artwork?._id, artwork?.visibility, artwork?.thumbnail_url, artwork?.image_url, privateThumbnail, privateImage]);
   useEffect(() => {
     const artistId = artwork?.artist?._id;
     if (!artistId) { setRelatedArtworks([]); return undefined; }
@@ -115,7 +119,7 @@ export default function ArtworkDetail() {
   }
 
   const isOwner = Boolean(user && artwork && user.id === artwork.artist?._id);
-  const canManage = user && artwork && (isOwner || user.role === 'main_admin' || (artwork.visibility !== 'private' && ['admin', 'sub_admin'].includes(user.role)));
+  const canManage = user && artwork && !(artwork.visibility === 'private' && user.role === 'sub_admin') && (isOwner || user.role === 'main_admin' || (artwork.visibility !== 'private' && ['admin', 'sub_admin'].includes(user.role)));
   const detailImage = displayImage;
   const exhibitArtworkIndex = exhibitContext?.artworks?.findIndex((item) => String(item._id) === String(id)) ?? -1;
   const exhibitArtworkCount = exhibitContext?.artworks?.length || 0;
@@ -207,7 +211,7 @@ export default function ArtworkDetail() {
         <div className="detail-body">
           {!editing ? (
             <>
-              <div className="eyebrow">{artwork.visibility === 'private' ? 'Private · My artwork Vault' : 'Artwork detail'}</div>
+              <div className="eyebrow">{artwork.visibility === 'private' ? (isOwner ? 'Private · My artwork Vault' : 'Private · Artist Vault') : 'Artwork detail'}</div>
               <div className="eyebrow">{(artwork.categories || []).join(' · ')}</div>
               <h1>{artwork.title}</h1>
               {artwork.visibility !== 'private' && <div className="detail-like"><ArtworkLikeButton artworkId={artwork._id} initialCount={artwork.like_count} /></div>}
@@ -238,7 +242,7 @@ export default function ArtworkDetail() {
               </div>
               {canManage && (
                 <div className="detail-actions">
-                  {isOwner && <button className="btn btn-primary" onClick={() => setPendingVisibility(artwork.visibility === 'private' ? 'public' : 'private')} disabled={changingVisibility}>{changingVisibility ? 'Saving…' : artwork.visibility === 'private' ? 'Make public' : 'Move to Vault'}</button>}
+                  {isOwner && user.role !== 'sub_admin' && <button className="btn btn-primary" onClick={() => setPendingVisibility(artwork.visibility === 'private' ? 'public' : 'private')} disabled={changingVisibility}>{changingVisibility ? 'Saving…' : artwork.visibility === 'private' ? 'Make public' : 'Move to Vault'}</button>}
                   <button className="btn btn-ghost" onClick={() => setEditing(true)}>Edit details</button>
                   <button className="btn btn-danger" onClick={remove}>Remove artwork</button>
                 </div>
@@ -291,7 +295,7 @@ export default function ArtworkDetail() {
       {pendingVisibility && <ConfirmDialog
         title={pendingVisibility === 'private' ? 'Move artwork to Vault?' : 'Make artwork public?'}
         message={pendingVisibility === 'private'
-          ? `“${artwork.title}” will be hidden from the public gallery, your profile, and exhibits. Only you and the main administrator can view it until you publish it again.`
+          ? `“${artwork.title}” will be hidden from the public gallery, your profile, and exhibits. Only you, sub-admins, and the main administrator can view it until you publish it again.`
           : `“${artwork.title}” will appear in the public gallery and on your artist profile again.`}
         confirmLabel={pendingVisibility === 'private' ? 'Move to Vault' : 'Make public'}
         onConfirm={changeVisibility}

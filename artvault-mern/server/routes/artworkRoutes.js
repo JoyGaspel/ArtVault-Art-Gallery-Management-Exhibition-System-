@@ -23,7 +23,7 @@ router.post('/', requireAuth, createArtwork);                    // POST /api/ar
 router.get('/mine', requireAuth, requireRole('artist'), listMyArtworks); // GET /api/artworks/mine
 router.get('/mine/portfolio', requireAuth, requireRole('artist'), listMyPortfolio);
 router.get('/vault', requireAuth, requireRole('artist'), listVaultArtworks);
-router.get('/admin/vault', requireAuth, requireRole('main_admin'), listVaultArtworks);
+router.get('/admin/vault', requireAuth, requireRole('sub_admin', 'main_admin'), listVaultArtworks);
 router.get('/:id/image', authorizeArtworkRead, getArtworkImage);
 router.get('/:id/thumbnail', authorizeArtworkRead, getArtworkThumbnail);
 router.get('/:id', authorizeArtworkRead, getArtwork);

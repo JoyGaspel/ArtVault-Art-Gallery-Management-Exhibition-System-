@@ -4,27 +4,30 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import PageLoadState from '../components/PageLoadState';
 import ArtworkThumbnail from '../components/ArtworkThumbnail';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { exhibitWindow, exhibitPhase, exhibitScheduleLabel } from '../utils/exhibitSchedule';
 
 const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
-const deadline = (exhibit) => new Date(new Date(exhibit.event_date).getTime() - THREE_DAYS);
+const deadline = (exhibit) => new Date(exhibitWindow(exhibit).start.getTime() - THREE_DAYS);
 const formatDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const formatDeadline = (value) => new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(value);
 
 export default function ExhibitSubmissions() {
   const { user } = useAuth(); const showToast = useToast();
   const [exhibits, setExhibits] = useState([]), [artworks, setArtworks] = useState([]), [entries, setEntries] = useState([]), [choices, setChoices] = useState({}), [loading, setLoading] = useState(true), [error, setError] = useState(''), [saving, setSaving] = useState('');
   const cacheKey = user?.id ? `artvault:exhibit-submissions:${user.id}` : '';
   async function load({ silent = false } = {}) {
-    if (!silent) setLoading(true); setError('');
+    if (!silent) { setLoading(true); setError(''); }
     try {
       const [exhibitResponse, artworkResponse, entryResponse] = await Promise.all([api.get('/exhibits'), api.get('/artworks/mine', { params: { limit: 100 } }), api.get('/exhibit-entries/my')]);
       const nextExhibits = exhibitResponse.data.exhibits || [];
       const nextArtworks = artworkResponse.data.artworks || [];
       const nextEntries = entryResponse.data.entries || [];
-      setExhibits(nextExhibits); setArtworks(nextArtworks); setEntries(nextEntries);
+      setExhibits(nextExhibits); setArtworks(nextArtworks); setEntries(nextEntries); setError('');
       try { sessionStorage.setItem(cacheKey, JSON.stringify({ exhibits: nextExhibits, artworks: nextArtworks, entries: nextEntries })); } catch { /* Storage is optional. */ }
     }
     catch (error) { const message = error.response?.data?.message || 'Could not load exhibit submissions.'; if (!silent) { setError(message); showToast(message, true); } }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }
   useEffect(() => {
     if (!user?.id) return;
@@ -37,7 +40,8 @@ export default function ExhibitSubmissions() {
     } catch { /* Ignore malformed browser cache and fetch fresh data. */ }
     load({ silent: hasCache });
   }, [user?.id]);
-  const upcomingExhibits = useMemo(() => exhibits.filter((exhibit) => new Date(exhibit.event_date).getTime() > Date.now()), [exhibits]);
+  useAutoRefresh(() => { if (user?.id) load({ silent: true }); });
+  const upcomingExhibits = useMemo(() => exhibits.filter((exhibit) => exhibitPhase(exhibit) === 'upcoming'), [exhibits]);
   const existingFor = (exhibitId, artworkId) => entries.find((entry) => String(entry.exhibit?._id || entry.exhibit) === String(exhibitId) && String(entry.artwork?._id || entry.artwork) === String(artworkId));
   async function submit(exhibit) {
     const artworkId = choices[exhibit._id]; if (!artworkId) return showToast('Choose one of your artworks first.', true);
@@ -58,7 +62,7 @@ export default function ExhibitSubmissions() {
       const availableArtworks = artworks.filter((artwork) => !usedIds.has(String(artwork._id)) && !blockedIds.has(String(artwork._id)));
       const selectedArtwork = artworks.find((artwork) => String(artwork._id) === String(selected));
       return <article className="submission-opportunity-card" key={exhibit._id}>
-        <div className="eyebrow">{isOpen ? `Open for entries · closes ${formatDate(deadline(exhibit))}` : 'Entries closed · review in progress'}</div><h2>{exhibit.name}</h2><p>{exhibit.description || 'A curated ArtVault exhibition.'}</p><div className="submission-meta">Event date · {formatDate(exhibit.event_date)}</div><div className="submission-availability">{availableArtworks.length} artwork{availableArtworks.length === 1 ? '' : 's'} available to you</div>
+        <div className="eyebrow">{isOpen ? `Open for entries · closes ${formatDeadline(deadline(exhibit))} Philippine time` : 'Entries closed · review in progress'}</div><h2>{exhibit.name}</h2><p>{exhibit.description || 'A curated ArtVault exhibition.'}</p><div className="submission-meta">{exhibitScheduleLabel(exhibit)}</div><div className="submission-availability">{availableArtworks.length} artwork{availableArtworks.length === 1 ? '' : 's'} available to you</div>
         <div className="submission-select-label">Choose your artwork</div>
         <div className="submission-artwork-picker" role="listbox" aria-label={`Artwork options for ${exhibit.name}`}>
           {!isOpen && <div className="submission-picker-empty">Submissions are closed</div>}

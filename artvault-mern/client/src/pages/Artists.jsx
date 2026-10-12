@@ -12,15 +12,14 @@ export default function Artists() {
   const [error, setError] = useState('');
   const [hoveredArtist, setHoveredArtist] = useState(null);
 
-  function load() {
-    setLoading(true);
-    setError('');
-    return api.get('/artists').then((res) => { setArtists(res.data.artists || []); }).catch((err) => {
-      setError(err.response?.data?.message || 'Could not load artists. Check that the API is running.');
-    }).finally(() => setLoading(false));
+  function load({ silent = false } = {}) {
+    if (!silent) { setLoading(true); setError(''); }
+    return api.get('/artists').then((res) => { setArtists(res.data.artists || []); setError(''); }).catch((err) => {
+      if (!silent) setError(err.response?.data?.message || 'Could not load artists. Check that the API is running.');
+    }).finally(() => { if (!silent) setLoading(false); });
   }
   useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(() => load({ silent: true }));
 
   const visibleArtists = search ? artists.filter((artist) => [artist.name, artist.bio, artist.latestArtwork?.title, ...(artist.specializations || [])].filter(Boolean).some((value) => value.toLowerCase().includes(search))) : artists;
 

@@ -1,21 +1,42 @@
 import { useEffect, useRef } from 'react';
 
-// Keeps read-only pages current after the API restarts or a tab regains focus.
-// The callback is stored in a ref so callers do not need to memoize it.
-export default function useAutoRefresh(load, intervalMs = 60000) {
+// Refresh visible data without reloading the page. Callers should pass a
+// silent load so background checks do not replace content with a spinner.
+export default function useAutoRefresh(load, intervalMs = 30000) {
   const loadRef = useRef(load);
-  useEffect(() => { loadRef.current = load; }, [load]);
+  loadRef.current = load;
 
   useEffect(() => {
+    let lastRefresh = Date.now();
+    let changeTimer;
     const refresh = () => {
-      if (document.visibilityState === 'visible') loadRef.current();
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastRefresh < 3000) return;
+      lastRefresh = now;
+      loadRef.current();
     };
-    // Avoid reloading the entire page every time the browser regains focus;
-    // the interval and explicit data-changed event keep content current.
-    window.addEventListener('artvault:data-changed', refresh);
+    const dataChanged = () => {
+      window.clearTimeout(changeTimer);
+      changeTimer = window.setTimeout(() => {
+        lastRefresh = 0;
+        refresh();
+      }, 300);
+    };
+    const storageChanged = (event) => {
+      if (event.key === 'artvault:data-version') dataChanged();
+    };
+    window.addEventListener('artvault:data-changed', dataChanged);
+    window.addEventListener('storage', storageChanged);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
     const timer = window.setInterval(refresh, intervalMs);
     return () => {
-      window.removeEventListener('artvault:data-changed', refresh);
+      window.removeEventListener('artvault:data-changed', dataChanged);
+      window.removeEventListener('storage', storageChanged);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+      window.clearTimeout(changeTimer);
       window.clearInterval(timer);
     };
   }, [intervalMs]);

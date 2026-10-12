@@ -14,14 +14,14 @@ export default function Archives() {
   const [error, setError] = useState('');
   const [pending, setPending] = useState(null);
   const [filter, setFilter] = useState('all');
-  const load = () => {
-    setLoading(true); setError('');
-    return api.get('/archives').then((r) => setArchives(Array.isArray(r.data?.archives) ? r.data.archives : []))
-      .catch((e) => { const message = e.response?.data?.message || 'Could not load archives. Restart the server and try again.'; setError(message); toast(message, true); })
-      .finally(() => setLoading(false));
+  const load = ({ silent = false } = {}) => {
+    if (!silent) { setLoading(true); setError(''); }
+    return api.get('/archives').then((r) => { setArchives(Array.isArray(r.data?.archives) ? r.data.archives : []); setError(''); })
+      .catch((e) => { if (!silent) { const message = e.response?.data?.message || 'Could not load archives. Restart the server and try again.'; setError(message); toast(message, true); } })
+      .finally(() => { if (!silent) setLoading(false); });
   };
   useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(() => load({ silent: true }));
   const visible = filter === 'all' ? archives : archives.filter((item) => item.entityType === filter);
   const count = (type) => archives.filter((item) => item.entityType === type).length;
   async function restore(item) { try { await api.post(`/archives/${item._id}/restore`); toast('Item restored.'); setArchives((current) => current.filter((entry) => entry._id !== item._id)); load(); } catch (e) { toast(e.response?.data?.message || 'Could not restore item.', true); } }

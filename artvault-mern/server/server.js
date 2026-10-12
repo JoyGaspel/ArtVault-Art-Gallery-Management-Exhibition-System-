@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const { createRateLimiters } = require('./middleware/rateLimits');
+const { startExhibitLifecycle } = require('./services/exhibitLifecycleService');
 
 const authRoutes = require('./routes/authRoutes');
 const artworkRoutes = require('./routes/artworkRoutes');
@@ -84,6 +85,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// The first offline stage is a snapshot viewer, not an unsynchronized writer.
+// Enforce that at the API boundary as well as in the browser UI.
+if (process.env.ARTVAULT_OFFLINE === 'true') {
+  app.use('/api', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    return res.status(403).json({ message: 'This offline copy is read-only. No changes were saved.' });
+  });
+}
+
 // Mount auth first so ordinary gallery/API traffic cannot exhaust its budget.
 app.use('/api/auth', authRouteLimiter, failedLoginLimiter, authRoutes);
 app.use('/api', apiLimiter);
@@ -104,7 +114,9 @@ const PORT = process.env.PORT || 5000;
 
 async function start() {
   await connectDB();
-  app.listen(PORT, () => console.log(`ArtVault API listening on http://localhost:${PORT}`));
+  if (process.env.ARTVAULT_OFFLINE !== 'true') startExhibitLifecycle();
+  const host = process.env.HOST || '0.0.0.0';
+  app.listen(PORT, host, () => console.log(`ArtVault API listening on http://${host}:${PORT}`));
 }
 
 start();

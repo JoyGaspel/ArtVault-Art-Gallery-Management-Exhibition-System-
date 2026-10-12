@@ -15,23 +15,23 @@ export default function ArtistProfile() {
   const [error, setError] = useState('');
   const [columnCount, setColumnCount] = useState(() => profileColumnCount());
 
-  function loadProfile() {
-    setLoading(true);
-    setError('');
+  function loadProfile({ silent = false } = {}) {
+    if (!silent) { setLoading(true); setError(''); }
     return api
       .get(`/artists/${id}`)
       .then((res) => {
         setArtist(res.data.artist);
         setArtworks(res.data.artworks);
+        setError('');
       })
-      .catch((err) => setError(err.response?.data?.message || 'Could not load this artist profile.'))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!silent) setError(err.response?.data?.message || 'Could not load this artist profile.'); })
+      .finally(() => { if (!silent) setLoading(false); });
   }
 
   useEffect(() => {
     loadProfile();
   }, [id]);
-  useAutoRefresh(loadProfile);
+  useAutoRefresh(() => loadProfile({ silent: true }));
 
   useEffect(() => {
     const onResize = () => setColumnCount(profileColumnCount());
@@ -53,7 +53,7 @@ export default function ArtistProfile() {
           <div className="eyebrow">Artist profile</div>
           <h1>{artist.name}</h1>
           <p className="profile-tagline">A collection of work by {artist.name}.</p>
-          <div className="chip-row" style={{ margin: '8px 0 0' }}>
+          <div className="profile-specializations">
             {(artist.specializations || []).map((s) => (
               <span className="chip active" key={s} style={{ cursor: 'default' }}>{s}</span>
             ))}

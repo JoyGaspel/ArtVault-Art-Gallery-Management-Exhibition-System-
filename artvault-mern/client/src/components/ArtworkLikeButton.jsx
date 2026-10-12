@@ -31,6 +31,17 @@ export default function ArtworkLikeButton({ artworkId, initialCount = 0, compact
   }, [likeCacheKey]);
 
   useEffect(() => {
+    if (!likeCacheKey) return undefined;
+    const onStorageChanged = (event) => {
+      if (event.key !== likeCacheKey || event.newValue === null) return;
+      setLiked(event.newValue === '1');
+      setStatusLoaded(true);
+    };
+    window.addEventListener('storage', onStorageChanged);
+    return () => window.removeEventListener('storage', onStorageChanged);
+  }, [likeCacheKey]);
+
+  useEffect(() => {
     const onLikesChanged = (event) => {
       const detail = event.detail || {};
       if (String(detail.artworkId) === String(artworkId) && Number.isFinite(Number(detail.likeCount))) {

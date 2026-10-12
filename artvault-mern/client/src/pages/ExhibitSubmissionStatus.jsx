@@ -4,8 +4,9 @@ import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import PageLoadState from '../components/PageLoadState';
 import ArtworkThumbnail from '../components/ArtworkThumbnail';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
-const labels = { pending: 'Pending review', approved: 'Approved', denied: 'Denied', withdrawn: 'Withdrawn' };
+const labels = { pending: 'Pending review', approved: 'Approved', denied: 'Denied', withdrawn: 'Withdrawn', expired: 'Expired after exhibit' };
 const formatDate = (value) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function ExhibitSubmissionStatus() {
@@ -15,18 +16,18 @@ export default function ExhibitSubmissionStatus() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState('');
-  const groups = useMemo(() => ['pending', 'approved', 'denied', 'withdrawn'].map((status) => ({ status, items: entries.filter((entry) => entry.status === status) })).filter((group) => group.items.length), [entries]);
+  const groups = useMemo(() => ['pending', 'approved', 'denied', 'expired', 'withdrawn'].map((status) => ({ status, items: entries.filter((entry) => entry.status === status) })).filter((group) => group.items.length), [entries]);
 
   const cacheKey = user?.id ? `artvault:exhibit-submission-status:${user.id}` : '';
   function load({ silent = false } = {}) {
-    if (!silent) setLoading(true); setError('');
+    if (!silent) { setLoading(true); setError(''); }
     return api.get('/exhibit-entries/my').then((response) => {
       const nextEntries = response.data.entries || [];
-      setEntries(nextEntries);
+      setEntries(nextEntries); setError('');
       try { sessionStorage.setItem(cacheKey, JSON.stringify(nextEntries)); } catch { /* Storage is optional. */ }
     })
       .catch((error) => { const message = error.response?.data?.message || 'Could not load submission status.'; if (!silent) { setError(message); showToast(message, true); } })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }
   useEffect(() => {
     if (!user?.id) return;
@@ -37,6 +38,7 @@ export default function ExhibitSubmissionStatus() {
     } catch { /* Ignore malformed browser cache and fetch fresh data. */ }
     load({ silent: hasCache });
   }, [user?.id]);
+  useAutoRefresh(() => { if (user?.id) load({ silent: true }); });
 
   async function withdraw(entry) {
     setSaving(entry._id);

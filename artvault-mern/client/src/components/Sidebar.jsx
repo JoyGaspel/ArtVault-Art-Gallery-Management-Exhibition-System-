@@ -26,6 +26,7 @@ function NavigationLink({ to, label, icon, end = false }) {
 }
 
 export default function Sidebar() {
+  const offlineReadOnly = import.meta.env.VITE_OFFLINE_READONLY === 'true';
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
@@ -74,7 +75,7 @@ export default function Sidebar() {
           <div className="nav-group">
             <div className="nav-heading">Curation</div>
             <NavigationLink to="/manage-gallery" label="Manage gallery" icon="manageGallery" />
-            {isMainAdmin && <NavigationLink to="/manage-vault" label="Artist Vaults" icon="vault" />}
+            {hasAdminActivity && <NavigationLink to="/manage-vault" label="Artist Vaults" icon="vault" />}
             <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="manageExhibits" />
             <NavigationLink to="/manage-exhibit-entries" label="Exhibit entries" icon="entries" />
             <NavigationLink to="/manage-artists" label="Manage artists" icon="artists" />
@@ -109,9 +110,8 @@ export default function Sidebar() {
         </div>
       ) : (
         <div className="guest-panel">
-          <div className="nav-label"><strong>Viewing as guest</strong><span>Sign in to upload or curate.</span></div>
-          <NavLink to="/login" className="guest-signin">Sign in</NavLink>
-          <NavLink to="/signup" className="guest-signup">Create an artist account</NavLink>
+          <div className="nav-label"><strong>{offlineReadOnly ? 'Offline gallery' : 'Viewing as guest'}</strong><span>{offlineReadOnly ? 'Read-only local copy.' : 'Sign in to upload or curate.'}</span></div>
+          {!offlineReadOnly && <><NavLink to="/login" className="guest-signin">Sign in</NavLink><NavLink to="/signup" className="guest-signup">Create an artist account</NavLink></>}
         </div>
       )}
     </aside>

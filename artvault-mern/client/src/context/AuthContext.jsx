@@ -13,7 +13,8 @@ const AuthContext = createContext(null);
 
 // PROTOTYPE MODE: set this to false when the MongoDB-backed API session is ready.
 // The production replacement should use the server's HttpOnly/Secure cookie session.
-const PROTOTYPE_AUTH = !supabaseEnabled;
+const OFFLINE_READONLY = import.meta.env.VITE_OFFLINE_READONLY === 'true';
+const PROTOTYPE_AUTH = !supabaseEnabled && !OFFLINE_READONLY;
 
 function mapSupabaseUser(authUser) {
   if (!authUser) return null;
@@ -38,7 +39,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     window.clearTimeout(idleTimer.current);
-    if (!PROTOTYPE_AUTH) supabase.auth.signOut();
+    if (!PROTOTYPE_AUTH && supabase) supabase.auth.signOut();
     clearPrototypeSession();
     localStorage.removeItem('artvault_token');
     setUser(null);
@@ -52,6 +53,12 @@ export function AuthProvider({ children }) {
   }, [logout, user]);
 
   useEffect(() => {
+    if (OFFLINE_READONLY) {
+      localStorage.removeItem('artvault_token');
+      setUser(null);
+      setLoading(false);
+      return undefined;
+    }
     if (PROTOTYPE_AUTH) {
       setUser(restorePrototypeSession());
       setLoading(false);
@@ -97,6 +104,7 @@ export function AuthProvider({ children }) {
   }, [resetIdleTimer, user]);
 
   const login = useCallback(async (email, password, requestedRole = '') => {
+    if (OFFLINE_READONLY) throw { message: 'This offline copy is read-only. Sign in when you are back online.' };
     if (PROTOTYPE_AUTH) {
       const prototypeUser = await prototypeLogin(email, password);
       if (requestedRole === 'admin' && !['admin', 'sub_admin', 'main_admin'].includes(prototypeUser.role)) {
@@ -174,6 +182,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signup = useCallback(async (payload) => {
+    if (OFFLINE_READONLY) throw { message: 'Sign-up needs an internet connection. This offline copy is read-only.' };
     if (PROTOTYPE_AUTH) {
       const prototypeUser = await prototypeSignup(payload);
       setUser(prototypeUser);

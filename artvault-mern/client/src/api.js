@@ -25,4 +25,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use((response) => {
+  const method = (response.config?.method || 'get').toLowerCase();
+  const path = response.config?.url || '';
+  // A successful content change refreshes the open page and other tabs.
+  // Auth and notification read receipts do not change displayed collections.
+  if (['post', 'put', 'patch', 'delete'].includes(method)
+    && /^\/(artworks|artists|exhibits|exhibit-entries|archives|likes|admin-profiles)(\/|\?|$)/.test(path)) {
+    window.dispatchEvent(new Event('artvault:data-changed'));
+    try { localStorage.setItem('artvault:data-version', `${Date.now()}:${Math.random()}`); } catch { /* Storage is optional. */ }
+  }
+  return response;
+});
+
 export default api;

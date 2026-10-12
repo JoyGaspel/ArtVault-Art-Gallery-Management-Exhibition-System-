@@ -5,6 +5,7 @@ import ArtworkThumbnail from '../components/ArtworkThumbnail';
 import ArtworkCardDetails from '../components/ArtworkCardDetails';
 import PageLoadState from '../components/PageLoadState';
 import { useAuth } from '../context/AuthContext';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 
 export default function MyArtworks() {
   const { user } = useAuth();
@@ -16,20 +17,21 @@ export default function MyArtworks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError('');
-    api.get('/artworks/mine/portfolio', { params: { visibility: filter, page, limit: 24 } })
+  const load = useCallback(({ silent = false } = {}) => {
+    if (!silent) { setLoading(true); setError(''); }
+    return api.get('/artworks/mine/portfolio', { params: { visibility: filter, page, limit: 24 } })
       .then(({ data }) => {
         setArtworks(data.artworks || []);
         setCounts({ public: data.publicCount || 0, private: data.privateCount || 0 });
         setPages(Math.max(1, data.pages || 1));
+        setError('');
       })
-      .catch((err) => setError(err.response?.data?.message || 'Could not load your artworks.'))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!silent) setError(err.response?.data?.message || 'Could not load your artworks.'); })
+      .finally(() => { if (!silent) setLoading(false); });
   }, [filter, page]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(() => load({ silent: true }));
 
   function chooseFilter(value) {
     setFilter(value);

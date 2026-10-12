@@ -23,11 +23,11 @@ export default function ArtworkLikes() {
         setTotal(Number(response.data?.total) || 0);
         setError('');
       })
-      .catch((err) => setError(err.response?.data?.message || 'Could not load artwork likes.'))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (showLoading) setError(err.response?.data?.message || 'Could not load artwork likes.'); })
+      .finally(() => { if (showLoading) setLoading(false); });
   }
 
-  useEffect(() => load(), []);
+  useEffect(() => { load(); }, []);
   useAutoRefresh(() => load(false));
 
   async function removeLike(like) {

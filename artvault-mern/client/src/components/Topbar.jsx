@@ -50,7 +50,7 @@ export default function Topbar() {
         <button className="btn btn-primary" type="button" onClick={() => navigate('/manage-gallery')}>Manage gallery</button>
         <button className="btn btn-primary" type="button" onClick={() => navigate('/manage-exhibits')}>Manage exhibits</button>
       </>}
-      {!user && (
+      {!user && import.meta.env.VITE_OFFLINE_READONLY !== 'true' && (
         <div className="topbar-guest-actions">
           <Link className="btn btn-ghost" to="/login">Sign in</Link>
           <Link className="btn btn-primary" to="/signup">Join as artist</Link>

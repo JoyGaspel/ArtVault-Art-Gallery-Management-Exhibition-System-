@@ -15,6 +15,7 @@ function canViewArtwork(artwork, user) {
   return Boolean(user && (
     String(artwork.artist) === String(user._id)
     || user.role === 'main_admin'
+    || user.role === 'sub_admin'
   ));
 }
 

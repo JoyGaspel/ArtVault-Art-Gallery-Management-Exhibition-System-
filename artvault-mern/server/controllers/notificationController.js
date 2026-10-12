@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
+const { queueExhibitLifecycleCheck } = require('../services/exhibitLifecycleService');
 
 async function listMyNotifications(req, res, next) {
   try {
+    queueExhibitLifecycleCheck();
     const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
     const notifications = await Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })

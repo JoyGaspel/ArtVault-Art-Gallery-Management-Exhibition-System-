@@ -92,7 +92,7 @@ export default function ResponsiveNav() {
         {isAdmin && <>
           <span className="responsive-menu-heading">Curation</span>
           <LinkItem to="/manage-gallery" icon="manageGallery">Manage gallery</LinkItem>
-          {isMainAdmin && <LinkItem to="/manage-vault" icon="vault">Artist Vaults</LinkItem>}
+          {hasAdminActivity && <LinkItem to="/manage-vault" icon="vault">Artist Vaults</LinkItem>}
           <LinkItem to="/manage-exhibits" icon="manageExhibits">Manage exhibits</LinkItem>
           <LinkItem to="/manage-exhibit-entries" icon="entries">Exhibit entries</LinkItem>
           <LinkItem to="/manage-artists" icon="artists">Manage artists</LinkItem>
@@ -121,7 +121,7 @@ export default function ResponsiveNav() {
             {user.avatar_path ? <img className="responsive-avatar responsive-avatar-image" src={user.avatar_path} alt="" /> : <span className="responsive-avatar">{initials(user.name)}</span>}
             <span className="responsive-user-name">{user.name}</span>
           </NavLink>
-        </> : <>
+        </> : import.meta.env.VITE_OFFLINE_READONLY === 'true' ? <span className="responsive-user-name">Offline gallery</span> : <>
           <NavLink className="responsive-login" to="/login">Log in</NavLink>
           <NavLink className="responsive-join" to="/signup">Sign up</NavLink>
         </>}

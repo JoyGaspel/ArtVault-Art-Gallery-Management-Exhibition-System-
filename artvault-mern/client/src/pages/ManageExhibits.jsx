@@ -3,6 +3,8 @@ import api from '../api';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PageLoadState from '../components/PageLoadState';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { exhibitPhase, exhibitScheduleLabel, manilaTimeInput } from '../utils/exhibitSchedule';
 
 function monthDay(dateStr) {
   const d = new Date(dateStr);
@@ -12,7 +14,7 @@ function monthDay(dateStr) {
 
 const artworkId = (artwork) => String(artwork?._id || artwork || '');
 
-const emptyForm = { name: '', description: '', event_date: '', artworks: [] };
+const emptyForm = { name: '', description: '', event_date: '', all_day: false, start_time: '09:00', end_time: '17:00', artworks: [] };
 
 export default function ManageExhibits() {
   const showToast = useToast();
@@ -29,23 +31,25 @@ export default function ManageExhibits() {
 
   function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
-    setError('');
+    if (!silent) setError('');
     Promise.all([api.get('/exhibits'), api.get('/artworks', { params: { limit: 100 } })])
       .then(([exRes, artRes]) => {
         const nextExhibits = exRes.data.exhibits || [];
         const nextArtworks = artRes.data.artworks || [];
         setExhibits(nextExhibits);
         setArtworks(nextArtworks);
+        setError('');
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ exhibits: nextExhibits, artworks: nextArtworks })); } catch { /* Storage is optional. */ }
       })
       .catch((err) => { if (!silent) setError(err.response?.data?.message || 'Could not load exhibit management.'); })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }
   useEffect(() => {
     let hasCache = false;
     try { const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); if (cached?.exhibits && cached?.artworks) { setExhibits(cached.exhibits); setArtworks(cached.artworks); setLoading(false); hasCache = true; } } catch { /* Ignore malformed browser cache. */ }
     load({ silent: hasCache });
   }, []);
+  useAutoRefresh(() => load({ silent: true }));
 
   function openCreate() {
     setEditingId(null);
@@ -60,6 +64,9 @@ export default function ManageExhibits() {
       name: ex.name,
       description: ex.description || '',
       event_date: String(ex.event_date).slice(0, 10),
+      all_day: ex.is_all_day !== false,
+      start_time: manilaTimeInput(ex.starts_at) || '09:00',
+      end_time: manilaTimeInput(ex.ends_at) || '17:00',
       artworks: (ex.artworks || []).map(artworkId).filter(Boolean),
     });
     setModalOpen(true);
@@ -90,10 +97,15 @@ export default function ManageExhibits() {
       showToast('Give the exhibit a name first.', true);
       return;
     }
+    if (!form.event_date) return showToast('Choose the exhibit date.', true);
+    if (!form.all_day && (!form.start_time || !form.end_time || form.end_time <= form.start_time)) return showToast('Choose an end time after the start time.', true);
     setSaving(true);
     try {
       const payload = {
-        ...form,
+        event_date: form.event_date,
+        artworks: form.artworks,
+        starts_at: form.all_day ? null : `${form.event_date}T${form.start_time}:00+08:00`,
+        ends_at: form.all_day ? null : `${form.event_date}T${form.end_time}:00+08:00`,
         name: form.name.trim().replace(/\s+/g, ' '),
         description: form.description.trim().replace(/\s+/g, ' '),
       };
@@ -140,7 +152,7 @@ export default function ManageExhibits() {
       </div>
 
       <div className="stat-row">
-        <div className="stat-box"><div className="num">{exhibits.length}</div><div className="lbl">Active exhibits</div></div>
+        <div className="stat-box"><div className="num">{exhibits.length}</div><div className="lbl">Total exhibits</div></div>
         <div className="stat-box"><div className="num">{featuredCount}</div><div className="lbl">Artworks featured</div></div>
         <div className="stat-box"><div className="num">{artworks.length}</div><div className="lbl">Published artworks</div></div>
       </div>
@@ -156,6 +168,7 @@ export default function ManageExhibits() {
                 <div className="exhibit-date"><div className="day">{md.day}</div><div className="mon">{md.mon}</div></div>
                 <div className="exhibit-info">
                   <div className="name">{ex.name}</div>
+                  <div className="desc">{exhibitPhase(ex) === 'current' ? 'Happening now' : exhibitPhase(ex) === 'past' ? 'Past exhibit' : 'Upcoming'} · {exhibitScheduleLabel(ex)}</div>
                   <div className="desc">{ex.description} · {ex.artworks.length} pieces</div>
                 </div>
                 <div className="exhibit-row-actions">
@@ -187,6 +200,11 @@ export default function ManageExhibits() {
               <label>Event date <span className="required-mark" aria-hidden="true">*</span></label>
               <input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
             </div>
+            <div className="field"><label className="checkbox-row"><input type="checkbox" checked={form.all_day} onChange={(e) => setForm({ ...form, all_day: e.target.checked })} /> All-day exhibit</label></div>
+            {!form.all_day && <div className="exhibit-time-fields">
+              <div className="field"><label>Start time (Philippine time)</label><input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} /></div>
+              <div className="field"><label>End time (Philippine time)</label><input type="time" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} /></div>
+            </div>}
             <div className="field">
               <label>Include artworks <span className="optional-mark">(optional)</span></label>
               <div className="checkbox-list">

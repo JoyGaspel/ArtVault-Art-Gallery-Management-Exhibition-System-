@@ -17,7 +17,7 @@ function timeLabel(value) {
 function notificationTitle(notification) {
   if (notification.type === 'like') return 'Someone loved your artwork';
   if (notification.type === 'submission_status') return notification.title || 'Your submission was updated';
-  if (notification.type === 'exhibit') return 'A new exhibit is calling';
+  if (notification.type === 'exhibit') return notification.title === 'New exhibit opportunity' ? 'A new exhibit is calling' : notification.title || 'Exhibit update';
   return notification.title || 'ArtVault update';
 }
 
@@ -59,12 +59,15 @@ export default function NotificationBell() {
       }).catch(() => { /* Notifications are optional and must not block the app. */ });
     };
     load();
-    const timer = window.setInterval(load, 60000);
+    const timer = window.setInterval(load, 30000);
     const onVisible = () => { if (document.visibilityState === 'visible') load(); };
     const onNotificationsChanged = () => load();
+    const onStorageChanged = (event) => { if (event.key === 'artvault:data-version') load(); };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
     window.addEventListener('artvault:notifications-changed', onNotificationsChanged);
-    return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('artvault:notifications-changed', onNotificationsChanged); };
+    window.addEventListener('storage', onStorageChanged);
+    return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); window.removeEventListener('artvault:notifications-changed', onNotificationsChanged); window.removeEventListener('storage', onStorageChanged); };
   }, [user?.id, user?.role]);
 
   if (user?.role !== 'artist') return null;

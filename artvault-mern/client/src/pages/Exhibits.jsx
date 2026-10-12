@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import PageLoadState from '../components/PageLoadState';
+import { exhibitPhase, exhibitScheduleLabel, exhibitWindow } from '../utils/exhibitSchedule';
 
 const prefetchedExhibits = new Set();
 
@@ -12,15 +13,6 @@ function monthDay(dateStr) {
   return { day: d.getDate(), mon: months[d.getMonth()] };
 }
 
-function exhibitStatus(dateStr) {
-  const eventDate = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  eventDate.setHours(0, 0, 0, 0);
-  if (eventDate.getTime() === today.getTime()) return 'Happening today';
-  return eventDate > today ? 'Upcoming' : 'Past exhibit';
-}
-
 export default function Exhibits() {
   const [exhibits, setExhibits] = useState([]);
   const [params] = useSearchParams();
@@ -28,17 +20,19 @@ export default function Exhibits() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  function load() {
-    setLoading(true);
-    setError('');
-    return api.get('/exhibits').then((res) => setExhibits(res.data.exhibits || [])).catch((err) => {
-      setError(err.response?.data?.message || 'Could not load exhibits. Check that the API is running.');
-    }).finally(() => setLoading(false));
+  function load({ silent = false } = {}) {
+    if (!silent) { setLoading(true); setError(''); }
+    return api.get('/exhibits').then((res) => { setExhibits(res.data.exhibits || []); setError(''); }).catch((err) => {
+      if (!silent) setError(err.response?.data?.message || 'Could not load exhibits. Check that the API is running.');
+    }).finally(() => { if (!silent) setLoading(false); });
   }
   useEffect(() => { load(); }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(() => load({ silent: true }));
 
-  const visibleExhibits = search ? exhibits.filter((exhibit) => [exhibit.name, exhibit.description].filter(Boolean).some((value) => String(value).toLowerCase().includes(search))) : exhibits;
+  const visibleExhibits = (search ? exhibits.filter((exhibit) => [exhibit.name, exhibit.description].filter(Boolean).some((value) => String(value).toLowerCase().includes(search))) : exhibits).slice().sort((a, b) => {
+    const order = { current: 0, upcoming: 1, past: 2 };
+    return order[exhibitPhase(a)] - order[exhibitPhase(b)] || exhibitWindow(a).start - exhibitWindow(b).start;
+  });
   function prefetchExhibit(id) {
     const key = String(id);
     if (!key || prefetchedExhibits.has(key)) return;
@@ -62,7 +56,8 @@ export default function Exhibits() {
         <div className="exhibit-list">
           {visibleExhibits.map((e, index) => {
             const md = monthDay(e.event_date);
-            const status = exhibitStatus(e.event_date);
+            const phase = exhibitPhase(e);
+            const status = phase === 'current' ? 'Happening now' : phase === 'past' ? 'Past exhibit' : 'Upcoming';
             return (
               <Link to={`/exhibits/${e._id}`} className={`exhibit-card${index === 0 ? ' exhibit-card-featured' : ''}`} key={e._id} onMouseEnter={() => prefetchExhibit(e._id)} onFocus={() => prefetchExhibit(e._id)}>
                 <div className="exhibit-date">
@@ -72,6 +67,7 @@ export default function Exhibits() {
                 <div className="exhibit-info">
                   <div className={`exhibit-status${status === 'Past exhibit' ? ' past' : ''}`}>{status}</div>
                   <div className="name">{e.name}</div>
+                  <div className="desc">{exhibitScheduleLabel(e)}</div>
                   <div className="desc">{e.description} · {e.artworks.length} pieces</div>
                 </div>
                 <div className="exhibit-count" aria-label={`${e.artworks.length} artworks`}><strong>{e.artworks.length}</strong><span>pieces</span></div>

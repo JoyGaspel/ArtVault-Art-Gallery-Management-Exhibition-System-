@@ -14,11 +14,13 @@ const notificationSchema = new mongoose.Schema(
     artwork: { type: mongoose.Schema.Types.ObjectId, ref: 'Artwork', default: null },
     exhibit: { type: mongoose.Schema.Types.ObjectId, ref: 'Exhibit', default: null },
     isRead: { type: Boolean, default: false, index: true },
+    dedupe_key: { type: String, default: null },
   },
   { timestamps: true, collection: 'notifications' },
 );
 
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ recipient: 1, dedupe_key: 1 }, { unique: true, partialFilterExpression: { dedupe_key: { $type: 'string' } } });
 
 module.exports = mongoose.model('Notification', notificationSchema);

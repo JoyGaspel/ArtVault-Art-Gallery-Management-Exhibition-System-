@@ -157,7 +157,7 @@ export default function Upload() {
         <div className="vault-upload-choice" role="group" aria-label="Artwork visibility">
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'public'} onChange={() => setVisibility('public')} /> Public gallery</label>
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} /> Save privately to my Vault</label>
-            <small>Vault artworks are visible only to you and the main administrator.</small>
+            <small>Vault artworks are visible only to you, sub-admins, and the main administrator.</small>
         </div>
         <div className="form-actions">
           <button className="btn btn-primary" onClick={publish} disabled={saving}>

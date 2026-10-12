@@ -36,6 +36,7 @@ export default function Gallery() {
         const result = res.data?.artworks;
         if (!Array.isArray(result)) throw new Error('The gallery response was invalid.');
         setArtworks(result);
+        setErr('');
       })
       .catch((error) => {
         if (cancelled) return;

@@ -3,6 +3,7 @@ const SubmitExhibitEntry = require('../models/SubmitExhibitEntry');
 const Artist = require('../models/Artist');
 const AdminProfile = require('../models/AdminProfile');
 const ArtworkLike = require('../models/ArtworkLike');
+const Notification = require('../models/Notification');
 
 async function connectDB() {
   const uri = process.env.MONGO_URI;
@@ -20,10 +21,17 @@ async function connectDB() {
       serverSelectionTimeoutMS: 10000,
       maxPoolSize: 10,
     });
+    if (process.env.ARTVAULT_OFFLINE === 'true') {
+      console.log(`Offline MongoDB snapshot connected: ${conn.connection.name}`);
+      return;
+    }
     // Replace the original one-entry-per-artwork index so denied entries can
     // use the second attempt without allowing duplicate pending submissions.
     await SubmitExhibitEntry.syncIndexes();
     await ArtworkLike.syncIndexes();
+    // This unique key prevents duplicate lifecycle emails when Railway and a
+    // standby backend both run the same exhibit check.
+    await Notification.createIndexes();
     // Backfill the additive admin directory without changing existing artist
     // accounts, roles, passwords, artwork ownership, or audit references.
     // `sanitizeFilter` is enabled above for request safety. Mark this

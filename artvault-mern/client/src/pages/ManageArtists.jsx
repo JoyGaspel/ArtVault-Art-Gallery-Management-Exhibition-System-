@@ -32,18 +32,18 @@ export default function ManageArtists() {
 
   function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
-    setError('');
+    if (!silent) setError('');
     api.get('/artists/admin')
-      .then((response) => { const nextArtists = response.data.artists || []; setArtists(nextArtists); try { sessionStorage.setItem(cacheKey, JSON.stringify(nextArtists)); } catch { /* Storage is optional. */ } })
+      .then((response) => { const nextArtists = response.data.artists || []; setArtists(nextArtists); setError(''); try { sessionStorage.setItem(cacheKey, JSON.stringify(nextArtists)); } catch { /* Storage is optional. */ } })
       .catch((error) => { const message = error.response?.data?.message || 'Could not load artist accounts.'; if (!silent) { setError(message); showToast(message, true); } })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }
   useEffect(() => {
     let hasCache = false;
     try { const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); if (Array.isArray(cached)) { setArtists(cached); setLoading(false); hasCache = true; } } catch { /* Ignore malformed browser cache. */ }
     load({ silent: hasCache });
   }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(() => load({ silent: true }));
 
   function openEdit(artist) {
     setEditing(artist);

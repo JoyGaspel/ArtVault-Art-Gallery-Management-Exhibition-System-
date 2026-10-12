@@ -6,6 +6,7 @@ const Notification = require('../models/Notification');
 const { recordAudit } = require('../utils/audit');
 const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
 const { isPrivateArtwork, publicArtworkFilter } = require('../utils/artworkVisibility');
+const { exhibitWindow, exhibitPhase } = require('../utils/exhibitSchedule');
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -14,14 +15,14 @@ function validId(value) {
 }
 
 function cutoffFor(exhibit) {
-  return new Date(new Date(exhibit.event_date).getTime() - THREE_DAYS_MS);
+  return new Date(exhibitWindow(exhibit).starts_at.getTime() - THREE_DAYS_MS);
 }
 
 function populateEntry(query) {
   return query
     .populate({ path: 'artist', select: 'name email' })
     .populate({ path: 'artwork', select: 'title description categories materials artist created_at visibility', populate: { path: 'artist', select: 'name' } })
-    .populate({ path: 'exhibit', select: 'name description event_date artworks' })
+    .populate({ path: 'exhibit', select: 'name description event_date starts_at ends_at artworks' })
     .populate({ path: 'decided_by', select: 'name role' });
 }
 
@@ -52,7 +53,7 @@ async function listMyEntries(req, res, next) {
 // GET /api/exhibit-entries/review (admin only)
 async function listReviewEntries(req, res, next) {
   try {
-    const filter = req.query.status && ['pending', 'approved', 'denied', 'withdrawn'].includes(req.query.status)
+    const filter = req.query.status && ['pending', 'approved', 'denied', 'withdrawn', 'expired'].includes(req.query.status)
       ? { status: req.query.status } : {};
     const entries = await populateEntry(SubmitExhibitEntry.find(filter).sort({ createdAt: -1 }));
     const visible = req.user.role === 'main_admin' ? entries : entries.filter((entry) => !isPrivateArtwork(entry.artwork));
@@ -66,9 +67,9 @@ async function submitEntry(req, res, next) {
     const { exhibit: exhibitId, artwork: artworkId } = req.body;
     if (!validId(exhibitId) || !validId(artworkId)) return res.status(400).json({ message: 'Choose a valid exhibit and artwork.' });
 
-    const exhibit = await Exhibit.findById(exhibitId).select('name event_date artworks');
+    const exhibit = await Exhibit.findById(exhibitId).select('name event_date starts_at ends_at artworks');
     if (!exhibit) return res.status(404).json({ message: 'Exhibit not found.' });
-    if (new Date(exhibit.event_date) <= new Date()) return res.status(400).json({ message: 'This exhibit has already started.' });
+    if (exhibitPhase(exhibit) !== 'upcoming') return res.status(400).json({ message: 'This exhibit has already started.' });
     if (new Date() >= cutoffFor(exhibit)) return res.status(400).json({ message: 'Entries close three days before the exhibit date.' });
 
     const artwork = await Artwork.findOne({ _id: artworkId, artist: req.user._id, ...publicArtworkFilter() }).select('title artist');
@@ -96,7 +97,7 @@ async function submitEntry(req, res, next) {
 // DELETE /api/exhibit-entries/:id (artist withdraws pending entry)
 async function withdrawEntry(req, res, next) {
   try {
-    const entry = await SubmitExhibitEntry.findOne({ _id: req.params.id, artist: req.user._id }).populate('exhibit', 'event_date name');
+    const entry = await SubmitExhibitEntry.findOne({ _id: req.params.id, artist: req.user._id }).populate('exhibit', 'event_date starts_at ends_at name');
     if (!entry) return res.status(404).json({ message: 'Submission not found.' });
     if (entry.status !== 'pending') return res.status(400).json({ message: 'Only pending submissions can be withdrawn.' });
     if (new Date() >= cutoffFor(entry.exhibit)) return res.status(400).json({ message: 'Withdrawals close three days before the exhibit date.' });
@@ -115,16 +116,17 @@ async function decideEntry(req, res, next) {
     const reason = typeof denial_reason === 'string' ? denial_reason.trim().slice(0, 500) : '';
     if (status === 'denied' && !reason) return res.status(400).json({ message: 'A reason is required when denying a submission.' });
     const entry = await SubmitExhibitEntry.findById(req.params.id)
-      .populate('exhibit', 'name event_date')
+      .populate('exhibit', 'name event_date starts_at ends_at')
       .populate('artwork', 'title visibility');
     if (!entry) return res.status(404).json({ message: 'Submission not found.' });
+    if (!entry.exhibit || exhibitPhase(entry.exhibit) === 'past') return res.status(409).json({ message: 'This exhibit has ended; its submissions can no longer be reviewed.' });
     if (isPrivateArtwork(entry.artwork)) return res.status(409).json({ message: 'This artwork is in the artist’s Vault and cannot be reviewed until it is public.' });
     if (entry.status !== 'pending') return res.status(400).json({ message: `This submission is already ${entry.status}.` });
-    entry.status = status;
-    entry.denial_reason = status === 'denied' ? reason : '';
-    entry.decided_at = new Date();
-    entry.decided_by = req.user._id;
-    await entry.save();
+    const decision = await SubmitExhibitEntry.updateOne(
+      { _id: entry._id, status: 'pending' },
+      { $set: { status, denial_reason: status === 'denied' ? reason : '', decided_at: new Date(), decided_by: req.user._id } },
+    );
+    if (!decision.modifiedCount) return res.status(409).json({ message: 'This submission was already reviewed or expired. Refresh the page.' });
     const artworkId = entry.artwork?._id || entry.artwork;
     if (status === 'approved') {
       // Approval is the only submission action that changes the existing

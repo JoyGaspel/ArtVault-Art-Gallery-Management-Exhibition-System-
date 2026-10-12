@@ -45,16 +45,16 @@ export default function ManageGallery() {
 
   function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
-    setError('');
+    if (!silent) setError('');
     api.get('/artworks', { params: { limit: 100 } })
-      .then((response) => setArtworks(response.data.artworks || []))
+      .then((response) => { setArtworks(response.data.artworks || []); setError(''); })
       .catch((error) => { const message = error.response?.data?.message || 'Could not load gallery moderation.'; if (!silent) { setError(message); showToast(message, true); } })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }
   useEffect(() => {
     load();
   }, []);
-  useAutoRefresh(load);
+  useAutoRefresh(() => load({ silent: true }));
 
   const visible = useMemo(() => {
     const value = query.trim().toLowerCase();

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRecoveryClient } from '../lib/supabase';
+import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp } from '../lib/emailOtp';
 
 const RESEND_WAIT_SECONDS = 60;
 
@@ -95,8 +96,8 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
   async function verifyCode(event) {
     event.preventDefault();
     if (busy) return;
-    if (!/^\d{6}$/.test(otp.trim())) {
-      setError('Enter the 6-digit code from the password-reset email.');
+    if (!isValidEmailOtp(otp)) {
+      setError(`Enter the ${EMAIL_OTP_LENGTH}-digit code from the password-reset email.`);
       return;
     }
     setBusy(true);
@@ -176,8 +177,8 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
           <p id="recovery-description" className="recovery-description">If an account exists for <strong>{email}</strong>, a code is on its way. Check your inbox and spam folder.</p>
           <form onSubmit={verifyCode}>
             <div className="gate-field">
-              <label htmlFor="recovery-code">6-digit email code</label>
-              <input id="recovery-code" data-recovery-focus type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={otp} onChange={(event) => { setOtp(event.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }} disabled={busy} placeholder="Enter your code" />
+              <label htmlFor="recovery-code">{EMAIL_OTP_LENGTH}-digit email code</label>
+              <input id="recovery-code" data-recovery-focus type="text" inputMode="numeric" autoComplete="one-time-code" pattern={EMAIL_OTP_PATTERN} maxLength={EMAIL_OTP_LENGTH} required value={otp} onChange={(event) => { setOtp(normalizeEmailOtp(event.target.value)); setError(''); }} disabled={busy} placeholder="Enter your code" />
             </div>
             {error && <p className="recovery-error" role="alert">{error}</p>}
             <button className="gate-submit" type="submit" disabled={busy}>{busy ? 'Checking code…' : 'Verify code'}</button>

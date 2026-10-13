@@ -4,6 +4,7 @@ import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../api';
 import PasswordToggle from '../components/PasswordToggle';
+import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp } from '../lib/emailOtp';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -104,6 +105,7 @@ export default function Settings() {
     if (!currentPassword) return showToast('Enter your current password.', true);
     if (newPassword.length < 8) return showToast('Password must be at least 8 characters.', true);
     if (newPassword !== confirmPassword) return showToast('Passwords do not match.', true);
+    if (passwordOtpSent && !isValidEmailOtp(passwordOtp)) return showToast(`Enter the ${EMAIL_OTP_LENGTH}-digit email verification code.`, true);
     setAccountSaving(true);
     try {
       if (!passwordOtpSent) {
@@ -169,9 +171,9 @@ export default function Settings() {
             </div>
             {passwordOtpSent && (
               <div className="field" style={{ marginTop: 12 }}>
-                <label htmlFor="password-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
-                <input id="password-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}" maxLength={8} value={passwordOtp} onChange={(e) => setPasswordOtp(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Enter your code" />
-                <div className="hint">Enter the code sent to {user?.email} and press Update password again.</div>
+                <label htmlFor="password-otp">{EMAIL_OTP_LENGTH}-digit email verification code <span className="required-mark" aria-hidden="true">*</span></label>
+                <input id="password-otp" inputMode="numeric" autoComplete="one-time-code" pattern={EMAIL_OTP_PATTERN} maxLength={EMAIL_OTP_LENGTH} value={passwordOtp} onChange={(e) => setPasswordOtp(normalizeEmailOtp(e.target.value))} placeholder="Enter your code" />
+                <div className="hint">Enter the {EMAIL_OTP_LENGTH}-digit code sent to {user?.email} and press Update password again.</div>
                 <div className="security-action-row security-otp-actions">
                   <button className="btn btn-ghost security-secondary-btn" type="button" onClick={async () => { try { setPasswordOtp(''); await requestPasswordOtp(currentPassword); showToast('A new verification code was sent to your email.'); } catch (err) { showToast(err.message || 'Could not send another code.', true); } }} disabled={accountSaving}>Send another code</button>
                 </div>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthNav from '../components/AuthNav';
 import PasswordToggle from '../components/PasswordToggle';
+import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp } from '../lib/emailOtp';
 
 export default function Signup() {
   const { signup, verifySignupOtp, resendConfirmation, user } = useAuth();
@@ -107,9 +108,9 @@ export default function Signup() {
 
   async function onVerifyOtp(event) {
     event.preventDefault();
-    if (!/^\d{6,8}$/.test(otp.trim())) {
+    if (!isValidEmailOtp(otp)) {
       markTouched('otp');
-      setError('Enter the verification code from your email.');
+      setError(`Enter the ${EMAIL_OTP_LENGTH}-digit verification code from your email.`);
       return;
     }
     setSubmitting(true);
@@ -151,14 +152,14 @@ export default function Signup() {
             <div className="eyebrow">Check your inbox</div>
             <h1 style={{ fontSize: 26, marginBottom: 8 }}>Enter your verification code</h1>
             <p className="sub" style={{ color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.6 }}>
-              We sent a verification code to <strong>{email}</strong>. Enter it below to activate your ArtVault account.
+              We sent an {EMAIL_OTP_LENGTH}-digit verification code to <strong>{email}</strong>. Enter it below to activate your ArtVault account.
             </p>
             <div className="prototype-note">If the code does not arrive, check your spam folder or request a new code.</div>
             {error && <div className="gate-error"><span>⚠</span><span>{error}</span></div>}
             <form onSubmit={onVerifyOtp}>
               <div className="field">
-                <label htmlFor="signup-otp">Email verification code <span className="required-mark" aria-hidden="true">*</span></label>
-                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,8}" maxLength={8} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 8))} onBlur={() => markTouched('otp')} aria-invalid={Boolean(requiredMessage('otp', otp))} placeholder="Enter your code" />
+                <label htmlFor="signup-otp">{EMAIL_OTP_LENGTH}-digit email verification code <span className="required-mark" aria-hidden="true">*</span></label>
+                <input id="signup-otp" inputMode="numeric" autoComplete="one-time-code" pattern={EMAIL_OTP_PATTERN} maxLength={EMAIL_OTP_LENGTH} value={otp} onChange={(event) => setOtp(normalizeEmailOtp(event.target.value))} onBlur={() => markTouched('otp')} aria-invalid={Boolean(requiredMessage('otp', otp))} placeholder="Enter your code" />
                 {requiredMessage('otp', otp) && <div className="required-feedback" role="status">{requiredMessage('otp', otp)}</div>}
               </div>
               <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>{submitting ? 'Verifying…' : 'Verify email'}</button>

@@ -8,6 +8,7 @@ import {
   restorePrototypeSession,
 } from '../prototypeAuth';
 import { supabase, supabaseEnabled } from '../lib/supabase';
+import { EMAIL_OTP_LENGTH, isValidEmailOtp } from '../lib/emailOtp';
 
 const AuthContext = createContext(null);
 
@@ -216,6 +217,7 @@ export function AuthProvider({ children }) {
 
   const verifySignupOtp = useCallback(async (email, token) => {
     if (PROTOTYPE_AUTH) throw { message: 'OTP verification requires Supabase authentication.' };
+    if (!isValidEmailOtp(token)) throw { message: `Enter the ${EMAIL_OTP_LENGTH}-digit verification code from your email.` };
     const { data, error } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
       token: token.trim(),
@@ -258,7 +260,7 @@ export function AuthProvider({ children }) {
 
   const updatePassword = useCallback(async (password, otp = '') => {
     if (PROTOTYPE_AUTH) throw { message: 'Password changes require Supabase authentication.' };
-    if (!otp.trim()) throw { message: 'Enter the verification code sent to your email.' };
+    if (!isValidEmailOtp(otp)) throw { message: `Enter the ${EMAIL_OTP_LENGTH}-digit verification code sent to your email.` };
     const verification = await supabase.auth.verifyOtp({ email: user?.email, token: otp.trim(), type: 'email' });
     if (verification.error) throw { message: verification.error.message };
     const { error } = await supabase.auth.updateUser({ password });

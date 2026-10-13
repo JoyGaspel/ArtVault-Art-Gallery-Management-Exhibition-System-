@@ -502,6 +502,28 @@ button, input, textarea, select{ font-family:inherit; }
 .gate-error, .gate-locked{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:10px 13px; border-radius:10px; margin-bottom:16px; }
 .gate-error{ background:rgba(193,86,86,0.08); border:1px solid rgba(193,86,86,0.25); color:#A34848; }
 .gate-attempts{ margin:-8px 0 16px; padding:9px 13px; border-radius:10px; background:#fff5df; border:1px solid #efd39b; color:#7b571e; font-size:12.5px; line-height:1.45; }
+.gate-recovery-row{ display:flex; justify-content:flex-end; margin:-7px 0 17px; }
+.gate-forgot-password{ border:0; background:none; color:var(--violet-deep); font-size:12.5px; font-weight:700; cursor:pointer; padding:5px 0; text-align:right; }
+.gate-forgot-password:hover,.gate-forgot-password:focus-visible{ text-decoration:underline; }
+.gate-forgot-password.is-suggested{ border:1px solid var(--line); border-radius:10px; background:#fff; padding:8px 11px; text-decoration:none; }
+.gate-forgot-password span{ display:block; font-size:11px; font-weight:400; color:var(--ink-soft); margin-top:2px; }
+.gate-forgot-password:disabled{ opacity:.55; cursor:default; }
+.recovery-overlay{ z-index:220; }
+.recovery-modal{ max-width:440px; padding:26px 28px; }
+.recovery-modal .modal-head{ margin-bottom:12px; gap:12px; }
+.recovery-modal .modal-head h2{ font-size:22px; }
+.recovery-modal .gate-eyebrow{ margin-bottom:5px; }
+.recovery-modal .modal-close{ flex:none; min-width:36px; min-height:36px; font-size:24px; }
+.recovery-description{ margin:0 0 20px; color:var(--ink-soft); font-size:13.5px; line-height:1.55; overflow-wrap:anywhere; }
+.recovery-modal .gate-field{ margin-bottom:15px; }
+.recovery-modal .gate-submit{ min-height:46px; }
+.recovery-error{ margin:0 0 15px; padding:10px 12px; border-radius:10px; background:rgba(193,86,86,.08); border:1px solid rgba(193,86,86,.25); color:#a34848; font-size:12.5px; line-height:1.45; }
+.recovery-secondary-actions{ display:flex; justify-content:space-between; gap:10px; margin-top:14px; }
+.recovery-secondary-actions button{ border:0; background:none; color:var(--violet-deep); font-size:12px; font-weight:600; cursor:pointer; padding:6px 0; }
+.recovery-secondary-actions button:disabled{ opacity:.5; cursor:default; }
+.recovery-hint{ margin:16px 0 0; color:var(--ink-faint); font-size:11.5px; line-height:1.45; }
+.recovery-show-password{ display:flex; align-items:center; gap:8px; margin:-3px 0 17px; color:var(--ink-soft); font-size:12.5px; cursor:pointer; }
+.recovery-show-password input{ accent-color:var(--violet-deep); }
 .otp-feedback{ margin:12px auto 0; max-width:520px; padding:10px 14px; border:1px solid rgba(72,151,103,.25); border-radius:10px; background:rgba(72,151,103,.09); color:#2e7950; font-size:12.5px; line-height:1.45; text-align:center; }
 .otp-actions{ display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:14px; }
 .otp-resend-btn{ min-height:44px; min-width:210px; padding:10px 20px; justify-content:center; white-space:nowrap; }
@@ -867,6 +889,8 @@ button, input, textarea, select{ font-family:inherit; }
   .form-card{padding:18px 16px; border-radius:13px;}
   .modal-overlay{padding:12px;}
   .modal-box{padding:22px 18px; border-radius:16px;}
+  .recovery-overlay{ padding:12px; }
+  .recovery-modal{ width:100%; max-width:440px; max-height:calc(100dvh - 24px); padding:22px 18px; }
   .exhibit-modal-box{ padding:24px 20px; }
   .exhibit-modal-box .checkbox-list{ max-height:300px; }
   .modal-actions{flex-wrap:wrap;}

@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthNav from '../components/AuthNav';
 import PasswordToggle from '../components/PasswordToggle';
+import PasswordRecoveryModal from '../components/PasswordRecoveryModal';
+import { supabaseEnabled } from '../lib/supabase';
 
 export default function Login() {
   const { login, user, resendConfirmation } = useAuth();
@@ -18,7 +20,11 @@ export default function Login() {
   const [lockSeconds, setLockSeconds] = useState(0);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [resending, setResending] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoverySuggested, setRecoverySuggested] = useState(false);
   const lockInterval = useRef(null);
+  const forgotButtonRef = useRef(null);
+  const recoveryAvailable = supabaseEnabled && import.meta.env.VITE_OFFLINE_READONLY !== 'true';
 
   // Kept as a safe no-op for legacy hidden markup; demo shortcuts are disabled.
   function fillDemo() {}
@@ -57,6 +63,7 @@ export default function Login() {
       if (err.locked) {
         setLockSeconds(err.secondsLeft || 300);
         setAttemptsRemaining(0);
+        setRecoverySuggested(true);
         setError('Too many incorrect password attempts. Sign-in is locked for 5 minutes.');
       } else if (err.code === 'email_not_confirmed' || /confirm.*email|email.*confirm/i.test(err.message || '')) {
         setNeedsConfirmation(true);
@@ -74,6 +81,9 @@ export default function Login() {
         const friendlyMessage = /invalid credentials|invalid login credentials/i.test(message)
           ? (remaining !== null ? 'Incorrect password.' : 'Incorrect email or password.')
           : message;
+        if (remaining !== null || /invalid credentials|incorrect password/i.test(message)) {
+          setRecoverySuggested(true);
+        }
         setError(friendlyMessage);
         setAttemptsRemaining(remaining);
         setPassword('');
@@ -101,6 +111,11 @@ export default function Login() {
 
   const mm = String(Math.floor(lockSeconds / 60)).padStart(1, '0');
   const ss = String(lockSeconds % 60).padStart(2, '0');
+
+  function closeRecovery() {
+    setRecoveryOpen(false);
+    requestAnimationFrame(() => forgotButtonRef.current?.focus());
+  }
 
   return (
     <div className="auth-page">
@@ -164,6 +179,14 @@ export default function Login() {
               </div>
             </div>
 
+            {recoveryAvailable && (
+              <div className="gate-recovery-row">
+                <button ref={forgotButtonRef} className={`gate-forgot-password${recoverySuggested ? ' is-suggested' : ''}`} type="button" onClick={() => setRecoveryOpen(true)} disabled={submitting}>
+                  Forgot password? {recoverySuggested && <span>Reset it with an email code</span>}
+                </button>
+              </div>
+            )}
+
             <button className="gate-submit" type="submit" disabled={submitting || lockSeconds > 0}>
               {submitting ? <span className="spinner" /> : null}
               {submitting ? 'Verifying…' : 'Sign in'}
@@ -176,6 +199,13 @@ export default function Login() {
         </div>
       </div>
       </div>
+      {recoveryOpen && (
+        <PasswordRecoveryModal
+          initialEmail={email}
+          onClose={closeRecovery}
+          onPasswordChanged={() => { setPassword(''); setError(''); setAttemptsRemaining(null); setRecoverySuggested(false); }}
+        />
+      )}
     </div>
   );
 }

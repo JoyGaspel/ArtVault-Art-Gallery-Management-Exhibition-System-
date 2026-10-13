@@ -324,20 +324,48 @@ async function deleteArtistAsAdmin(req, res, next) {
       return res.status(403).json({ message: 'This artist has private Vault artworks. Only the main administrator can remove this account.' });
     }
 
-    const artworks = await Artwork.find({ artist: artist._id }).select('_id');
-    const artworkIds = artworks.map((artwork) => artwork._id);
-    if (artworkIds.length) {
-      const artworkDocs = await Artwork.find({ _id: mongoose.trusted({ $in: artworkIds }) }).lean();
-      await Archive.insertMany(artworkDocs.map((snapshot) => ({ entityType: 'artwork', entityId: snapshot._id, snapshot, deletedBy: req.user._id })));
-      await Exhibit.updateMany({}, { $pull: { artworks: { $in: artworkIds } } });
-      await Artwork.deleteMany({ _id: { $in: artworkIds } });
-      await ArtworkLike.deleteMany({ artwork: mongoose.trusted({ $in: artworkIds }) });
+    const removeRecords = async (session) => {
+      const inSession = (query) => session ? query.session(session) : query;
+      const writeOptions = session ? { session } : {};
+      const artworks = await inSession(Artwork.find({ artist: artist._id }).select('_id'));
+      const artworkIds = artworks.map((artwork) => artwork._id);
+      if (artworkIds.length) {
+        // sanitizeFilter is enabled globally. Server-owned $in filters must be
+        // trusted, otherwise Mongoose casts the operator object as an ObjectId.
+        const artworkFilter = { _id: mongoose.trusted({ $in: artworkIds }) };
+        const artworkDocs = await inSession(Artwork.find(artworkFilter).lean());
+        const existingArchives = await inSession(Archive.find({ entityType: 'artwork', entityId: mongoose.trusted({ $in: artworkIds }) }).select('entityId').lean());
+        const archivedIds = new Set(existingArchives.map((entry) => String(entry.entityId)));
+        const missingArchives = artworkDocs
+          .filter((snapshot) => !archivedIds.has(String(snapshot._id)))
+          .map((snapshot) => ({ entityType: 'artwork', entityId: snapshot._id, snapshot, deletedBy: req.user._id }));
+        if (missingArchives.length) await Archive.insertMany(missingArchives, writeOptions);
+        await Exhibit.updateMany({}, { $pull: { artworks: { $in: artworkIds } } }, writeOptions);
+        await Artwork.deleteMany(artworkFilter, writeOptions);
+        await ArtworkLike.deleteMany({ artwork: mongoose.trusted({ $in: artworkIds }) }, writeOptions);
+      }
+      await Archive.create([{ entityType: 'artist', entityId: artist._id, snapshot: artist.toObject(), deletedBy: req.user._id }], writeOptions);
+      // Administrator removals intentionally keep the Supabase Auth identity.
+      // The MongoDB profile and owned content are archived/deleted here; the
+      // authentication account can be reused or handled separately later.
+      await artist.deleteOne(writeOptions);
+    };
+
+    // Atlas supports transactions, so an error must not leave the artist's
+    // artworks archived and removed from exhibits while the artist remains.
+    // A standalone offline MongoDB does not support transactions; the same
+    // operation remains available there with idempotent artwork archives.
+    const topology = mongoose.connection.client?.topology?.description?.type;
+    if (topology === 'ReplicaSetWithPrimary' || topology === 'Sharded') {
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(() => removeRecords(session));
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      await removeRecords();
     }
-    await Archive.create({ entityType: 'artist', entityId: artist._id, snapshot: artist.toObject(), deletedBy: req.user._id });
-    // Administrator removals intentionally keep the Supabase Auth identity.
-    // The MongoDB profile and owned content are archived/deleted here; the
-    // authentication account can be reused or handled separately later.
-    await artist.deleteOne();
     recordAudit({ req, action: 'delete', entityType: 'artist', entityId: artist._id, details: { administered: true } });
     res.json({ message: 'Artist account and owned artworks deleted.' });
   } catch (err) {

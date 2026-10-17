@@ -1427,10 +1427,9 @@ button, input, textarea, select{ font-family:inherit; }
 .offline-readonly-banner { padding: 10px 18px; text-align: center; background: #f5efff; color: #55418a; border-bottom: 1px solid #ded4f1; font-size: 13px; }
 
 /* Terms stay in the signup flow; the text has its own scroll area. */
-.signup-form .signup-terms-field { grid-column: 1 / -1; margin: 2px 0 14px; }
-.signup-terms-choice { display: flex; align-items: flex-start; gap: 11px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #faf8ff; color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; }
-.signup-terms-choice:focus-within { border-color: var(--violet-deep); box-shadow: 0 0 0 3px rgba(107,79,176,.12); }
-.signup-terms-choice input[type="checkbox"] { flex: 0 0 auto; width: 17px; height: 17px; margin: 2px 0 0; padding: 0; accent-color: var(--violet-deep); cursor: pointer; }
+.signup-form .signup-terms-field { grid-column: 1 / -1; margin: 7px 0 18px; }
+.signup-terms-choice { display: flex; align-items: flex-start; gap: 10px; width: fit-content; max-width: 100%; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.signup-terms-choice input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; margin: 1px 0 0; padding: 0; accent-color: var(--violet-deep); cursor: pointer; }
 .signup-terms-choice input[aria-invalid="true"] { outline: 2px solid #c15656; outline-offset: 2px; box-shadow: none; }
 .signup-terms-choice > div { min-width: 0; }
 .signup-terms-choice label { display: inline; margin: 0; color: inherit; font: inherit; cursor: pointer; }

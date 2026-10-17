@@ -1436,6 +1436,10 @@ button, input, textarea, select{ font-family:inherit; }
 .signup-terms-open { border: 0; padding: 0; background: transparent; color: var(--violet-deep); font: inherit; font-weight: 700; text-align: left; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .signup-terms-open:hover { color: var(--ink); }
 .signup-terms-open:focus-visible { outline: 2px solid var(--violet-deep); outline-offset: 3px; border-radius: 2px; }
+@media (min-width: 1100px) {
+  .signup-form .signup-terms-field { text-align: center; }
+  .signup-terms-choice { margin-inline: auto; text-align: left; }
+}
 
 .terms-overlay { z-index: 230; background: rgba(29,19,52,.58); backdrop-filter: blur(4px); }
 .terms-modal { display: flex; flex-direction: column; width: min(100%, 720px); max-height: min(88dvh, 800px); overflow: hidden; border: 1px solid #ddd3ee; border-radius: 20px; background: #fff; box-shadow: 0 28px 80px rgba(25,17,48,.3); }

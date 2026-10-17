@@ -24,11 +24,13 @@ async function signup(req, res, next) {
     if (!normalizedName || !normalizedEmail || typeof password !== 'string' || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
     }
+    if (req.body.acceptedTerms !== true) return res.status(400).json({ message: 'Accept the Terms and Conditions before creating an account.' });
     if (firstName && (!/^[A-Z][A-Za-z]{1,49}$/.test(firstName) || firstName.length > 50)) return res.status(400).json({ message: 'First name must start with a capital letter and contain 2–50 letters.' });
     if (lastName && (!/^[A-Z][A-Za-z]{1,49}(?: [A-Z][A-Za-z]{1,49})*$/.test(lastName) || lastName.length > 50)) return res.status(400).json({ message: 'Last name must start with a capital letter and contain 2–50 letters.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return res.status(400).json({ message: 'Enter a valid email address.' });
     }
+    if (normalizedEmail.length > 254) return res.status(400).json({ message: 'Email must be 254 characters or fewer.' });
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
     }
@@ -52,6 +54,8 @@ async function signup(req, res, next) {
       role: 'artist',
       specializations: specializations || [],
       bio: bio || '',
+      termsVersion: '2026-10-17',
+      termsAcceptedAt: new Date(),
     });
 
     const token = generateToken(user);

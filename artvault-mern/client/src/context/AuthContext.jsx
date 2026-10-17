@@ -184,6 +184,7 @@ export function AuthProvider({ children }) {
 
   const signup = useCallback(async (payload) => {
     if (OFFLINE_READONLY) throw { message: 'Sign-up needs an internet connection. This offline copy is read-only.' };
+    if (payload.acceptedTerms !== true) throw { message: 'Accept the Terms and Conditions before creating an account.' };
     if (PROTOTYPE_AUTH) {
       const prototypeUser = await prototypeSignup(payload);
       setUser(prototypeUser);
@@ -201,6 +202,8 @@ export function AuthProvider({ children }) {
           role: 'artist',
           specializations: payload.specializations || [],
           bio: payload.bio || '',
+          termsVersion: '2026-10-17',
+          termsAcceptedAt: new Date().toISOString(),
         },
       },
     });

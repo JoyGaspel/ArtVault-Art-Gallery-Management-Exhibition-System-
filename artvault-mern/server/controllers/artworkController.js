@@ -44,6 +44,15 @@ function cleanList(value, maxItems, maxItemLength) {
   return [...new Set(value.map((item) => cleanText(item, maxItemLength)).filter(Boolean))].slice(0, maxItems);
 }
 
+function validateArtworkLists(categories, materials) {
+  if (!Array.isArray(categories) || !categories.length || categories.length > MAX_CATEGORIES || categories.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 40)) {
+    throw Object.assign(new Error('Choose between 1 and 5 categories, each 40 characters or fewer.'), { status: 400 });
+  }
+  if (materials !== undefined && (!Array.isArray(materials) || materials.length > MAX_MATERIALS || materials.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 80))) {
+    throw Object.assign(new Error('Use at most 20 materials, each 80 characters or fewer.'), { status: 400 });
+  }
+}
+
 function validateImageData(imagePath, maxBytes = MAX_IMAGE_BYTES) {
   if (!imagePath) return '';
   if (typeof imagePath !== 'string') throw Object.assign(new Error('Artwork image must be a valid file.'), { status: 400 });
@@ -283,6 +292,7 @@ async function createArtwork(req, res, next) {
     const cleanDescription = cleanText(description, 1000);
     if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
     if (typeof description !== 'undefined' && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
+    validateArtworkLists(categories, materials);
 
     const artwork = await Artwork.create({
       title: cleanTitle,
@@ -404,6 +414,7 @@ async function updateArtwork(req, res, next) {
     if (title !== undefined && title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
     if (description !== undefined && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
     if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
+    if (categories !== undefined || materials !== undefined) validateArtworkLists(categories ?? artwork.categories, materials ?? artwork.materials);
     if (title !== undefined) artwork.title = cleanText(title, 50);
     if (description !== undefined) artwork.description = cleanText(description, 1000);
     if (image_path !== undefined) artwork.image_path = validateImageData(image_path);

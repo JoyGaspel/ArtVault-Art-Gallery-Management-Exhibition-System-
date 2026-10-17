@@ -34,6 +34,8 @@ node scripts/start-offline.js
 
 Open <http://127.0.0.1:5174>. Keep that PowerShell window open; press `Ctrl+C` to stop. The launcher binds the API and frontend to the local computer, turns off outgoing email, and does not contact Supabase for sign-in.
 
+Use **port 5174** for the offline snapshot, not the regular development site on port 5173 or the deployed Vercel URL. Those normally use the online Atlas/Supabase services and will not become offline automatically. If the gallery is empty, check <http://127.0.0.1:5500/api/health>; it should report `databaseName: artvault_offline`. If the launcher says MongoDB is unavailable, start the local MongoDB Windows service and run the launcher again.
+
 ## Important limits
 
 - `mongodump` is a snapshot, not automatic synchronization. It will not update itself when Atlas changes.

@@ -27,6 +27,8 @@ const artistSchema = new mongoose.Schema(
     suspendedAt: { type: Date, default: null },
     supabaseUserId: { type: String, sparse: true, unique: true, select: false },
     emailConfirmedAt: { type: Date, default: null },
+    termsVersion: { type: String, default: '' },
+    termsAcceptedAt: { type: Date, default: null },
     specializations: {
       type: [{ type: String, enum: ALL_SPECIALIZATIONS }],
       default: [],

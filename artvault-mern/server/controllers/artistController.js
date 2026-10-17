@@ -9,6 +9,7 @@ const { recordAudit } = require('../utils/audit');
 const AdminProfile = require('../models/AdminProfile');
 const ArtworkLike = require('../models/ArtworkLike');
 const { publicArtworkFilter } = require('../utils/artworkVisibility');
+const { sendAccountNoticeInBackground } = require('../services/accountNoticeService');
 
 async function syncAdminProfile(artist) {
   const isAdmin = ['sub_admin', 'main_admin'].includes(artist.role);
@@ -161,6 +162,7 @@ async function getArtist(req, res, next) {
 // PUT /api/artists/me  (the signed-in artist updates their own profile)
 async function updateMyProfile(req, res, next) {
   try {
+    if (req.user.role !== 'artist') return res.status(403).json({ message: 'Administrator profiles cannot be edited here.' });
     const { name, firstName, lastName, bio, specializations, avatar_path, emailLikes, emailSubmissionStatus, emailExhibits } = req.body;
     const artist = req.user;
 
@@ -219,6 +221,7 @@ async function deleteMyAccount(req, res, next) {
     req.user.status = 'suspended';
     req.user.suspendedAt = new Date();
     await req.user.save();
+    sendAccountNoticeInBackground(req.user.email, 'deletion_requested');
     recordAudit({ req, action: 'account_delete', entityType: 'artist', entityId: req.user._id, details: { suspended: true } });
     res.json({ message: 'Your account is suspended and awaiting main-administrator review.' });
   } catch (err) {
@@ -261,10 +264,12 @@ async function setArtistStatus(req, res, next) {
     if (req.user.role === 'sub_admin' && artist.role !== 'artist') {
       return res.status(403).json({ message: 'Sub-admins can only suspend or activate artist accounts.' });
     }
+    const previousStatus = artist.status;
     artist.status = status;
     artist.suspendedAt = status === 'suspended' ? new Date() : null;
     await artist.save();
     await syncAdminProfile(artist);
+    if (previousStatus !== status) sendAccountNoticeInBackground(artist.email, status);
     recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { status, administered: true } });
     res.json({ artist: artist.toSafeObject() });
   } catch (err) {
@@ -366,6 +371,7 @@ async function deleteArtistAsAdmin(req, res, next) {
     } else {
       await removeRecords();
     }
+    sendAccountNoticeInBackground(artist.email, 'removed');
     recordAudit({ req, action: 'delete', entityType: 'artist', entityId: artist._id, details: { administered: true } });
     res.json({ message: 'Artist account and owned artworks deleted.' });
   } catch (err) {

@@ -139,8 +139,8 @@ export default function Settings() {
       <div className="page-head settings-page-head">
         <div>
           <div className="eyebrow">Account</div>
-          <h1>Profile settings</h1>
-          <div className="sub">{isAdmin ? 'Manage the profile information shown for your administrator account.' : 'This is what other visitors see on your artist profile.'}</div>
+          <h1>{isAdmin ? 'Account security' : 'Profile settings'}</h1>
+          <div className="sub">{isAdmin ? 'Manage your account password.' : 'This is what other visitors see on your artist profile.'}</div>
         </div>
 
         <div className="form-card account-security-card">
@@ -187,7 +187,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="settings-profile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 32 }}>
+      {!isAdmin && <div className="settings-profile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 32 }}>
         <div className="form-card">
           <div className="field">
             <label htmlFor="profile-picture">Profile picture <span className="optional-mark">(optional)</span></label>
@@ -266,7 +266,7 @@ export default function Settings() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
       {confirmDelete && (
         <ConfirmDialog
           title="Delete your account?"

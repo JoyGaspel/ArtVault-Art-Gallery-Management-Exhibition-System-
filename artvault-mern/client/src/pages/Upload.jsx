@@ -36,7 +36,7 @@ export default function Upload() {
     const file = event.target.files?.[0];
     if (!file) { setImage(null); setPreview(''); return; }
     const extensionLooksValid = /\.(png|jpe?g|webp|gif)$/i.test(file.name);
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type) && !extensionLooksValid) {
+    if ((file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) || !extensionLooksValid) {
       setImage(null);
       setPreview('');
       showToast('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.', true);
@@ -47,6 +47,11 @@ export default function Upload() {
       setImage(null);
       setPreview('');
       showToast('Image must be 10 MB or smaller.', true);
+      event.target.value = '';
+      return;
+    }
+    if (!file.size) {
+      showToast('The selected image is empty. Choose another file.', true);
       event.target.value = '';
       return;
     }
@@ -63,8 +68,27 @@ export default function Upload() {
   }
 
   async function publish() {
+    if (saving) return;
     if (!title.trim()) {
       setTitleErr(true);
+      showToast('Give this artwork a title before saving.', true);
+      return;
+    }
+    if (title.trim().length > 50 || description.trim().length > 1000) {
+      showToast('Title must be 50 characters or fewer, and description 1,000 or fewer.', true);
+      return;
+    }
+    if (!categories.length || categories.length > 5) {
+      showToast('Choose between 1 and 5 artwork categories.', true);
+      return;
+    }
+    const materialList = materials.split(',').map((s) => s.trim()).filter(Boolean);
+    if (materialList.length > 20 || materialList.some((item) => item.length > 80)) {
+      showToast('Use at most 20 materials, each 80 characters or fewer.', true);
+      return;
+    }
+    if (image && ((image.type && !ALLOWED_IMAGE_TYPES.includes(image.type)) || image.size > MAX_IMAGE_BYTES || !image.size)) {
+      showToast('Choose a valid image up to 10 MB.', true);
       return;
     }
     setSaving(true);
@@ -81,7 +105,7 @@ export default function Upload() {
         description: cleanDescription,
         image_path,
         thumbnail_path,
-        materials: materials.split(',').map((s) => s.trim()).filter(Boolean),
+        materials: materialList,
         categories,
         visibility,
       });
@@ -151,7 +175,7 @@ export default function Upload() {
         <div className="field">
           <label>Materials <span className="optional-mark">(optional)</span></label>
           <input value={materials} onChange={(e) => setMaterials(e.target.value)} placeholder="e.g. Cotton thread, natural dye" />
-          <div className="hint">Separate materials with commas.</div>
+          <div className="hint">Separate materials with commas; maximum 20, each up to 80 characters.</div>
         </div>
 
         <div className="vault-upload-choice" role="group" aria-label="Artwork visibility">

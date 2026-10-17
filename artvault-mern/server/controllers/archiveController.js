@@ -6,6 +6,7 @@ const Exhibit = require('../models/Exhibit');
 const crypto = require('crypto');
 const { recordAudit } = require('../utils/audit');
 const supabase = require('../config/supabase');
+const { sendAccountNoticeInBackground } = require('../services/accountNoticeService');
 
 async function listArchives(req, res, next) {
   try {
@@ -55,6 +56,7 @@ async function restoreArchive(req, res, next) {
         await artworkArchive.deleteOne();
       }
       await archive.deleteOne();
+      sendAccountNoticeInBackground(existing?.email || archive.snapshot?.email, 'active');
       recordAudit({ req, action: 'restore', entityType: 'artist', entityId: archive.entityId });
       return res.json({ message: 'Artist account and artworks restored successfully.' });
     }
@@ -82,17 +84,21 @@ async function permanentlyDeleteArchive(req, res, next) {
     }
     const result = await Archive.findById(req.params.id);
     if (!result) return res.status(404).json({ message: 'Archive item not found.' });
+    let deletedArtistEmail = '';
     if (result.entityType === 'artist') {
       const artist = await Artist.findById(result.entityId).select('+supabaseUserId');
-      if (artist?.supabaseUserId && !supabase?.admin) return res.status(503).json({ message: 'Supabase server credentials are required to permanently delete this artist account.' });
-      if (artist?.supabaseUserId) {
-        const { error } = await supabase.admin.auth.admin.deleteUser(artist.supabaseUserId);
+      deletedArtistEmail = artist?.email || result.snapshot?.email || '';
+      const supabaseUserId = artist?.supabaseUserId || result.snapshot?.supabaseUserId;
+      if (supabaseUserId && !supabase?.admin?.auth?.admin) return res.status(503).json({ message: 'Supabase server credentials are required to permanently delete this artist account.' });
+      if (supabaseUserId) {
+        const { error } = await supabase.admin.auth.admin.deleteUser(supabaseUserId);
         if (error) return res.status(502).json({ message: 'Could not permanently remove the artist authentication account.' });
       }
       await Artist.deleteOne({ _id: result.entityId });
       await Archive.deleteMany({ entityType: 'artwork', 'snapshot.artist': result.entityId });
     }
     await result.deleteOne();
+    if (deletedArtistEmail) sendAccountNoticeInBackground(deletedArtistEmail, 'permanently_deleted');
     recordAudit({ req, action: 'permanent_delete', entityType: 'archive', entityId: result._id, details: { archivedEntityType: result.entityType } });
     res.json({ message: 'Archive item permanently deleted.' });
   } catch (err) { next(err); }

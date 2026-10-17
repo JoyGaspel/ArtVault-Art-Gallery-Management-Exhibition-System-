@@ -1,13 +1,21 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const Artist = require('../models/Artist');
+const Archive = require('../models/Archive');
 const supabase = require('../config/supabase');
 
 async function mirrorSupabaseUser(authUser) {
   if (!authUser?.email || !authUser.email_confirmed_at) return null;
 
+  // A removed Supabase identity may still authenticate. Do not silently
+  // recreate its Mongo profile until an administrator restores the archive.
   let user = await Artist.findOne({ supabaseUserId: authUser.id }).select('+supabaseUserId');
   if (!user) user = await Artist.findOne({ email: authUser.email.toLowerCase() });
+
+  if (!user) {
+    const removedAccount = await Archive.exists({ entityType: 'artist', 'snapshot.email': authUser.email.toLowerCase() });
+    if (removedAccount) return { removed: true };
+  }
 
   if (!user) {
     user = new Artist({
@@ -23,6 +31,8 @@ async function mirrorSupabaseUser(authUser) {
       bio: authUser.user_metadata?.bio || '',
       supabaseUserId: authUser.id,
       emailConfirmedAt: authUser.email_confirmed_at ? new Date(authUser.email_confirmed_at) : null,
+      termsVersion: authUser.user_metadata?.termsVersion || '',
+      termsAcceptedAt: authUser.user_metadata?.termsAcceptedAt || null,
     });
   } else if (!user.supabaseUserId) {
     user.supabaseUserId = authUser.id;
@@ -38,6 +48,10 @@ async function mirrorSupabaseUser(authUser) {
   if ((!user.name || user.name === authUser.email) && metadata.name) user.name = metadata.name;
   if (!user.bio && metadata.bio) user.bio = metadata.bio;
   if ((!user.specializations || !user.specializations.length) && Array.isArray(metadata.specializations)) user.specializations = metadata.specializations;
+  if (!user.termsAcceptedAt && metadata.termsAcceptedAt) {
+    user.termsVersion = metadata.termsVersion || '';
+    user.termsAcceptedAt = new Date(metadata.termsAcceptedAt);
+  }
 
   // Preserve the designated owner account as the main administrator.
   const mainAdminEmail = (process.env.MAIN_ADMIN_EMAIL || '').trim().toLowerCase();
@@ -74,6 +88,7 @@ async function requireAuth(req, res, next) {
           return res.status(500).json({ message: 'Could not sync your account with the application database.' });
         }
         if (user) {
+          if (user.removed) return res.status(423).json({ message: 'This account was removed. Contact an ArtVault administrator.' });
           if (user.status === 'suspended') {
             return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
           }

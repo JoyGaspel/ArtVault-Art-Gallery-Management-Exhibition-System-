@@ -26,6 +26,7 @@ import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
 import ArtworkLikes from './pages/ArtworkLikes';
 import Vault from './pages/Vault';
 import MyArtworks from './pages/MyArtworks';
+import Terms from './pages/Terms';
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/terms" element={<Terms />} />
 
             <Route element={<AppLayout />}>
               <Route path="/" element={<Gallery />} />
@@ -57,7 +59,7 @@ export default function App() {
               <Route path="/manage-gallery" element={<ProtectedRoute role="admin"><ManageGallery /></ProtectedRoute>} />
               <Route path="/archives" element={<ProtectedRoute role="admin"><Archives /></ProtectedRoute>} />
               <Route path="/audit-logs" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><AuditLogs /></ProtectedRoute>} />
-              <Route path="/artwork-likes" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><ArtworkLikes /></ProtectedRoute>} />
+              <Route path="/artwork-likes" element={<ProtectedRoute role="main_admin"><ArtworkLikes /></ProtectedRoute>} />
             </Route>
           </Routes>
         </ToastProvider>

@@ -103,9 +103,9 @@ export default function ResponsiveNav() {
           <span className="responsive-menu-heading">Activity &amp; records</span>
           <LinkItem to="/archives" icon="archives">Archives</LinkItem>
           {hasAdminActivity && <LinkItem to="/audit-logs" icon="activity">{isMainAdmin ? 'Activity logs' : 'Artist activity'}</LinkItem>}
-          {hasAdminActivity && <LinkItem to="/artwork-likes" icon="likes">Artwork likes</LinkItem>}
+          {isMainAdmin && <LinkItem to="/artwork-likes" icon="likes">Artwork likes</LinkItem>}
           <span className="responsive-menu-heading">Account</span>
-          <LinkItem to="/settings" icon="settings">Settings</LinkItem>
+          <LinkItem to="/settings" icon="settings">Account security</LinkItem>
         </>}
         {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} /><span>Sign out</span></button>}
       </div>

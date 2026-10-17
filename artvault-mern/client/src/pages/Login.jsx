@@ -33,7 +33,7 @@ export default function Login() {
     // Do not redirect while a role-restricted sign-in is still being checked.
     // This prevents an artist account from briefly reaching the homepage after
     // selecting Admin and then being rejected.
-    if (user && !submitting) navigate('/', { replace: true });
+    if (user && !submitting) navigate(['admin', 'sub_admin', 'main_admin'].includes(user.role) ? '/manage-gallery' : '/', { replace: true });
   }, [user, navigate, submitting]);
 
   useEffect(() => {

@@ -24,6 +24,7 @@ export default function Signup() {
   const [resendSubmitting, setResendSubmitting] = useState(false);
   const [resendFeedback, setResendFeedback] = useState('');
   const [touched, setTouched] = useState({});
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   function markTouched(field) {
     setTouched((current) => ({ ...current, [field]: true }));
@@ -62,7 +63,7 @@ export default function Signup() {
     const cleanLastName = lastName.trim().replace(/\s+/g, ' ');
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanFirstName || !cleanLastName || !cleanEmail || !password || !confirm) {
-      setTouched({ firstName: true, lastName: true, email: true, password: true, confirm: true });
+      setTouched({ firstName: true, lastName: true, email: true, password: true, confirm: true, terms: true });
       setError('Fill in every field to create your account.');
       return;
     }
@@ -78,19 +79,32 @@ export default function Signup() {
       setError('Extension must be Jr, Sr, II, III, IV, or V, without special symbols.');
       return;
     }
+    if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Enter a valid email address of 254 characters or fewer.');
+      return;
+    }
     if (password.length < 6) {
       setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password.length > 128) {
+      setError('Password must be 128 characters or fewer.');
       return;
     }
     if (password !== confirm) {
       setError('Passwords don\u2019t match.');
       return;
     }
+    if (!acceptedTerms) {
+      setTouched((current) => ({ ...current, terms: true }));
+      setError('Review and accept the Terms and Conditions to create your account.');
+      return;
+    }
     setSubmitting(true);
     try {
       const cleanExtension = extensionName.trim().replace(/\.$/, '');
       const name = `${cleanFirstName} ${cleanLastName}${cleanExtension ? ` ${cleanExtension}` : ''}`;
-      const result = await signup({ name, firstName: cleanFirstName, lastName: cleanLastName, extensionName: cleanExtension, email: cleanEmail, password, role: 'artist' });
+      const result = await signup({ name, firstName: cleanFirstName, lastName: cleanLastName, extensionName: cleanExtension, email: cleanEmail, password, role: 'artist', acceptedTerms: true });
       if (result?.needsOtp || result?.needsConfirmation) {
         setConfirmationSent(true);
       } else {
@@ -198,18 +212,18 @@ export default function Signup() {
           </div>
           <div className="field">
             <label htmlFor="extensionName">Extension name <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>(optional)</span></label>
-            <input id="extensionName" value={extensionName} onChange={(e) => setExtensionName(e.target.value)} placeholder="e.g. Jr, Sr, II" autoComplete="honorific-suffix" />
+            <input id="extensionName" maxLength={10} value={extensionName} onChange={(e) => setExtensionName(e.target.value)} placeholder="e.g. Jr, Sr, II" autoComplete="honorific-suffix" />
             <div className="hint">Common extensions only: Jr, Sr, II, III, IV, or V.</div>
           </div>
           <div className="field">
             <label htmlFor="email">Email <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => markTouched('email')} aria-invalid={Boolean(requiredMessage('email', email))} placeholder="e.g. juan@example.com" autoComplete="email" />
+            <input id="email" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => markTouched('email')} aria-invalid={Boolean(requiredMessage('email', email))} placeholder="e.g. juan@example.com" autoComplete="email" />
             {requiredMessage('email', email) && <div className="required-feedback" role="status">{requiredMessage('email', email)}</div>}
           </div>
           <div className="field">
             <label htmlFor="password">Password <span className="required-mark" aria-hidden="true">*</span></label>
             <div className="gate-field-wrap">
-              <input id="password" type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => markTouched('password')} aria-invalid={Boolean(requiredMessage('password', password))} placeholder="At least 6 characters" autoComplete="new-password" />
+              <input id="password" type={showPassword ? 'text' : 'password'} required maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => markTouched('password')} aria-invalid={Boolean(requiredMessage('password', password))} placeholder="At least 6 characters" autoComplete="new-password" />
               <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />
             </div>
             {requiredMessage('password', password) && <div className="required-feedback" role="status">{requiredMessage('password', password)}</div>}
@@ -225,6 +239,10 @@ export default function Signup() {
             <div className="hint">Administrator accounts are provisioned separately — this form always creates an Artist account.</div>
           </div>
 
+          <div className="field">
+            <label className="checkbox-row" htmlFor="acceptedTerms"><input id="acceptedTerms" type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} onBlur={() => markTouched('terms')} /> I have read and agree to the <Link to="/terms" target="_blank" rel="noopener noreferrer">ArtVault Terms and Conditions</Link>.</label>
+            {touched.terms && !acceptedTerms && <div className="required-feedback" role="status">Required: accept the terms to continue.</div>}
+          </div>
           <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>
             {submitting ? <span className="spinner" /> : null}
             {submitting ? 'Creating account…' : 'Create account'}

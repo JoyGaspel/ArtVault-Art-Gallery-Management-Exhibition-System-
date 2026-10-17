@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -26,7 +26,6 @@ import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
 import ArtworkLikes from './pages/ArtworkLikes';
 import Vault from './pages/Vault';
 import MyArtworks from './pages/MyArtworks';
-import Terms from './pages/Terms';
 
 export default function App() {
   return (
@@ -36,7 +35,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/terms" element={<Terms />} />
+            <Route path="/terms" element={<Navigate to="/signup?terms=open" replace />} />
 
             <Route element={<AppLayout />}>
               <Route path="/" element={<Gallery />} />

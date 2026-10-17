@@ -1425,3 +1425,45 @@ button, input, textarea, select{ font-family:inherit; }
 .submission-status-pill.expired { background: rgba(120,110,150,.12); color: var(--ink-soft); }
 .submission-status-group.expired { border-color: rgba(120,110,150,.25); }
 .offline-readonly-banner { padding: 10px 18px; text-align: center; background: #f5efff; color: #55418a; border-bottom: 1px solid #ded4f1; font-size: 13px; }
+
+/* Terms stay in the signup flow; the text has its own scroll area. */
+.signup-form .signup-terms-field { grid-column: 1 / -1; margin: 2px 0 14px; }
+.signup-terms-choice { display: flex; align-items: flex-start; gap: 11px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #faf8ff; color: var(--ink-soft); font-size: 12.5px; line-height: 1.55; }
+.signup-terms-choice:focus-within { border-color: var(--violet-deep); box-shadow: 0 0 0 3px rgba(107,79,176,.12); }
+.signup-terms-choice input[type="checkbox"] { flex: 0 0 auto; width: 17px; height: 17px; margin: 2px 0 0; padding: 0; accent-color: var(--violet-deep); cursor: pointer; }
+.signup-terms-choice input[aria-invalid="true"] { outline: 2px solid #c15656; outline-offset: 2px; box-shadow: none; }
+.signup-terms-choice > div { min-width: 0; }
+.signup-terms-choice label { display: inline; margin: 0; color: inherit; font: inherit; cursor: pointer; }
+.signup-terms-open { border: 0; padding: 0; background: transparent; color: var(--violet-deep); font: inherit; font-weight: 700; text-align: left; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.signup-terms-open:hover { color: var(--ink); }
+.signup-terms-open:focus-visible { outline: 2px solid var(--violet-deep); outline-offset: 3px; border-radius: 2px; }
+
+.terms-overlay { z-index: 230; background: rgba(29,19,52,.58); backdrop-filter: blur(4px); }
+.terms-modal { display: flex; flex-direction: column; width: min(100%, 720px); max-height: min(88dvh, 800px); overflow: hidden; border: 1px solid #ddd3ee; border-radius: 20px; background: #fff; box-shadow: 0 28px 80px rgba(25,17,48,.3); }
+.terms-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 24px 28px 20px; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, #f8f3ff, #fff 75%); }
+.terms-modal-head .eyebrow { margin-bottom: 7px; color: var(--violet-deep); }
+.terms-modal-head h2 { margin: 0; color: var(--ink); font-family: 'Fraunces', Georgia, serif; font-size: clamp(22px, 3vw, 30px); line-height: 1.2; }
+.terms-modal-head p { margin: 8px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.terms-modal-close { flex: 0 0 auto; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--violet-deep); font-size: 25px; line-height: 1; cursor: pointer; }
+.terms-modal-close:hover { background: var(--lilac-soft); }
+.terms-modal-close:focus-visible,.terms-modal-foot .btn:focus-visible,.terms-modal-scroll:focus-visible { outline: 2px solid var(--violet-deep); outline-offset: 2px; }
+.terms-modal-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 28px 20px; scrollbar-color: #c9b5e8 #f7f3fd; }
+.terms-copy { color: var(--ink-soft); font-size: 13.5px; line-height: 1.7; }
+.terms-copy > p:first-child { color: var(--ink); font-size: 14px; }
+.terms-copy p { margin: 12px 0; }
+.terms-copy section { padding: 12px 0 14px; border-top: 1px solid var(--line); }
+.terms-copy h3 { margin: 0 0 4px; color: var(--ink); font-family: 'Fraunces', Georgia, serif; font-size: 18px; line-height: 1.3; }
+.terms-copy section p { margin: 0; }
+.terms-copy .terms-contact { padding: 12px 14px; border-radius: 10px; background: #f8f4ff; }
+.terms-modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 28px; border-top: 1px solid var(--line); background: #fff; }
+.terms-modal-foot span { max-width: 350px; color: var(--ink-faint); font-size: 12px; line-height: 1.4; }
+.terms-modal-foot .btn { flex: 0 0 auto; justify-content: center; min-height: 40px; }
+@media (max-width: 620px) {
+  .terms-overlay { padding: 10px; }
+  .terms-modal { max-height: calc(100dvh - 20px); border-radius: 16px; }
+  .terms-modal-head { gap: 10px; padding: 18px 18px 16px; }
+  .terms-modal-head h2 { font-size: 23px; }
+  .terms-modal-scroll { padding: 6px 18px 14px; }
+  .terms-modal-foot { flex-direction: column; align-items: stretch; gap: 10px; padding: 13px 18px; }
+  .terms-modal-foot .btn { width: 100%; }
+}

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthNav from '../components/AuthNav';
 import PasswordToggle from '../components/PasswordToggle';
+import TermsModal from '../components/TermsModal';
 import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp } from '../lib/emailOtp';
 
 export default function Signup() {
@@ -25,6 +26,18 @@ export default function Signup() {
   const [resendFeedback, setResendFeedback] = useState('');
   const [touched, setTouched] = useState({});
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(() => new URLSearchParams(window.location.search).get('terms') === 'open');
+  const termsTriggerRef = useRef(null);
+
+  function closeTerms() {
+    setTermsOpen(false);
+    if (new URLSearchParams(window.location.search).has('terms')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('terms');
+      navigate(`${url.pathname}${url.search}${url.hash}`, { replace: true });
+    }
+    requestAnimationFrame(() => termsTriggerRef.current?.focus());
+  }
 
   function markTouched(field) {
     setTouched((current) => ({ ...current, [field]: true }));
@@ -239,8 +252,11 @@ export default function Signup() {
             <div className="hint">Administrator accounts are provisioned separately — this form always creates an Artist account.</div>
           </div>
 
-          <div className="field">
-            <label className="checkbox-row" htmlFor="acceptedTerms"><input id="acceptedTerms" type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} onBlur={() => markTouched('terms')} /> I have read and agree to the <Link to="/terms" target="_blank" rel="noopener noreferrer">ArtVault Terms and Conditions</Link>.</label>
+          <div className="field signup-terms-field">
+            <div className="signup-terms-choice">
+              <input id="acceptedTerms" type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} onBlur={() => markTouched('terms')} aria-invalid={touched.terms && !acceptedTerms} />
+              <div><label htmlFor="acceptedTerms">I have read and agree to the</label>{' '}<button ref={termsTriggerRef} className="signup-terms-open" type="button" onClick={() => setTermsOpen(true)}>ArtVault Terms and Conditions</button>.</div>
+            </div>
             {touched.terms && !acceptedTerms && <div className="required-feedback" role="status">Required: accept the terms to continue.</div>}
           </div>
           <button className="btn btn-primary" type="submit" disabled={submitting} style={{ width: '100%', justifyContent: 'center' }}>
@@ -256,6 +272,7 @@ export default function Signup() {
         )}
       </div>
       </div>
+      {termsOpen && <TermsModal onClose={closeTerms} />}
     </div>
   );
 }

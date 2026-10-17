@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const likeRoutes = require('../routes/likeRoutes');
+const artistRoutes = require('../routes/artistRoutes');
 const { updateMyProfile } = require('../controllers/artistController');
 const { createArtwork } = require('../controllers/artworkController');
 const { signup } = require('../controllers/authController');
@@ -37,6 +38,11 @@ test('administrators cannot edit their own public profile through the artist end
   }
 });
 
+test('administrator directory cannot edit artist profiles, while owner editing remains available', () => {
+  assert.equal(artistRoutes.stack.some((layer) => layer.route?.path === '/admin/:id' && layer.route.methods.put), false);
+  assert.equal(artistRoutes.stack.some((layer) => layer.route?.path === '/me' && layer.route.methods.put), true);
+});
+
 test('signup rejects requests without accepted terms before creating an account', async () => {
   const res = response();
   await signup({ body: { name: 'Test Artist', email: 'artist@example.com', password: 'password123' } }, res, (error) => { throw error; });
@@ -45,7 +51,7 @@ test('signup rejects requests without accepted terms before creating an account'
 });
 
 test('artwork upload rejects missing or oversized category lists before database writes', async () => {
-  for (const categories of [[], Array(6).fill('Digital Art'), ['']]) {
+  for (const categories of [[], Array(6).fill('Digital Art'), [''], ['Not a real category']]) {
     const res = response();
     let validationError = null;
     await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories } }, res, (error) => { validationError = error; });

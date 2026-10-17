@@ -8,7 +8,7 @@ const hostname = window.location.hostname;
 const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
 // Keep a production fallback so an accidentally missing Vercel variable does
 // not silently send image/API requests to the retired Render service.
-const deployedApiUrl = 'https://artvault-art-gallery-management-exhibition-syste-production.up.railway.app/api';
+export const deployedApiUrl = 'https://artvault-art-gallery-management-exhibition-syste-production.up.railway.app/api';
 const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(configuredApiUrl);
 // Production must always use the live Railway backend. This prevents a stale
 // Vercel VITE_API_URL (for example an old Render or localhost value) from

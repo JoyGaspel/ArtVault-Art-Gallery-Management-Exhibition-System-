@@ -29,6 +29,10 @@ export default function Upload() {
   const fileInputRef = useRef(null);
 
   function toggleCategory(cat) {
+    if (!categories.includes(cat) && categories.length >= 5) {
+      showToast('Choose no more than 5 categories.', true);
+      return;
+    }
     setCategories((c) => (c.includes(cat) ? c.filter((x) => x !== cat) : [...c, cat]));
   }
 
@@ -37,6 +41,7 @@ export default function Upload() {
     if (!file) { setImage(null); setPreview(''); return; }
     const extensionLooksValid = /\.(png|jpe?g|webp|gif)$/i.test(file.name);
     if ((file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) || !extensionLooksValid) {
+      if (preview) URL.revokeObjectURL(preview);
       setImage(null);
       setPreview('');
       showToast('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.', true);
@@ -44,6 +49,7 @@ export default function Upload() {
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
+      if (preview) URL.revokeObjectURL(preview);
       setImage(null);
       setPreview('');
       showToast('Image must be 10 MB or smaller.', true);
@@ -51,6 +57,9 @@ export default function Upload() {
       return;
     }
     if (!file.size) {
+      if (preview) URL.revokeObjectURL(preview);
+      setImage(null);
+      setPreview('');
       showToast('The selected image is empty. Choose another file.', true);
       event.target.value = '';
       return;
@@ -131,9 +140,7 @@ export default function Upload() {
       <div className="form-card upload-form-card">
         <div className="field">
           <label htmlFor="artwork-image">Artwork image <span className="optional-mark">(optional)</span></label>
-          {/* image/* gives the native picker its normal "Image files" filter;
-              handleImageChange and the API still enforce the supported formats. */}
-          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept="image/*" onChange={handleImageChange} />
+          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} />
           <div className="hint">PNG, JPG/JPEG, WebP, or GIF only. Maximum 10 MB.</div>
           {preview && (
             <div className="upload-preview-wrap">
@@ -159,18 +166,20 @@ export default function Upload() {
           <div className="hint">{description.length}/1000 characters</div>
         </div>
         <div className="field">
-          <label>Categories <span className="optional-mark">(optional)</span></label>
+          <label>Categories <span className="required-mark" aria-hidden="true">*</span></label>
           <div className="chip-select">
             {ALL_CATEGORIES.map((c) => (
               <button
                 type="button" key={c}
                 className={`chip-toggle${categories.includes(c) ? ' on' : ''}`}
                 onClick={() => toggleCategory(c)}
+                disabled={categories.length >= 5 && !categories.includes(c)}
               >
                 {c}
               </button>
             ))}
           </div>
+          <div className="hint">Choose 1 to 5 categories. At least one is required.</div>
         </div>
         <div className="field">
           <label>Materials <span className="optional-mark">(optional)</span></label>

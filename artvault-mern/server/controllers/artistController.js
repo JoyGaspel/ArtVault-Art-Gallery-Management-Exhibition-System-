@@ -299,27 +299,6 @@ async function setArtistRole(req, res, next) {
   }
 }
 
-// PUT /api/artists/admin/:id  (administrator updates an artist profile)
-async function updateArtistAsAdmin(req, res, next) {
-  try {
-    const { name, bio, specializations } = req.body;
-    const artist = await Artist.findOne({ _id: req.params.id, role: mongoose.trusted({ $in: ['artist', 'sub_admin'] }) }).select('+supabaseUserId');
-    if (!artist) return res.status(404).json({ message: 'Artist account not found.' });
-    if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 120)) return res.status(400).json({ message: 'Artist name must be 1–120 characters.' });
-    if (bio !== undefined && (typeof bio !== 'string' || bio.trim().length > 50)) return res.status(400).json({ message: 'Bio must be 50 characters or fewer.' });
-
-    if (name !== undefined) artist.name = cleanProfileText(name, 120);
-    if (bio !== undefined) artist.bio = cleanProfileText(bio, 50);
-    if (specializations !== undefined) artist.specializations = cleanSpecializations(specializations);
-
-    await artist.save();
-    recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { fields: ['profile'], administered: true } });
-    res.json({ artist: artist.toSafeObject() });
-  } catch (err) {
-    next(err);
-  }
-}
-
 // DELETE /api/artists/admin/:id  (removes the artist and their owned artwork)
 async function deleteArtistAsAdmin(req, res, next) {
   try {
@@ -388,6 +367,5 @@ module.exports = {
   listAdminArtists,
   setArtistRole,
   setArtistStatus,
-  updateArtistAsAdmin,
   deleteArtistAsAdmin,
 };

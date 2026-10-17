@@ -16,6 +16,10 @@ const ALLOWED_IMAGE_TYPES = new Map([
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_CATEGORIES = 5;
 const MAX_MATERIALS = 20;
+const ALLOWED_CATEGORIES = new Set([
+  'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
+  'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
+]);
 // Small private thumbnails travel with the authenticated card list. This
 // avoids one extra token check and HTTP request per Vault card. Larger or
 // legacy images still use the protected thumbnail endpoint.
@@ -47,6 +51,9 @@ function cleanList(value, maxItems, maxItemLength) {
 function validateArtworkLists(categories, materials) {
   if (!Array.isArray(categories) || !categories.length || categories.length > MAX_CATEGORIES || categories.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 40)) {
     throw Object.assign(new Error('Choose between 1 and 5 categories, each 40 characters or fewer.'), { status: 400 });
+  }
+  if (categories.some((item) => !ALLOWED_CATEGORIES.has(item.trim()))) {
+    throw Object.assign(new Error('Choose categories from the ArtVault category list.'), { status: 400 });
   }
   if (materials !== undefined && (!Array.isArray(materials) || materials.length > MAX_MATERIALS || materials.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 80))) {
     throw Object.assign(new Error('Use at most 20 materials, each 80 characters or fewer.'), { status: 400 });
@@ -430,6 +437,53 @@ async function updateArtwork(req, res, next) {
   }
 }
 
+// Apply an offline metadata draft only if this artist still owns the public
+// artwork and the live record has not changed since the local snapshot.
+async function syncArtworkMetadata(req, res, next) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
+    const { expectedUpdatedAt, title, description, categories, materials } = req.body || {};
+    const expected = new Date(expectedUpdatedAt);
+    if (!expectedUpdatedAt || Number.isNaN(expected.getTime())) {
+      return res.status(400).json({ message: 'A valid snapshot version is required.' });
+    }
+    if (typeof title !== 'string' || !title.trim() || title.trim().length > 50) {
+      return res.status(400).json({ message: 'Title must be between 1 and 50 characters.' });
+    }
+    if (typeof description !== 'string' || description.trim().length > 1000) {
+      return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
+    }
+    validateArtworkLists(categories, materials);
+    const filter = {
+      _id: req.params.id,
+      artist: req.user._id,
+      visibility: { $ne: 'private' },
+      updated_at: expected,
+    };
+    const artwork = await Artwork.findOneAndUpdate(filter, { $set: {
+      title: cleanText(title, 50),
+      description: cleanText(description, 1000),
+      categories: cleanList(categories, MAX_CATEGORIES, 40),
+      materials: cleanList(materials, MAX_MATERIALS, 80),
+    } }, { new: true, runValidators: true });
+    if (!artwork) {
+      const current = await Artwork.findById(req.params.id).select('artist visibility title description categories materials updated_at').lean();
+      if (!current || String(current.artist) !== String(req.user._id)) return res.status(404).json({ message: 'Artwork not found in your account.' });
+      if (current.visibility === 'private') return res.status(409).json({ message: 'This artwork is now in your Vault. Offline drafts cannot change Vault artworks.' });
+      return res.status(409).json({ message: 'This artwork changed online. Review both versions before syncing.', current: {
+        title: current.title,
+        description: current.description,
+        categories: current.categories,
+        materials: current.materials,
+        updated_at: current.updated_at,
+      } });
+    }
+    recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: { title: artwork.title, source: 'offline-sync' } });
+    res.set('Cache-Control', 'private, no-store');
+    return res.json({ artwork: { _id: artwork._id, title: artwork.title, updated_at: artwork.updated_at } });
+  } catch (err) { return next(err); }
+}
+
 // DELETE /api/artworks/:id  (owner artist or admin only — see loadArtworkAndAuthorize)
 async function deleteArtwork(req, res, next) {
   try {
@@ -457,6 +511,7 @@ module.exports = {
   createArtwork,
   getArtwork,
   updateArtwork,
+  syncArtworkMetadata,
   deleteArtwork,
   loadArtworkAndAuthorize,
 };

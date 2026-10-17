@@ -21,3 +21,12 @@ export function createRecoveryClient() {
     },
   });
 }
+
+// Used only by the loopback offline workspace after the computer reconnects.
+// Its session is memory-only and never becomes the browsing session.
+export function createOfflineSyncClient() {
+  if (!supabaseEnabled) return null;
+  return createClient(url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}

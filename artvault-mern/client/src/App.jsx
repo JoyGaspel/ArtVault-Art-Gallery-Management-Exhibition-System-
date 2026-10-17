@@ -26,6 +26,7 @@ import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
 import ArtworkLikes from './pages/ArtworkLikes';
 import Vault from './pages/Vault';
 import MyArtworks from './pages/MyArtworks';
+import OfflineWorkspace from './pages/OfflineWorkspace';
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<Gallery />} />
               <Route path="/artworks/:id" element={<ArtworkDetail />} />
+              {import.meta.env.VITE_OFFLINE_READONLY === 'true' && <Route path="/offline-workspace" element={<OfflineWorkspace />} />}
               <Route path="/artists" element={<Artists />} />
               <Route path="/artists/:id" element={<ArtistProfile />} />
               <Route path="/exhibits" element={<Exhibits />} />

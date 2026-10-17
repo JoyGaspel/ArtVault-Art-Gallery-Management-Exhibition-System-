@@ -59,6 +59,7 @@ for (const localOrigin of [
   'http://127.0.0.1:5173',
   'https://localhost:5173',
   'https://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
 ]) {
   if (!allowedOrigins.includes(localOrigin)) allowedOrigins.push(localOrigin);
 }
@@ -85,8 +86,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// The first offline stage is a snapshot viewer, not an unsynchronized writer.
-// Enforce that at the API boundary as well as in the browser UI.
+// Offline metadata drafts live in the browser queue, not this snapshot DB.
+// Keep every local API write blocked so Atlas and the snapshot cannot diverge.
 if (process.env.ARTVAULT_OFFLINE === 'true') {
   app.use('/api', (req, res, next) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();

@@ -11,6 +11,7 @@ const {
   createArtwork,
   getArtwork,
   updateArtwork,
+  syncArtworkMetadata,
   deleteArtwork,
   loadArtworkAndAuthorize,
 } = require('../controllers/artworkController');
@@ -28,6 +29,7 @@ router.get('/:id/image', authorizeArtworkRead, getArtworkImage);
 router.get('/:id/thumbnail', authorizeArtworkRead, getArtworkThumbnail);
 router.get('/:id', authorizeArtworkRead, getArtwork);
 router.patch('/:id/visibility', requireAuth, setArtworkVisibility);
+router.patch('/:id/sync-metadata', requireAuth, requireRole('artist'), syncArtworkMetadata);
 router.put('/:id', requireAuth, loadArtworkAndAuthorize, updateArtwork);    // PUT    /api/artworks/:id
 router.delete('/:id', requireAuth, loadArtworkAndAuthorize, deleteArtwork); // DELETE /api/artworks/:id
 

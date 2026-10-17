@@ -77,6 +77,7 @@ export default function ResponsiveNav() {
         <LinkItem to="/" icon="gallery" end>Gallery</LinkItem>
         <LinkItem to="/artists" icon="artists">Artists</LinkItem>
         <LinkItem to="/exhibits" icon="exhibits">Exhibits</LinkItem>
+        {import.meta.env.VITE_OFFLINE_READONLY === 'true' && <LinkItem to="/offline-workspace" icon="photo">Offline drafts &amp; sync</LinkItem>}
         {isArtist && <>
           <span className="responsive-menu-heading">My studio</span>
           <LinkItem to="/upload" icon="upload">Upload</LinkItem>

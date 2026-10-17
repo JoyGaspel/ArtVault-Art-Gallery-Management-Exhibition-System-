@@ -45,7 +45,7 @@ export default function ArtworkLikes() {
     }
   }
 
-  if (!['sub_admin', 'main_admin'].includes(user?.role)) return <div className="empty">Administrator access is required.</div>;
+  if (user?.role !== 'main_admin') return <div className="empty">Main administrator access is required.</div>;
 
   return (
     <section>

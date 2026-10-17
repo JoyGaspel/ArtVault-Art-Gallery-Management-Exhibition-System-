@@ -50,6 +50,7 @@ export default function Sidebar() {
         <div className="nav-group">
           <div className="nav-heading">Discover</div>
           {browseLinks.map((link) => <NavigationLink key={link.to} {...link} />)}
+          {offlineReadOnly && <NavigationLink to="/offline-workspace" label="Offline drafts & sync" icon="photo" />}
         </div>
 
         {isArtist && <>
@@ -110,7 +111,7 @@ export default function Sidebar() {
         </div>
       ) : (
         <div className="guest-panel">
-          <div className="nav-label"><strong>{offlineReadOnly ? 'Offline gallery' : 'Viewing as guest'}</strong><span>{offlineReadOnly ? 'Read-only local copy.' : 'Sign in to upload or curate.'}</span></div>
+          <div className="nav-label"><strong>{offlineReadOnly ? 'Offline workspace' : 'Viewing as guest'}</strong><span>{offlineReadOnly ? 'Draft changes here; sync after reconnecting.' : 'Sign in to upload or curate.'}</span></div>
           {!offlineReadOnly && <><NavLink to="/login" className="guest-signin">Sign in</NavLink><NavLink to="/signup" className="guest-signup">Create an artist account</NavLink></>}
         </div>
       )}

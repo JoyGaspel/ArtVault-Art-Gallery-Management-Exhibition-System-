@@ -2,6 +2,7 @@ const net = require('node:net');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { createRequire } = require('node:module');
+const { readOfflineDatabase } = require('./offline-state');
 
 const root = path.resolve(__dirname, '..');
 const serverDir = path.join(root, 'server');
@@ -25,11 +26,12 @@ async function main() {
   if (!await portOpen(27017)) throw new Error('Local MongoDB is not running on 127.0.0.1:27017. Start the MongoDB Windows service first.');
   if (await portOpen(API_PORT) || await portOpen(WEB_PORT)) throw new Error(`Offline port ${API_PORT} or ${WEB_PORT} is already in use. Stop the older offline copy before starting another.`);
 
-  await mongoose.connect('mongodb://127.0.0.1:27017/artvault_offline', { serverSelectionTimeoutMS: 3000 });
+  const offlineDatabase = readOfflineDatabase();
+  await mongoose.connect(`mongodb://127.0.0.1:27017/${offlineDatabase}`, { serverSelectionTimeoutMS: 3000 });
   const counts = await Promise.all(['artworks', 'artists', 'exhibits'].map((name) => mongoose.connection.db.collection(name).estimatedDocumentCount()));
   await mongoose.disconnect();
   if (!counts.some(Boolean)) {
-    throw new Error('artvault_offline has no ArtVault data yet. Restore a mongodump backup first with node scripts/restore-offline.js "C:\\path\\to\\backup.archive".');
+    throw new Error(`${offlineDatabase} has no ArtVault data yet. Restore a mongodump backup or run node scripts/refresh-offline.js while online.`);
   }
 
   const localEnv = {
@@ -38,12 +40,12 @@ async function main() {
     ARTVAULT_OFFLINE: 'true',
     ARTVAULT_OFFLINE_API_PORT: String(API_PORT),
     VITE_OFFLINE_READONLY: 'true',
-    VITE_SUPABASE_URL: '',
-    VITE_SUPABASE_PUBLISHABLE_KEY: '',
+    // Vite reads the local client's public Supabase key for reconnect-time
+    // sign-in. Browsing and saving local drafts never require the internet.
     SUPABASE_URL: '',
     SUPABASE_PUBLISHABLE_KEY: '',
     SUPABASE_SECRET_KEY: '',
-    MONGO_URI: 'mongodb://127.0.0.1:27017/artvault_offline',
+    MONGO_URI: `mongodb://127.0.0.1:27017/${offlineDatabase}`,
     HOST: '127.0.0.1',
     PORT: String(API_PORT),
     EMAIL_NOTIFICATIONS_ENABLED: 'false',
@@ -68,7 +70,7 @@ async function main() {
       process.exitCode = code || 1;
     }
   }));
-  console.log(`Offline ArtVault is starting at http://127.0.0.1:${WEB_PORT} (browse-only). Press Ctrl+C to stop it.`);
+  console.log(`Offline ArtVault is starting at http://127.0.0.1:${WEB_PORT} (local drafts available). Press Ctrl+C to stop it.`);
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });

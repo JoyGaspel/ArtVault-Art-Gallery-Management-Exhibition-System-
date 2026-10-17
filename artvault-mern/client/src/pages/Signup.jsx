@@ -172,6 +172,7 @@ export default function Signup() {
   return (
     <div className="auth-page signup-page">
       <AuthNav active="signup" />
+      <div className="signup-layout">
       <div className="signup-content" style={{ minHeight: 'calc(100vh - 72px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--lilac-soft)' }}>
       <div className="form-card signup-card" style={{ width: '100%' }}>
         {confirmationSent ? (
@@ -271,6 +272,19 @@ export default function Signup() {
         </>
         )}
       </div>
+      </div>
+      <aside className="signup-showcase" aria-label="What you can do with ArtVault">
+        <div className="signup-showcase-content">
+          <span className="signup-showcase-kicker">Your creative space</span>
+          <h2>Every piece deserves a place.</h2>
+          <p>Make an artist account to share your work, keep pieces private until you are ready, and take part in curated exhibits.</p>
+          <div className="signup-showcase-features">
+            <div><span>01</span><div><strong>Build your portfolio</strong><p>Publish artwork in the gallery and on your artist profile.</p></div></div>
+            <div><span>02</span><div><strong>Keep a private Vault</strong><p>Choose which pieces stay hidden until you make them public.</p></div></div>
+            <div><span>03</span><div><strong>Join exhibits</strong><p>Submit your work and follow its review status.</p></div></div>
+          </div>
+        </div>
+      </aside>
       </div>
       {termsOpen && <TermsModal onClose={closeTerms} />}
     </div>

@@ -343,7 +343,6 @@ button, input, textarea, select{ font-family:inherit; }
 .required-mark{ color:#C15656; font-weight:700; margin-left:2px; }
 .optional-mark{ color:var(--ink-faint); font-weight:400; margin-left:2px; }
 .gate-demo{ display:none; }
-.back-link{ display:none !important; }
 .signup-content{ align-items:center !important; overflow-y:auto; }
 .signup-card{ max-width:540px !important; padding:24px 30px; }
 .signup-card h1{ font-size:25px !important; }

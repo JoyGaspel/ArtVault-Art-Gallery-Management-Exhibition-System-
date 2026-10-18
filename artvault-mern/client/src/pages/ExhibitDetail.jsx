@@ -4,6 +4,7 @@ import api from '../api';
 import ArtCard from '../components/ArtCard';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import { exhibitPhase, exhibitScheduleLabel } from '../utils/exhibitSchedule';
+import { goBackOr } from '../utils/navigation';
 
 export default function ExhibitDetail() {
   const { id } = useParams();
@@ -27,7 +28,7 @@ export default function ExhibitDetail() {
 
   return (
     <section>
-      <button className="back-link" onClick={() => navigate(-1)}>← Back to exhibits</button>
+      <button className="back-link" type="button" onClick={() => goBackOr(navigate, '/exhibits')}>← Back to exhibits</button>
       <div className="exhibit-detail-hero">
         <div><div className="eyebrow">Digital exhibition · {exhibitPhase(exhibit) === 'current' ? 'Happening now' : exhibitPhase(exhibit) === 'past' ? 'Past exhibit' : 'Upcoming'}</div><h1>{exhibit.name}</h1><p>{exhibitScheduleLabel(exhibit)}</p><p>{exhibit.description || 'A curated collection of works from the ArtVault community.'}</p></div>
         <div className="exhibit-detail-count"><strong>{exhibit.artworks.length}</strong><span>works on view</span></div>

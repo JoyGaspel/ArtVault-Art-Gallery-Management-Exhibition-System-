@@ -10,6 +10,7 @@ import ArtCard from '../components/ArtCard';
 import useArtworkMedia from '../hooks/useArtworkMedia';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import { materialError } from '../utils/materialValidation';
+import { goBackOr } from '../utils/navigation';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -136,7 +137,8 @@ export default function ArtworkDetail() {
     if (nextArtwork?._id && String(nextArtwork._id) !== String(id)) {
       setLoading(true);
       setEditing(false);
-      navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`);
+      // Carousel steps should not fill browser history; Back returns to the exhibit.
+      navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`, { replace: true });
     }
   }
 
@@ -220,12 +222,15 @@ export default function ArtworkDetail() {
   return (
     <section>
       {exhibitContext && exhibitArtworkIndex >= 0 ? (
-        <div className="exhibit-artwork-nav" aria-label={`Artwork navigation for ${exhibitContext.name}`}>
-          <button type="button" onClick={() => moveInExhibit(-1)} aria-label="Previous artwork">‹</button>
-          <span>{exhibitArtworkIndex + 1} of {exhibitArtworkCount} · {exhibitContext.name}</span>
-          <button type="button" onClick={() => moveInExhibit(1)} aria-label="Next artwork">›</button>
-        </div>
-      ) : <button className="back-link" onClick={() => navigate(-1)}>← Back</button>}
+        <>
+          <Link className="back-link" to={`/exhibits/${exhibitContext._id}`} replace>← Back to exhibit</Link>
+          <div className="exhibit-artwork-nav" aria-label={`Artwork navigation for ${exhibitContext.name}`}>
+            <button type="button" onClick={() => moveInExhibit(-1)} aria-label="Previous artwork">‹</button>
+            <span>{exhibitArtworkIndex + 1} of {exhibitArtworkCount} · {exhibitContext.name}</span>
+            <button type="button" onClick={() => moveInExhibit(1)} aria-label="Next artwork">›</button>
+          </div>
+        </>
+      ) : <button className="back-link" type="button" onClick={() => goBackOr(navigate, artwork?.visibility === 'private' && isOwner ? '/vault' : '/')}>← Back</button>}
 
       {artwork.has_image && (
         <div className="image-zoom-controls" aria-label="Artwork image zoom controls">

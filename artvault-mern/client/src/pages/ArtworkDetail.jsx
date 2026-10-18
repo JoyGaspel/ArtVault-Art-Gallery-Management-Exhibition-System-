@@ -269,7 +269,7 @@ export default function ArtworkDetail() {
                   <div className="val">{exhibits.length ? exhibits.map((e) => e.name).join(', ') : 'Not currently featured'}</div>
                 </div>
               </div>
-              {artwork.has_ownership_evidence && user && (isOwner || ['admin', 'sub_admin', 'main_admin'].includes(user.role)) && <button type="button" className="btn btn-ghost ownership-proof-button" onClick={downloadOwnershipProof} disabled={proofLoading}>{proofLoading ? 'Loading proof…' : 'Download private ownership proof'}</button>}
+              {artwork.has_ownership_evidence && ['admin', 'sub_admin', 'main_admin'].includes(user?.role) && <button type="button" className="btn btn-ghost ownership-proof-button" onClick={downloadOwnershipProof} disabled={proofLoading}>{proofLoading ? 'Loading proof…' : 'Download ownership proof'}</button>}
               {canManage && (
                 <div className="detail-actions">
                   {isOwner && user.role !== 'sub_admin' && <button className="btn btn-primary" onClick={() => setPendingVisibility(artwork.visibility === 'private' ? 'public' : 'private')} disabled={changingVisibility}>{changingVisibility ? 'Saving…' : artwork.visibility === 'private' ? 'Make public' : 'Move to Vault'}</button>}

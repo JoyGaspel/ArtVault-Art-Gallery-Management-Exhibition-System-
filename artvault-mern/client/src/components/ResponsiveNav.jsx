@@ -86,6 +86,7 @@ export default function ResponsiveNav() {
           <LinkItem to="/upload" icon="upload">Upload</LinkItem>
           <LinkItem to="/my-artworks" icon="photo">My artworks</LinkItem>
           <LinkItem to="/vault" icon="vault">My Vault</LinkItem>
+          <LinkItem to="/removed-artworks" icon="archives">Recently removed</LinkItem>
           <span className="responsive-menu-heading">Submissions</span>
           <LinkItem to="/exhibit-submissions" icon="submissions">Exhibit submissions</LinkItem>
           <LinkItem to="/exhibit-submission-status" icon="status">Submission status</LinkItem>

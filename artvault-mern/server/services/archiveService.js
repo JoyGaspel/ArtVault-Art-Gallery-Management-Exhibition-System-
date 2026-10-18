@@ -8,14 +8,14 @@ function archiveId(entityType, entityId) {
   return hex;
 }
 
-async function archiveOnce({ entityType, snapshot, deletedBy, session }) {
+async function archiveOnce({ entityType, snapshot, deletedBy, session, artistRecoverUntil }) {
   const entityId = snapshot._id;
   const options = session ? { upsert: true, session, timestamps: false } : { upsert: true, timestamps: false };
   const archivedAt = new Date();
   try {
     const result = await Archive.updateOne(
       { entityType, entityId },
-      { $setOnInsert: { _id: archiveId(entityType, entityId), entityType, entityId, snapshot, deletedBy, deletedAt: archivedAt, createdAt: archivedAt, updatedAt: archivedAt } },
+      { $setOnInsert: { _id: archiveId(entityType, entityId), entityType, entityId, snapshot, deletedBy, deletedAt: archivedAt, artistRecoverUntil: artistRecoverUntil || null, createdAt: archivedAt, updatedAt: archivedAt } },
       options,
     );
     return result.upsertedCount === 1;

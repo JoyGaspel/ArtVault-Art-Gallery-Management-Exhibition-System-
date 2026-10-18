@@ -338,6 +338,13 @@ button, input, textarea, select{ font-family:inherit; }
 .upload-actions .btn-primary{ box-shadow:0 4px 12px rgba(79,51,139,.16); }
 .upload-actions .btn-ghost{ border-color:rgba(110,79,163,.32); color:var(--violet-deep); }
 .upload-actions .btn-ghost:hover{ background:var(--lilac-soft); border-color:var(--violet); }
+.removed-artworks-list{ display:grid; gap:14px; margin-top:20px; }
+.removed-artwork-card{ display:flex; align-items:center; justify-content:space-between; gap:20px; min-width:0; padding:22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--bg-card); }
+.removed-artwork-details{ min-width:0; }
+.removed-artwork-details h2{ margin:5px 0 8px; overflow-wrap:anywhere; }
+.removed-artwork-details p{ margin:5px 0; color:var(--ink-soft); }
+.removed-artwork-deadline{ font-weight:600; }
+@media(max-width:650px){ .removed-artwork-card{ align-items:stretch; flex-direction:column; padding:18px; } .removed-artwork-card .btn{ width:100%; } }
 .field{ margin-bottom:18px; }
 .field label{ display:block; font-size:13px; font-weight:600; margin-bottom:7px; }
 .required-mark{ color:#C15656; font-weight:700; margin-left:2px; }

@@ -26,6 +26,7 @@ import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
 import ArtworkLikes from './pages/ArtworkLikes';
 import Vault from './pages/Vault';
 import MyArtworks from './pages/MyArtworks';
+import RemovedArtworks from './pages/RemovedArtworks';
 import OfflineWorkspace from './pages/OfflineWorkspace';
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
               <Route path="/upload" element={<ProtectedRoute role="artist"><Upload /></ProtectedRoute>} />
               <Route path="/vault" element={<ProtectedRoute role="artist"><Vault /></ProtectedRoute>} />
               <Route path="/my-artworks" element={<ProtectedRoute role="artist"><MyArtworks /></ProtectedRoute>} />
+              <Route path="/removed-artworks" element={<ProtectedRoute role="artist"><RemovedArtworks /></ProtectedRoute>} />
               <Route path="/manage-vault" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><Vault /></ProtectedRoute>} />
               <Route path="/exhibit-submissions" element={<ProtectedRoute role="artist"><ExhibitSubmissions /></ProtectedRoute>} />
               <Route path="/exhibit-submission-status" element={<ProtectedRoute role="artist"><ExhibitSubmissionStatus /></ProtectedRoute>} />

@@ -1,7 +1,9 @@
 const express = require('express');
-const { listArchives, restoreArchive, permanentlyDeleteArchive, requestArchiveDeletion } = require('../controllers/archiveController');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { listArchives, restoreArchive, permanentlyDeleteArchive, requestArchiveDeletion, listMyRemovedArtworks, restoreMyRemovedArtwork } = require('../controllers/archiveController');
+const { requireAuth, requireAdmin, requireRole } = require('../middleware/auth');
 const router = express.Router();
+router.get('/mine/artworks', requireAuth, requireRole('artist'), listMyRemovedArtworks);
+router.post('/mine/artworks/:id/restore', requireAuth, requireRole('artist'), restoreMyRemovedArtwork);
 router.use(requireAuth, requireAdmin);
 router.get('/', listArchives);
 router.post('/:id/restore', restoreArchive);

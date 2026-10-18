@@ -7,6 +7,48 @@ const crypto = require('crypto');
 const { recordAudit } = require('../utils/audit');
 const supabase = require('../config/supabase');
 const { sendAccountNoticeInBackground } = require('../services/accountNoticeService');
+const { isArtistRecoverable } = require('../services/artistArtworkRecovery');
+
+function artistArtworkFilter(userId, now = new Date()) {
+  return {
+    entityType: 'artwork',
+    deletedBy: userId,
+    'snapshot.artist': userId,
+    artistRecoverUntil: { $gt: now },
+  };
+}
+
+async function listMyRemovedArtworks(req, res, next) {
+  try {
+    const archives = await Archive.find(artistArtworkFilter(req.user._id))
+      .select('entityId snapshot.title snapshot.visibility snapshot.categories deletedAt artistRecoverUntil')
+      .sort({ deletedAt: -1 })
+      .lean();
+    res.set('Cache-Control', 'no-store');
+    res.json({ artworks: archives.map((item) => ({
+      archiveId: item._id,
+      artworkId: item.entityId,
+      title: item.snapshot?.title || 'Untitled artwork',
+      visibility: item.snapshot?.visibility === 'private' ? 'private' : 'public',
+      categories: item.snapshot?.categories || [],
+      deletedAt: item.deletedAt,
+      recoverUntil: item.artistRecoverUntil,
+    })) });
+  } catch (err) { next(err); }
+}
+
+async function restoreMyRemovedArtwork(req, res, next) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Removed artwork not found.' });
+    const archive = await Archive.findOne({ _id: req.params.id, ...artistArtworkFilter(req.user._id) });
+    if (!archive) return res.status(404).json({ message: 'This artwork is no longer in your 30-day recovery area.' });
+    if (await Artwork.exists({ _id: archive.entityId })) return res.status(409).json({ message: 'This artwork has already been restored.' });
+    await Artwork.create(archive.snapshot);
+    await archive.deleteOne();
+    recordAudit({ req, action: 'restore', entityType: 'artwork', entityId: archive.entityId, details: { source: 'artist_recovery' } });
+    res.json({ message: 'Artwork restored.', artworkId: archive.entityId, visibility: archive.snapshot.visibility || 'public' });
+  } catch (err) { next(err); }
+}
 
 async function listArchives(req, res, next) {
   try {
@@ -14,6 +56,12 @@ async function listArchives(req, res, next) {
       entityType: mongoose.trusted({ $ne: 'artist' }),
       'snapshot.visibility': mongoose.trusted({ $ne: 'private' }),
     };
+    // Self-removed artworks stay in the artist's recovery area for 30 days.
+    // A date filter moves them into this admin list without a background job.
+    filter.$or = [
+      { artistRecoverUntil: null },
+      { artistRecoverUntil: { $lte: new Date() } },
+    ];
     // Archive snapshots retain image data for restoration, but the archive
     // list only needs labels and timestamps. Excluding base64 image fields
     // prevents the admin page from downloading megabytes unnecessarily.
@@ -85,6 +133,7 @@ async function permanentlyDeleteArchive(req, res, next) {
     }
     const result = await Archive.findById(req.params.id);
     if (!result) return res.status(404).json({ message: 'Archive item not found.' });
+    if (isArtistRecoverable(result)) return res.status(409).json({ message: 'This artwork is still in the artist’s 30-day recovery period.' });
     let deletedArtistEmail = '';
     if (result.entityType === 'artist') {
       const artist = await Artist.findById(result.entityId).select('+supabaseUserId');
@@ -122,4 +171,4 @@ async function requestArchiveDeletion(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listArchives, restoreArchive, permanentlyDeleteArchive, requestArchiveDeletion };
+module.exports = { listArchives, restoreArchive, permanentlyDeleteArchive, requestArchiveDeletion, listMyRemovedArtworks, restoreMyRemovedArtwork };

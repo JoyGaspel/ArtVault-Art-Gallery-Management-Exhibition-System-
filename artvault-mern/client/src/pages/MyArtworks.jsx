@@ -48,14 +48,14 @@ export default function MyArtworks() {
     <div className="page-head collection-page-head"><div>
       <div className="eyebrow">MY STUDIO · COLLECTION</div>
       <h1>My artworks</h1>
-      <div className="sub">Find everything you have uploaded. Public works appear in the gallery; private works stay in your Vault.</div>
+      <div className="sub">Find your current artworks here. Public works appear in the gallery; private works stay in your Vault. Removed works are kept in Recently removed for 30 days.</div>
     </div>{user?.role === 'artist' && <Link className="btn btn-primary" to="/upload">Upload artwork</Link>}</div>
 
     <div className="my-artworks-toolbar">
       <div className="chip-row" role="group" aria-label="Filter my artworks">
         {filters.map((item) => <button key={item.value} type="button" className={`chip${filter === item.value ? ' active' : ''}`} aria-pressed={filter === item.value} onClick={() => chooseFilter(item.value)}>{item.label} <span>{item.count}</span></button>)}
       </div>
-      <div className="my-artworks-shortcuts"><Link to="/vault">Open my Vault</Link>{user?.id && <Link to={`/artists/${user.id}`}>My public profile</Link>}</div>
+      <div className="my-artworks-shortcuts"><Link to="/vault">Open my Vault</Link><Link to="/removed-artworks">Recently removed</Link>{user?.id && <Link to={`/artists/${user.id}`}>My public profile</Link>}</div>
     </div>
 
     {loading ? <PageLoadState loading label="your artworks" /> : error ? <PageLoadState error={error} onRetry={load} /> : !artworks.length

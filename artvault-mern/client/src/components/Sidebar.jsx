@@ -63,6 +63,7 @@ export default function Sidebar() {
             <NavigationLink to="/upload" label="Upload artwork" icon="upload" />
             <NavigationLink to="/my-artworks" label="My artworks" icon="photo" />
             <NavigationLink to="/vault" label="My artwork Vault" icon="vault" />
+            <NavigationLink to="/removed-artworks" label="Recently removed" icon="archives" />
           </div>
           <div className="nav-group">
             <div className="nav-heading">Submissions</div>

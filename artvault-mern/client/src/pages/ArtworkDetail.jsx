@@ -327,7 +327,9 @@ export default function ArtworkDetail() {
       </div>
       {!editing && relatedArtworks.length > 0 && <section className="related-artworks"><div className="section-kicker">More from this artist</div><h2>Continue exploring</h2><div className="gallery-grid related-gallery">{relatedArtworks.map((item) => <ArtCard key={item._id} artwork={item} />)}</div></section>}
       {lightboxOpen && lightboxImage && <div className="art-lightbox" role="dialog" aria-modal="true" aria-label={`${artwork.title} full view`} onClick={() => setLightboxOpen(false)}><button type="button" className="art-lightbox-close" aria-label="Close full view" onClick={() => setLightboxOpen(false)}>×</button><div className="art-lightbox-frame"><img src={lightboxImage} alt={artwork.title} onClick={(event) => event.stopPropagation()} />{lightboxLoading && <span className="art-lightbox-loading" role="status">Loading full resolution…</span>}</div></div>}
-      {pendingDelete && <ConfirmDialog title="Archive artwork?" message={`“${artwork.title}” will be moved to Archives before removal.`} confirmLabel="Move to archives" danger onConfirm={confirmRemove} onCancel={() => setPendingDelete(false)} />}
+      {pendingDelete && <ConfirmDialog title="Are you sure you want to remove this artwork?" message={isOwner && user?.role === 'artist'
+        ? `“${artwork.title}” will disappear from your artworks, the public gallery, and exhibits. You can restore it from Recently removed for 30 days; after that, only administrators can restore it.`
+        : `“${artwork.title}” will disappear from the gallery and exhibits and move to administrator Archives.`} confirmLabel="Yes, remove artwork" danger onConfirm={confirmRemove} onCancel={() => setPendingDelete(false)} />}
       {pendingVisibility && <ConfirmDialog
         title={pendingVisibility === 'private' ? 'Move artwork to Vault?' : 'Make artwork public?'}
         message={pendingVisibility === 'private'

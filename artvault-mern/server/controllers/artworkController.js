@@ -1,6 +1,7 @@
 const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
 const { archiveOnce } = require('../services/archiveService');
+const { artistRecoveryDeadline } = require('../services/artistArtworkRecovery');
 const ArtworkLike = require('../models/ArtworkLike');
 const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
@@ -525,7 +526,9 @@ async function syncArtworkMetadata(req, res, next) {
 async function deleteArtwork(req, res, next) {
   try {
     const artwork = req.artwork;
-    await archiveOnce({ entityType: 'artwork', snapshot: artwork.toObject(), deletedBy: req.user._id });
+    const artistRecoverUntil = req.user.role === 'artist' && String(artwork.artist) === String(req.user._id)
+      ? artistRecoveryDeadline() : null;
+    await archiveOnce({ entityType: 'artwork', snapshot: artwork.toObject(), deletedBy: req.user._id, artistRecoverUntil });
     await artwork.deleteOne();
     await ArtworkLike.deleteMany({ artwork: artwork._id });
     await Exhibit.updateMany({}, { $pull: { artworks: artwork._id } });

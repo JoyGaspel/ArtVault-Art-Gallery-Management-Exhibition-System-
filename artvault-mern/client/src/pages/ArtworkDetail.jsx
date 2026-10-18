@@ -295,7 +295,7 @@ export default function ArtworkDetail() {
       {pendingVisibility && <ConfirmDialog
         title={pendingVisibility === 'private' ? 'Move artwork to Vault?' : 'Make artwork public?'}
         message={pendingVisibility === 'private'
-          ? `“${artwork.title}” will be hidden from the public gallery, your profile, and exhibits. Only you, sub-admins, and the main administrator can view it until you publish it again.`
+          ? `“${artwork.title}” will be hidden from the public gallery, your profile, and exhibits until you publish it again.`
           : `“${artwork.title}” will appear in the public gallery and on your artist profile again.`}
         confirmLabel={pendingVisibility === 'private' ? 'Move to Vault' : 'Make public'}
         onConfirm={changeVisibility}

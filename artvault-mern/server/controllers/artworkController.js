@@ -48,6 +48,14 @@ function cleanList(value, maxItems, maxItemLength) {
   return [...new Set(value.map((item) => cleanText(item, maxItemLength)).filter(Boolean))].slice(0, maxItems);
 }
 
+function invalidMaterial(value) {
+  const item = value.trim();
+  return !/\p{L}{2}/u.test(item)
+    || !/^[\p{L}\p{N}\s.'’()&+/-]+$/u.test(item)
+    || /(?:https?:\/\/|www\.|\S+@\S+|(.)\1{4,})/iu.test(item)
+    || /^(?:test|none|n\/?a|asdf|qwerty)$/iu.test(item);
+}
+
 function validateArtworkLists(categories, materials) {
   if (!Array.isArray(categories) || !categories.length || categories.length > MAX_CATEGORIES || categories.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 40)) {
     throw Object.assign(new Error('Choose between 1 and 5 categories, each 40 characters or fewer.'), { status: 400 });
@@ -57,6 +65,9 @@ function validateArtworkLists(categories, materials) {
   }
   if (materials !== undefined && (!Array.isArray(materials) || materials.length > MAX_MATERIALS || materials.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 80))) {
     throw Object.assign(new Error('Use at most 20 materials, each 80 characters or fewer.'), { status: 400 });
+  }
+  if (materials?.some(invalidMaterial) || (materials && new Set(materials.map((item) => item.trim().toLocaleLowerCase())).size !== materials.length)) {
+    throw Object.assign(new Error('Enter distinct material names, not links, symbols, or placeholder text (for example: canvas, acrylic paint, cotton thread).'), { status: 400 });
   }
 }
 
@@ -113,6 +124,7 @@ async function listArtworks(req, res, next) {
         ], as: 'like_stats' } },
         { $project: {
           title: 1, description: 1, categories: 1, materials: 1, visibility: 1,
+          ownershipDeclared: 1, ownershipDeclaredAt: 1,
           created_at: 1, updated_at: 1,
           artist: { $arrayElemAt: ['$artist', 0] },
           like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
@@ -290,9 +302,10 @@ async function getArtworkImage(req, res, next) {
 // POST /api/artworks  (auth required — artist uploads their own piece)
 async function createArtwork(req, res, next) {
   try {
-    const { title, description, image_path, thumbnail_path, categories, materials, visibility = 'public' } = req.body;
+    const { title, description, image_path, thumbnail_path, categories, materials, visibility = 'public', ownershipDeclared } = req.body;
     if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
     if (visibility === 'private' && req.user.role !== 'artist') return res.status(403).json({ message: 'Only artists can save artworks to a vault.' });
+    if (ownershipDeclared !== true) return res.status(400).json({ message: 'Confirm that you created this artwork or have permission to display it on ArtVault.' });
     const cleanTitle = cleanText(title, 150);
     if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
     if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
@@ -310,6 +323,8 @@ async function createArtwork(req, res, next) {
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
       visibility,
+      ownershipDeclared: true,
+      ownershipDeclaredAt: new Date(),
     });
     recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: visibility === 'private' ? { visibility } : { title: artwork.title } });
 
@@ -421,7 +436,7 @@ async function updateArtwork(req, res, next) {
     if (title !== undefined && title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
     if (description !== undefined && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
     if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
-    if (categories !== undefined || materials !== undefined) validateArtworkLists(categories ?? artwork.categories, materials ?? artwork.materials);
+    if (categories !== undefined || materials !== undefined) validateArtworkLists(categories ?? artwork.categories, materials);
     if (title !== undefined) artwork.title = cleanText(title, 50);
     if (description !== undefined) artwork.description = cleanText(description, 1000);
     if (image_path !== undefined) artwork.image_path = validateImageData(image_path);

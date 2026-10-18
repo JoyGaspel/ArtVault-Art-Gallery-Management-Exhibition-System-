@@ -12,7 +12,7 @@ const categories = [
   'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
 ];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/pjpeg', 'image/webp', 'image/gif'];
 
 function ModerationThumbnail({ artwork }) {
   const [failed, setFailed] = useState(false);
@@ -79,9 +79,9 @@ export default function ManageGallery() {
   function handleImageChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const extensionLooksValid = /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+    const extensionLooksValid = /\.(png|jpe?g|jpe|webp|gif)$/i.test(file.name);
     if (!ALLOWED_IMAGE_TYPES.includes(file.type) && !extensionLooksValid) {
-      showToast('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.', true);
+      showToast('Only PNG, JPG/JPEG/JPE, WebP, or GIF images are allowed.', true);
       event.target.value = '';
       return;
     }
@@ -188,6 +188,7 @@ export default function ManageGallery() {
               <div className="admin-artist-info">
                 <h2>{artwork.title}</h2>
                 <div className="mono admin-artist-email">by {artwork.artist?.name || 'Unknown artist'} · {new Date(artwork.created_at).toLocaleDateString()}</div>
+                <div className="mono admin-artist-email">{artwork.ownershipDeclared && artwork.ownershipDeclaredAt ? `Ownership/permission declared ${new Date(artwork.ownershipDeclaredAt).toLocaleDateString()}` : 'Ownership declaration not recorded'}</div>
                 <div className="admin-artist-tags">
                   {(artwork.categories || []).length ? artwork.categories.map((item) => <span className="tiny-tag" key={item}>{item}</span>) : <span className="admin-muted">Uncategorised</span>}
                 </div>
@@ -211,7 +212,7 @@ export default function ManageGallery() {
             </div>
             <div className="field"><label>Title <span className="required-mark" aria-hidden="true">*</span></label><input maxLength={50} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></div>
             <div className="field"><label>Description <span className="optional-mark">(optional)</span></label><textarea maxLength={1000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /><div className="hint">{form.description.length}/1000 characters</div></div>
-            <div className="field"><label htmlFor="moderation-artwork-image">Artwork image <span className="optional-mark">(optional)</span></label><input ref={imageInputRef} className="file-input" id="moderation-artwork-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} /><div className="hint">Choose a replacement image. PNG, JPG/JPEG, WebP, or GIF up to 10 MB.</div>{imagePreview && <div className="moderation-edit-preview"><img src={imagePreview} alt="Artwork preview" /><button type="button" className="upload-preview-remove" onClick={clearImageSelection} aria-label="Clear replacement image">×</button></div>}</div>
+            <div className="field"><label htmlFor="moderation-artwork-image">Artwork image <span className="optional-mark">(optional)</span></label><input ref={imageInputRef} className="file-input" id="moderation-artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} /><div className="hint">Choose a replacement image. PNG, JPG/JPEG/JPE, WebP, or GIF up to 10 MB.</div>{imagePreview && <div className="moderation-edit-preview"><img src={imagePreview} alt="Artwork preview" /><button type="button" className="upload-preview-remove" onClick={clearImageSelection} aria-label="Clear replacement image">×</button></div>}</div>
             <div className="field">
               <label>Categories <span className="optional-mark">(optional)</span></label>
               <div className="chip-select">{categories.map((item) => <button key={item} type="button" className={`chip-toggle${form.categories.includes(item) ? ' on' : ''}`} onClick={() => toggleCategory(item)}>{item}</button>)}</div>

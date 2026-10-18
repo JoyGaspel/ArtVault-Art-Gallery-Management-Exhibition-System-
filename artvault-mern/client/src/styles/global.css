@@ -1369,6 +1369,8 @@ button, input, textarea, select{ font-family:inherit; }
 .vault-upload-choice label { display: flex; align-items: center; gap: .6rem; cursor: pointer; font-weight: 600; }
 .vault-upload-choice input { accent-color: #6b4db2; }
 .vault-upload-choice small { color: #635a78; }
+.artwork-ownership-choice { display: flex; align-items: flex-start; gap: .65rem; margin: .5rem 0 1rem; padding: .85rem 1rem; border: 1px solid #ded5ee; border-radius: 14px; background: #fbf9fe; color: var(--ink); line-height: 1.45; cursor: pointer; }
+.artwork-ownership-choice input { flex: 0 0 auto; margin-top: .2rem; accent-color: #6b4db2; }
 /* Artist collection: use one card language for public work and private Vault work. */
 .collection-page-head { align-items:center; padding:22px 24px; border:1px solid #e4d9f3; border-radius:20px; background:linear-gradient(115deg, #f7f2ff 0%, #fff 76%); }
 .collection-page-head > div { min-width:0; max-width:680px; }

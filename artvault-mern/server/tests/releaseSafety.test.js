@@ -54,7 +54,25 @@ test('artwork upload rejects missing or oversized category lists before database
   for (const categories of [[], Array(6).fill('Digital Art'), [''], ['Not a real category']]) {
     const res = response();
     let validationError = null;
-    await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories } }, res, (error) => { validationError = error; });
+    await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories, ownershipDeclared: true } }, res, (error) => { validationError = error; });
+    assert.equal(validationError?.status, 400);
+  }
+});
+
+test('artwork upload requires an explicit ownership or permission declaration', async () => {
+  for (const ownershipDeclared of [undefined, false, 'true']) {
+    const res = response();
+    await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories: ['Digital Art'], ownershipDeclared } }, res, (error) => { throw error; });
+    assert.equal(res.code, 400);
+    assert.match(res.body.message, /permission/);
+  }
+});
+
+test('artwork upload rejects obvious non-material and repeated materials', async () => {
+  for (const materials of [['https://example.com'], ['12345'], ['asdf'], ['aaaaaaa'], ['Canvas', 'canvas']]) {
+    const res = response();
+    let validationError;
+    await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories: ['Digital Art'], materials, ownershipDeclared: true } }, res, (error) => { validationError = error; });
     assert.equal(validationError?.status, 400);
   }
 });

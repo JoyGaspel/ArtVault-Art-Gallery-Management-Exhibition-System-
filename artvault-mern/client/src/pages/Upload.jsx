@@ -10,7 +10,19 @@ const ALL_CATEGORIES = [
   'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
 ];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/pjpeg', 'image/webp', 'image/gif'];
+
+function materialError(value) {
+  const list = value.split(',').map((item) => item.trim()).filter(Boolean);
+  if (list.length > 20 || list.some((item) => item.length > 80)) return 'Use at most 20 materials, each 80 characters or fewer.';
+  if (list.some((item) => !/\p{L}{2}/u.test(item) || !/^[\p{L}\p{N}\s.'’()&+/-]+$/u.test(item)
+    || /(?:https?:\/\/|www\.|\S+@\S+|(.)\1{4,})/iu.test(item)
+    || /^(?:test|none|n\/?a|asdf|qwerty)$/iu.test(item))) {
+    return 'Enter material names, not links, symbols, or placeholder text. For example: canvas, acrylic paint, cotton thread.';
+  }
+  if (new Set(list.map((item) => item.toLocaleLowerCase())).size !== list.length) return 'List each material only once.';
+  return '';
+}
 
 export default function Upload() {
   const navigate = useNavigate();
@@ -20,10 +32,12 @@ export default function Upload() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [materials, setMaterials] = useState('');
+  const [materialsTouched, setMaterialsTouched] = useState(false);
   const [categories, setCategories] = useState(['Digital Art']);
   const [titleErr, setTitleErr] = useState(false);
   const [saving, setSaving] = useState(false);
   const [visibility, setVisibility] = useState('');
+  const [ownershipDeclared, setOwnershipDeclared] = useState(false);
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');
   const fileInputRef = useRef(null);
@@ -39,12 +53,12 @@ export default function Upload() {
   function handleImageChange(event) {
     const file = event.target.files?.[0];
     if (!file) { setImage(null); setPreview(''); return; }
-    const extensionLooksValid = /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+    const extensionLooksValid = /\.(png|jpe?g|jpe|webp|gif)$/i.test(file.name);
     if ((file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) || !extensionLooksValid) {
       if (preview) URL.revokeObjectURL(preview);
       setImage(null);
       setPreview('');
-      showToast('Only PNG, JPG/JPEG, WebP, or GIF images are allowed.', true);
+      showToast('Only PNG, JPG/JPEG/JPE, WebP, or GIF images are allowed.', true);
       event.target.value = '';
       return;
     }
@@ -95,9 +109,15 @@ export default function Upload() {
       showToast('Choose Public gallery or Save privately to my Vault before saving.', true);
       return;
     }
+    if (!ownershipDeclared) {
+      showToast('Confirm that you created this artwork or have permission to display it on ArtVault.', true);
+      return;
+    }
     const materialList = materials.split(',').map((s) => s.trim()).filter(Boolean);
-    if (materialList.length > 20 || materialList.some((item) => item.length > 80)) {
-      showToast('Use at most 20 materials, each 80 characters or fewer.', true);
+    const materialsIssue = materialError(materials);
+    if (materialsIssue) {
+      setMaterialsTouched(true);
+      showToast(materialsIssue, true);
       return;
     }
     if (image && ((image.type && !ALLOWED_IMAGE_TYPES.includes(image.type)) || image.size > MAX_IMAGE_BYTES || !image.size)) {
@@ -121,6 +141,7 @@ export default function Upload() {
         materials: materialList,
         categories,
         visibility,
+        ownershipDeclared,
       });
       showToast(visibility === 'private' ? `"${res.data.artwork.title}" saved to your Vault.` : `"${res.data.artwork.title}" published to the gallery.`);
       navigate(visibility === 'private' ? '/vault' : `/artworks/${res.data.artwork._id}`);
@@ -144,8 +165,8 @@ export default function Upload() {
       <div className="form-card upload-form-card">
         <div className="field">
           <label htmlFor="artwork-image">Artwork image <span className="optional-mark">(optional)</span></label>
-          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} />
-          <div className="hint">PNG, JPG/JPEG, WebP, or GIF only. Maximum 10 MB.</div>
+          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} />
+          <div className="hint">PNG, JPG/JPEG/JPE, WebP, or GIF only. Maximum 10 MB.</div>
           {preview && (
             <div className="upload-preview-wrap">
               <img className="upload-preview" src={preview} alt="Artwork preview" />
@@ -187,15 +208,19 @@ export default function Upload() {
         </div>
         <div className="field">
           <label>Materials <span className="optional-mark">(optional)</span></label>
-          <input value={materials} onChange={(e) => setMaterials(e.target.value)} placeholder="e.g. Cotton thread, natural dye" />
-          <div className="hint">Separate materials with commas; maximum 20, each up to 80 characters.</div>
+          <input value={materials} onChange={(e) => setMaterials(e.target.value)} onBlur={() => setMaterialsTouched(true)} aria-invalid={materialsTouched && Boolean(materialError(materials))} aria-describedby="upload-materials-help" placeholder="e.g. Cotton thread, natural dye" />
+          <div className="hint" id="upload-materials-help">{materialsTouched && materialError(materials) ? materialError(materials) : 'Separate real material names with commas; custom materials are welcome. Maximum 20, each up to 80 characters.'}</div>
         </div>
 
         <div className="vault-upload-choice" role="group" aria-label="Artwork visibility, required">
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'public'} onChange={() => setVisibility('public')} /> Public gallery</label>
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} /> Save privately to my Vault</label>
-            <small>Choose one before saving. Vault artworks are visible only to you, sub-admins, and the main administrator.</small>
+            <small>Choose where to save your artwork before continuing.</small>
         </div>
+        <label className="artwork-ownership-choice">
+          <input type="checkbox" checked={ownershipDeclared} onChange={(event) => setOwnershipDeclared(event.target.checked)} />
+          <span>I created this artwork or have permission to display it on ArtVault. <span className="required-mark" aria-hidden="true">*</span></span>
+        </label>
         <div className="form-actions">
           <button className="btn btn-primary" onClick={publish} disabled={saving}>
             {saving ? <span className="spinner" /> : null}

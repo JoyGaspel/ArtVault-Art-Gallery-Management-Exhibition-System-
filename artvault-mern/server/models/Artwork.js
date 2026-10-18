@@ -9,6 +9,8 @@ const artworkSchema = new mongoose.Schema(
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true },
     // Existing documents without this field remain public for compatibility.
     visibility: { type: String, enum: ['public', 'private'], default: 'public', index: true },
+    ownershipDeclared: { type: Boolean, default: false },
+    ownershipDeclaredAt: { type: Date, default: null },
     categories: { type: [String], default: [] },
     materials: { type: [String], default: [] },
   },

@@ -57,7 +57,7 @@ export default function Vault() {
         ? 'Review private artworks. Only the owning artist can publish them.'
         : subAdmin
           ? 'Monitor private artworks. This is view-only; you cannot edit, delete, or publish them.'
-          : 'Only you, sub-admins, and the main administrator can see these artworks. Your public profile stays visible.'}</div>
+          : 'Keep artworks here until you are ready to make them public.'}</div>
     </div>{!adminReview && <Link className="btn btn-ghost" to="/my-artworks">All my artworks</Link>}</div>
     {loading ? <PageLoadState loading label="Vault" /> : error ? <PageLoadState error={error} onRetry={load} /> : !artworks.length
       ? <div className="empty">{adminReview ? 'No private artworks to review.' : <>Your Vault is empty. {user?.role === 'artist' && <><Link to="/upload">Upload a new artwork</Link> or </>}move one here from its detail page.</>}</div>

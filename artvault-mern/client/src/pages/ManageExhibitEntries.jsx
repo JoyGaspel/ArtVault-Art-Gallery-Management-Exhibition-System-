@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api from '../api';
 import { useToast } from '../components/Toast';
 import PageLoadState from '../components/PageLoadState';
@@ -11,6 +11,7 @@ export default function ManageExhibitEntries() {
   const showToast = useToast();
   const [entries, setEntries] = useState([]), [filter, setFilter] = useState('pending'), [loading, setLoading] = useState(true), [error, setError] = useState(''), [saving, setSaving] = useState('');
   const [denying, setDenying] = useState(null), [reason, setReason] = useState('');
+  const decidingRef = useRef(false);
   const cacheKey = `artvault:admin-exhibit-entries:${filter}`;
   async function load({ silent = false } = {}) {
     if (!silent) { setLoading(true); setError(''); }
@@ -31,8 +32,9 @@ export default function ManageExhibitEntries() {
   }, [filter]);
   useAutoRefresh(() => load({ silent: true }));
   async function decide(entry, status, denial_reason = '') {
-    setSaving(entry._id); try { await api.put(`/exhibit-entries/${entry._id}/decision`, { status, denial_reason }); showToast(status === 'approved' ? 'Entry approved for the exhibit.' : 'Entry denied.'); setDenying(null); setReason(''); await load(); }
-    catch (error) { showToast(error.response?.data?.message || 'Could not update this entry.', true); } finally { setSaving(''); }
+    if (decidingRef.current) return;
+    decidingRef.current = true; setSaving(entry._id); try { await api.put(`/exhibit-entries/${entry._id}/decision`, { status, denial_reason }); showToast(status === 'approved' ? 'Entry approved for the exhibit.' : 'Entry denied.'); setDenying(null); setReason(''); await load(); }
+    catch (error) { showToast(error.response?.data?.message || 'Could not update this entry.', true); } finally { decidingRef.current = false; setSaving(''); }
   }
   return <section className="submission-page">
     <div className="page-head"><div><div className="eyebrow">Curation · review queue</div><h1>Exhibit entries</h1><div className="sub">Review artist submissions before they appear in an exhibit.</div></div></div>

@@ -28,6 +28,8 @@ export default function Signup() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [termsOpen, setTermsOpen] = useState(() => new URLSearchParams(window.location.search).get('terms') === 'open');
   const termsTriggerRef = useRef(null);
+  const submittingRef = useRef(false);
+  const resendingRef = useRef(false);
 
   function closeTerms() {
     setTermsOpen(false);
@@ -56,13 +58,30 @@ export default function Signup() {
     return messages[field];
   }
 
+  function nameMessage(field, value) {
+    const required = requiredMessage(field, value);
+    if (required || !touched[field] || !value) return required;
+    if (value !== value.trim() || /\s{2,}|[^A-Za-z ]/.test(value)) return 'Use letters and single spaces only; remove spaces at the beginning or end.';
+    if (!validPersonName(value)) return 'Each name needs at least 2 letters and must start with a capital letter.';
+    return '';
+  }
+
   function validPersonName(value) {
-    const clean = value.trim();
-    return clean.length >= 2 && clean.split(/\s+/).every((part) => /^[A-Z][A-Za-z]*$/.test(part));
+    return value.length >= 2 && value.length <= 50 && /^[A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+)*$/.test(value);
   }
 
   function validExtension(value) {
-    return !value.trim() || /^(Jr|Sr|II|III|IV|V)$/i.test(value.trim().replace(/\.$/, ''));
+    return !value || /^(Jr|Sr|II|III|IV|V)\.?$/i.test(value);
+  }
+
+  function extensionMessage() {
+    return touched.extensionName && !validExtension(extensionName) ? 'Use Jr, Sr, II, III, IV, or V without spaces.' : '';
+  }
+
+  function emailMessage() {
+    const required = requiredMessage('email', email);
+    if (required || !touched.email || !email) return required;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254 ? '' : 'Enter a valid email address without spaces.';
   }
 
   useEffect(() => {
@@ -71,28 +90,33 @@ export default function Signup() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError('');
-    const cleanFirstName = firstName.trim().replace(/\s+/g, ' ');
-    const cleanLastName = lastName.trim().replace(/\s+/g, ' ');
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanFirstName = firstName;
+    const cleanLastName = lastName;
+    const cleanEmail = email.toLowerCase();
     if (!cleanFirstName || !cleanLastName || !cleanEmail || !password || !confirm) {
       setTouched({ firstName: true, lastName: true, email: true, password: true, confirm: true, terms: true });
       setError('Fill in every field to create your account.');
       return;
     }
     if (!validPersonName(cleanFirstName)) {
-      setError('First name must begin with a capital letter, contain letters only, and be at least 2 characters.');
+      markTouched('firstName');
+      setError('First name needs 2 or more letters, a capital first letter, and no extra spaces.');
       return;
     }
     if (!validPersonName(cleanLastName)) {
-      setError('Last name must begin with a capital letter, contain letters only, and be at least 2 characters.');
+      markTouched('lastName');
+      setError('Last name needs capitalized words separated by one space, with no extra spaces.');
       return;
     }
     if (!validExtension(extensionName)) {
+      markTouched('extensionName');
       setError('Extension must be Jr, Sr, II, III, IV, or V, without special symbols.');
       return;
     }
     if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      markTouched('email');
       setError('Enter a valid email address of 254 characters or fewer.');
       return;
     }
@@ -113,6 +137,7 @@ export default function Signup() {
       setError('Review and accept the Terms and Conditions to create your account.');
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const cleanExtension = extensionName.trim().replace(/\.$/, '');
@@ -129,17 +154,20 @@ export default function Signup() {
         : (err.message || 'Something went wrong. Try again.');
       setError(message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function onVerifyOtp(event) {
     event.preventDefault();
+    if (submittingRef.current) return;
     if (!isValidEmailOtp(otp)) {
       markTouched('otp');
       setError(`Enter the ${EMAIL_OTP_LENGTH}-digit verification code from your email.`);
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
     try {
@@ -149,11 +177,14 @@ export default function Signup() {
       if (/expired|invalid/i.test(err.message || '')) setOtp('');
       setError(err.message || 'That verification code is invalid or expired.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function resendOtp() {
+    if (resendingRef.current || submittingRef.current) return;
+    resendingRef.current = true;
     setResendSubmitting(true);
     setResendFeedback('');
     setError('');
@@ -165,6 +196,7 @@ export default function Signup() {
     } catch (err) {
       setError(err.message || 'Could not send another code.');
     } finally {
+      resendingRef.current = false;
       setResendSubmitting(false);
     }
   }
@@ -214,25 +246,26 @@ export default function Signup() {
         <form className="signup-form" onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="firstName">First name <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="firstName" required maxLength={50} value={firstName} onChange={(e) => setFirstName(e.target.value)} onBlur={() => markTouched('firstName')} aria-invalid={Boolean(requiredMessage('firstName', firstName))} placeholder="e.g. Juan" autoComplete="given-name" />
-            {requiredMessage('firstName', firstName) && <div className="required-feedback" role="status">{requiredMessage('firstName', firstName)}</div>}
+            <input id="firstName" required maxLength={50} value={firstName} onChange={(e) => setFirstName(e.target.value)} onBlur={() => markTouched('firstName')} aria-invalid={Boolean(nameMessage('firstName', firstName))} placeholder="e.g. Juan" autoComplete="given-name" />
+            {nameMessage('firstName', firstName) && <div className="required-feedback" role="status">{nameMessage('firstName', firstName)}</div>}
             <div className="hint">At least 2 letters, starting with a capital letter. Letters only.</div>
           </div>
           <div className="field">
             <label htmlFor="lastName">Last name <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="lastName" required maxLength={50} value={lastName} onChange={(e) => setLastName(e.target.value)} onBlur={() => markTouched('lastName')} aria-invalid={Boolean(requiredMessage('lastName', lastName))} placeholder="e.g. Dela Cruz" autoComplete="family-name" />
-            {requiredMessage('lastName', lastName) && <div className="required-feedback" role="status">{requiredMessage('lastName', lastName)}</div>}
+            <input id="lastName" required maxLength={50} value={lastName} onChange={(e) => setLastName(e.target.value)} onBlur={() => markTouched('lastName')} aria-invalid={Boolean(nameMessage('lastName', lastName))} placeholder="e.g. Dela Cruz" autoComplete="family-name" />
+            {nameMessage('lastName', lastName) && <div className="required-feedback" role="status">{nameMessage('lastName', lastName)}</div>}
             <div className="hint">Use letters only; each name must be at least 2 characters.</div>
           </div>
           <div className="field">
             <label htmlFor="extensionName">Extension name <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>(optional)</span></label>
-            <input id="extensionName" maxLength={10} value={extensionName} onChange={(e) => setExtensionName(e.target.value)} placeholder="e.g. Jr, Sr, II" autoComplete="honorific-suffix" />
+            <input id="extensionName" maxLength={10} value={extensionName} onChange={(e) => setExtensionName(e.target.value)} onBlur={() => markTouched('extensionName')} aria-invalid={Boolean(extensionMessage())} placeholder="e.g. Jr, Sr, II" autoComplete="honorific-suffix" />
+            {extensionMessage() && <div className="required-feedback" role="status">{extensionMessage()}</div>}
             <div className="hint">Common extensions only: Jr, Sr, II, III, IV, or V.</div>
           </div>
           <div className="field">
             <label htmlFor="email">Email <span className="required-mark" aria-hidden="true">*</span></label>
-            <input id="email" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => markTouched('email')} aria-invalid={Boolean(requiredMessage('email', email))} placeholder="e.g. juan@example.com" autoComplete="email" />
-            {requiredMessage('email', email) && <div className="required-feedback" role="status">{requiredMessage('email', email)}</div>}
+            <input id="email" type="email" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => markTouched('email')} aria-invalid={Boolean(emailMessage())} placeholder="e.g. juan@example.com" autoComplete="email" />
+            {emailMessage() && <div className="required-feedback" role="status">{emailMessage()}</div>}
           </div>
           <div className="field">
             <label htmlFor="password">Password <span className="required-mark" aria-hidden="true">*</span></label>

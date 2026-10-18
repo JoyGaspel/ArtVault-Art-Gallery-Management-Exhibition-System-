@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -15,6 +15,7 @@ const formatDeadline = (value) => new Intl.DateTimeFormat('en-PH', { timeZone: '
 export default function ExhibitSubmissions() {
   const { user } = useAuth(); const showToast = useToast();
   const [exhibits, setExhibits] = useState([]), [artworks, setArtworks] = useState([]), [entries, setEntries] = useState([]), [choices, setChoices] = useState({}), [loading, setLoading] = useState(true), [error, setError] = useState(''), [saving, setSaving] = useState('');
+  const submittingRef = useRef(false);
   const cacheKey = user?.id ? `artvault:exhibit-submissions:${user.id}` : '';
   async function load({ silent = false } = {}) {
     if (!silent) { setLoading(true); setError(''); }
@@ -44,10 +45,11 @@ export default function ExhibitSubmissions() {
   const upcomingExhibits = useMemo(() => exhibits.filter((exhibit) => exhibitPhase(exhibit) === 'upcoming'), [exhibits]);
   const existingFor = (exhibitId, artworkId) => entries.find((entry) => String(entry.exhibit?._id || entry.exhibit) === String(exhibitId) && String(entry.artwork?._id || entry.artwork) === String(artworkId));
   async function submit(exhibit) {
+    if (submittingRef.current) return;
     const artworkId = choices[exhibit._id]; if (!artworkId) return showToast('Choose one of your artworks first.', true);
-    const key = `${exhibit._id}:${artworkId}`; setSaving(key);
+    const key = `${exhibit._id}:${artworkId}`; submittingRef.current = true; setSaving(key);
     try { await api.post('/exhibit-entries', { exhibit: exhibit._id, artwork: artworkId }); showToast('Entry submitted for admin review.'); await load(); }
-    catch (error) { showToast(error.response?.data?.message || 'Could not submit this entry.', true); } finally { setSaving(''); }
+    catch (error) { showToast(error.response?.data?.message || 'Could not submit this entry.', true); } finally { submittingRef.current = false; setSaving(''); }
   }
   return <section className="submission-page">
     <div className="page-head"><div><div className="eyebrow">Artist studio · opportunities</div><h1>Exhibit submissions</h1><div className="sub">Send your own artwork to an upcoming exhibit for curator review.</div></div></div>
@@ -72,7 +74,7 @@ export default function ExhibitSubmissions() {
         {selectedArtwork && <div className="submission-artwork-details"><ArtworkThumbnail artwork={selectedArtwork} alt="" /><div><strong>{selectedArtwork.title}</strong><span>{(selectedArtwork.categories || []).join(' · ') || 'Uncategorized'}</span><span>{(selectedArtwork.materials || []).join(', ') || 'Materials not specified'} · uploaded {formatDate(selectedArtwork.created_at)}</span></div></div>}
         {!selected && availableArtworks.length === 0 && isOpen && <div className="submission-no-artworks">All of your artworks are already submitted to or included in this exhibit.</div>}
         {existing && <div className={`submission-inline-status ${existing.status}`}>Already submitted ({existing.status})</div>}
-        <button className="btn btn-primary submission-submit-btn" type="button" disabled={!isOpen || !selected || Boolean(existing) || saving === key} onClick={() => submit(exhibit)}>{saving === key ? 'Submitting…' : 'Submit for review'}</button>
+        <button className="btn btn-primary submission-submit-btn" type="button" disabled={!isOpen || !selected || Boolean(existing) || Boolean(saving)} onClick={() => submit(exhibit)}>{saving === key ? 'Submitting…' : 'Submit for review'}</button>
       </article>;
     })}</div>}
   </section>;

@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
 const { requireAuth } = require('../middleware/auth');
 const { isPrivateArtwork, publicArtworkFilter, canViewArtwork } = require('../utils/artworkVisibility');
+const knownMaterialTerms = new Set(require('../data/materialTerms.json'));
 
 const ALLOWED_IMAGE_TYPES = new Map([
   ['image/png', '89504e470d0a1a0a'],
@@ -50,10 +51,10 @@ function cleanList(value, maxItems, maxItemLength) {
 
 function invalidMaterial(value) {
   const item = value.trim();
-  return !/\p{L}{2}/u.test(item)
-    || !/^[\p{L}\p{N}\s.'’()&+/-]+$/u.test(item)
-    || /(?:https?:\/\/|www\.|\S+@\S+|(.)\1{4,})/iu.test(item)
-    || /^(?:test|none|n\/?a|asdf|qwerty)$/iu.test(item);
+  if (!/^[\p{L}\p{N}\s.'’()&+/-]+$/u.test(item)
+    || /(?:https?:\/\/|www\.|\S+@\S+|(.)\1{4,})/iu.test(item)) return true;
+  const words = item.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  return !words.length || words.some((word) => !knownMaterialTerms.has(word));
 }
 
 function validateArtworkLists(categories, materials) {
@@ -67,7 +68,7 @@ function validateArtworkLists(categories, materials) {
     throw Object.assign(new Error('Use at most 20 materials, each 80 characters or fewer.'), { status: 400 });
   }
   if (materials?.some(invalidMaterial) || (materials && new Set(materials.map((item) => item.trim().toLocaleLowerCase())).size !== materials.length)) {
-    throw Object.assign(new Error('Enter distinct material names, not links, symbols, or placeholder text (for example: canvas, acrylic paint, cotton thread).'), { status: 400 });
+    throw Object.assign(new Error('Enter recognized, distinct material names (for example: canvas, acrylic paint, cotton thread). Contact an administrator if your material is missing.'), { status: 400 });
   }
 }
 

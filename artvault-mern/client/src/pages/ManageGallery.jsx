@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
 import PageLoadState from '../components/PageLoadState';
+import { materialError } from '../utils/materialValidation';
 
 const categories = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -116,6 +117,8 @@ export default function ManageGallery() {
       showToast('Artwork title is required.', true);
       return;
     }
+    const materialsIssue = materialError(form.materials);
+    if (materialsIssue) { showToast(materialsIssue, true); return; }
     setSaving(true);
     try {
       const payload = {
@@ -217,7 +220,7 @@ export default function ManageGallery() {
               <label>Categories <span className="optional-mark">(optional)</span></label>
               <div className="chip-select">{categories.map((item) => <button key={item} type="button" className={`chip-toggle${form.categories.includes(item) ? ' on' : ''}`} onClick={() => toggleCategory(item)}>{item}</button>)}</div>
             </div>
-            <div className="field"><label>Materials <span className="optional-mark">(optional)</span></label><input value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} /><div className="hint">Separate materials with commas.</div></div>
+            <div className="field"><label>Materials <span className="optional-mark">(optional)</span></label><input value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} aria-invalid={Boolean(materialError(form.materials))} aria-describedby="moderation-materials-help" /><div className="hint" id="moderation-materials-help">{materialError(form.materials) || 'Use recognizable material names, separated by commas.'}</div></div>
             <div className="modal-actions">
               <button className="btn btn-ghost" type="button" onClick={() => setEditing(null)}>Cancel</button>
               <button className="btn btn-primary" type="button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save changes'}</button>

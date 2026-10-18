@@ -4,6 +4,7 @@ import api from '../api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
+import { materialError } from '../utils/materialValidation';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -11,18 +12,6 @@ const ALL_CATEGORIES = [
 ];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/pjpeg', 'image/webp', 'image/gif'];
-
-function materialError(value) {
-  const list = value.split(',').map((item) => item.trim()).filter(Boolean);
-  if (list.length > 20 || list.some((item) => item.length > 80)) return 'Use at most 20 materials, each 80 characters or fewer.';
-  if (list.some((item) => !/\p{L}{2}/u.test(item) || !/^[\p{L}\p{N}\s.'’()&+/-]+$/u.test(item)
-    || /(?:https?:\/\/|www\.|\S+@\S+|(.)\1{4,})/iu.test(item)
-    || /^(?:test|none|n\/?a|asdf|qwerty)$/iu.test(item))) {
-    return 'Enter material names, not links, symbols, or placeholder text. For example: canvas, acrylic paint, cotton thread.';
-  }
-  if (new Set(list.map((item) => item.toLocaleLowerCase())).size !== list.length) return 'List each material only once.';
-  return '';
-}
 
 export default function Upload() {
   const navigate = useNavigate();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ import PageLoadState from '../components/PageLoadState';
 import ArtCard from '../components/ArtCard';
 import useArtworkMedia from '../hooks/useArtworkMedia';
 import useAutoRefresh from '../hooks/useAutoRefresh';
+import { materialError } from '../utils/materialValidation';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -40,14 +41,18 @@ export default function ArtworkDetail() {
   const [lightboxLoading, setLightboxLoading] = useState(false);
   const [changingVisibility, setChangingVisibility] = useState(false);
   const [pendingVisibility, setPendingVisibility] = useState(null);
+  const currentIdRef = useRef(id);
+  currentIdRef.current = id;
   const privateThumbnail = useArtworkMedia(artwork, 'thumbnail');
   const privateImage = useArtworkMedia(artwork, 'image');
 
   function load({ silent = false } = {}) {
+    const requestedId = id;
     if (!silent) { setLoading(true); setError(''); }
     return api
-      .get(`/artworks/${id}`)
+      .get(`/artworks/${requestedId}`)
       .then((res) => {
+        if (currentIdRef.current !== requestedId) return;
         setArtwork(res.data.artwork);
         setExhibits(res.data.exhibits);
         setError('');
@@ -60,8 +65,8 @@ export default function ArtworkDetail() {
           });
         }
       })
-      .catch((err) => { if (!silent) { setArtwork(undefined); setError(err.response?.data?.message || 'Could not load this artwork.'); } })
-      .finally(() => { if (!silent) setLoading(false); });
+      .catch((err) => { if (!silent && currentIdRef.current === requestedId) { setArtwork(undefined); setError(err.response?.data?.message || 'Could not load this artwork.'); } })
+      .finally(() => { if (!silent && currentIdRef.current === requestedId) setLoading(false); });
   }
 
   useEffect(() => { load(); }, [id]);
@@ -127,7 +132,11 @@ export default function ArtworkDetail() {
     if (exhibitArtworkIndex < 0 || !exhibitArtworkCount) return;
     const nextIndex = (exhibitArtworkIndex + direction + exhibitArtworkCount) % exhibitArtworkCount;
     const nextArtwork = exhibitContext.artworks[nextIndex];
-    if (nextArtwork?._id) navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`);
+    if (nextArtwork?._id && String(nextArtwork._id) !== String(id)) {
+      setLoading(true);
+      setEditing(false);
+      navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`);
+    }
   }
 
   function toggleCategory(cat) {
@@ -138,6 +147,8 @@ export default function ArtworkDetail() {
   }
 
   async function saveEdit() {
+    const materialsIssue = materialError(form.materials);
+    if (materialsIssue) { showToast(materialsIssue, true); return; }
     setSaving(true);
     try {
       const res = await api.put(`/artworks/${id}`, {
@@ -276,7 +287,8 @@ export default function ArtworkDetail() {
               </div>
               <div className="field">
                 <label>Materials <span className="optional-mark">(optional)</span></label>
-                <input value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} />
+                <input value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} aria-invalid={Boolean(materialError(form.materials))} aria-describedby="artwork-edit-materials-help" />
+                <div className="hint" id="artwork-edit-materials-help">{materialError(form.materials) || 'Use recognizable material names, separated by commas.'}</div>
               </div>
               <div className="detail-actions">
                 <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>

@@ -16,17 +16,19 @@ function generateToken(user) {
 async function signup(req, res, next) {
   try {
     const { name, email, password, specializations, bio } = req.body;
-    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    const normalizedName = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
-    const firstName = typeof req.body.firstName === 'string' ? req.body.firstName.trim() : '';
-    const lastName = typeof req.body.lastName === 'string' ? req.body.lastName.trim() : '';
+    const normalizedEmail = typeof email === 'string' ? email.toLowerCase() : '';
+    const normalizedName = typeof name === 'string' ? name : '';
+    const firstName = typeof req.body.firstName === 'string' ? req.body.firstName : '';
+    const lastName = typeof req.body.lastName === 'string' ? req.body.lastName : '';
 
     if (!normalizedName || !normalizedEmail || typeof password !== 'string' || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required.' });
     }
     if (req.body.acceptedTerms !== true) return res.status(400).json({ message: 'Accept the Terms and Conditions before creating an account.' });
-    if (firstName && (!/^[A-Z][A-Za-z]{1,49}$/.test(firstName) || firstName.length > 50)) return res.status(400).json({ message: 'First name must start with a capital letter and contain 2–50 letters.' });
+    if (normalizedName !== normalizedName.trim() || /\s{2,}/.test(normalizedName)) return res.status(400).json({ message: 'Name must not have leading, trailing, or repeated spaces.' });
+    if (firstName && (!/^[A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+)*$/.test(firstName) || firstName.length > 50)) return res.status(400).json({ message: 'First name must use 2–50 letters with no extra spaces.' });
     if (lastName && (!/^[A-Z][A-Za-z]{1,49}(?: [A-Z][A-Za-z]{1,49})*$/.test(lastName) || lastName.length > 50)) return res.status(400).json({ message: 'Last name must start with a capital letter and contain 2–50 letters.' });
+    if (req.body.extensionName && (typeof req.body.extensionName !== 'string' || !/^(Jr|Sr|II|III|IV|V)\.?$/i.test(req.body.extensionName))) return res.status(400).json({ message: 'Extension must be Jr, Sr, II, III, IV, or V without spaces.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return res.status(400).json({ message: 'Enter a valid email address.' });
     }

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const likeRoutes = require('../routes/likeRoutes');
 const artistRoutes = require('../routes/artistRoutes');
 const { updateMyProfile } = require('../controllers/artistController');
-const { createArtwork } = require('../controllers/artworkController');
+const { createArtwork, updateArtwork } = require('../controllers/artworkController');
 const { signup } = require('../controllers/authController');
 
 function response() {
@@ -50,6 +50,17 @@ test('signup rejects requests without accepted terms before creating an account'
   assert.match(res.body.message, /Terms and Conditions/);
 });
 
+test('signup rejects extra spaces in names before creating an account', async () => {
+  for (const name of [' Test Artist', 'Test  Artist', 'Test Artist ']) {
+    const res = response();
+    await signup({ body: { name, firstName: 'Test', lastName: 'Artist', email: 'artist@example.com', password: 'password123', acceptedTerms: true } }, res, (error) => { throw error; });
+    assert.equal(res.code, 400);
+  }
+  const res = response();
+  await signup({ body: { name: 'Test Artist', firstName: 'Test', lastName: 'Artist  Jr', email: 'artist@example.com', password: 'password123', acceptedTerms: true } }, res, (error) => { throw error; });
+  assert.equal(res.code, 400);
+});
+
 test('artwork upload rejects missing or oversized category lists before database writes', async () => {
   for (const categories of [[], Array(6).fill('Digital Art'), [''], ['Not a real category']]) {
     const res = response();
@@ -69,10 +80,24 @@ test('artwork upload requires an explicit ownership or permission declaration', 
 });
 
 test('artwork upload rejects obvious non-material and repeated materials', async () => {
-  for (const materials of [['https://example.com'], ['12345'], ['asdf'], ['aaaaaaa'], ['Canvas', 'canvas']]) {
+  for (const materials of [['https://example.com'], ['12345'], ['asdf'], ['aaaaaaa'], ['asfjaHFUJKASDG FSDGF'], ['Canvas', 'canvas']]) {
     const res = response();
     let validationError;
     await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories: ['Digital Art'], materials, ownershipDeclared: true } }, res, (error) => { validationError = error; });
     assert.equal(validationError?.status, 400);
   }
+});
+
+test('artwork edit rejects unrecognized materials before saving', async () => {
+  let saved = false;
+  let validationError;
+  await updateArtwork({ artwork: { categories: ['Traditional Art'], materials: [], save: async () => { saved = true; } }, body: { materials: ['asfjaHFUJKASDG FSDGF'] } }, response(), (error) => { validationError = error; });
+  assert.equal(validationError?.status, 400);
+  assert.equal(saved, false);
+});
+
+test('frontend and backend use the same material terms', () => {
+  const serverTerms = require('../data/materialTerms.json');
+  const clientTerms = require('../../client/src/data/materialTerms.json');
+  assert.deepEqual(serverTerms, clientTerms);
 });

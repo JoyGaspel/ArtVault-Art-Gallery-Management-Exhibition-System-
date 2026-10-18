@@ -1,6 +1,6 @@
 const Exhibit = require('../models/Exhibit');
 const mongoose = require('mongoose');
-const Archive = require('../models/Archive');
+const { archiveOnce } = require('../services/archiveService');
 const Artwork = require('../models/Artwork');
 const Artist = require('../models/Artist');
 const Notification = require('../models/Notification');
@@ -188,7 +188,7 @@ async function deleteExhibit(req, res, next) {
   try {
     const exhibit = await Exhibit.findById(req.params.id);
     if (!exhibit) return res.status(404).json({ message: 'Exhibit not found.' });
-    await Archive.create({ entityType: 'exhibit', entityId: exhibit._id, snapshot: exhibit.toObject(), deletedBy: req.user._id });
+    await archiveOnce({ entityType: 'exhibit', snapshot: exhibit.toObject(), deletedBy: req.user._id });
     await exhibit.deleteOne();
     recordAudit({ req, action: 'delete', entityType: 'exhibit', entityId: exhibit._id, details: { name: exhibit.name } });
     res.json({ message: 'Exhibit removed.' });

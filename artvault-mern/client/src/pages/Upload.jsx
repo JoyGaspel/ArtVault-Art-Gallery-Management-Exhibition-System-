@@ -23,7 +23,7 @@ export default function Upload() {
   const [categories, setCategories] = useState(['Digital Art']);
   const [titleErr, setTitleErr] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [visibility, setVisibility] = useState('public');
+  const [visibility, setVisibility] = useState('');
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState('');
   const fileInputRef = useRef(null);
@@ -91,6 +91,10 @@ export default function Upload() {
       showToast('Choose between 1 and 5 artwork categories.', true);
       return;
     }
+    if (!['public', 'private'].includes(visibility)) {
+      showToast('Choose Public gallery or Save privately to my Vault before saving.', true);
+      return;
+    }
     const materialList = materials.split(',').map((s) => s.trim()).filter(Boolean);
     if (materialList.length > 20 || materialList.some((item) => item.length > 80)) {
       showToast('Use at most 20 materials, each 80 characters or fewer.', true);
@@ -133,7 +137,7 @@ export default function Upload() {
         <div>
           <div className="eyebrow">ARTIST STUDIO · NEW WORK</div>
           <h1>Upload an artwork</h1>
-          <div className="sub">Add a new piece to your portfolio and the public gallery.</div>
+          <div className="sub">Add a new piece to your portfolio, then choose whether to publish it or keep it in your Vault.</div>
         </div>
       </div>
 
@@ -187,15 +191,15 @@ export default function Upload() {
           <div className="hint">Separate materials with commas; maximum 20, each up to 80 characters.</div>
         </div>
 
-        <div className="vault-upload-choice" role="group" aria-label="Artwork visibility">
+        <div className="vault-upload-choice" role="group" aria-label="Artwork visibility, required">
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'public'} onChange={() => setVisibility('public')} /> Public gallery</label>
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} /> Save privately to my Vault</label>
-            <small>Vault artworks are visible only to you, sub-admins, and the main administrator.</small>
+            <small>Choose one before saving. Vault artworks are visible only to you, sub-admins, and the main administrator.</small>
         </div>
         <div className="form-actions">
           <button className="btn btn-primary" onClick={publish} disabled={saving}>
             {saving ? <span className="spinner" /> : null}
-            {saving ? 'Saving…' : visibility === 'private' ? 'Save to Vault' : 'Publish artwork'}
+            {saving ? 'Saving…' : visibility === 'private' ? 'Save to Vault' : visibility === 'public' ? 'Publish artwork' : 'Choose where to save'}
           </button>
           <button className="btn btn-ghost" onClick={() => navigate('/')}>Cancel</button>
         </div>

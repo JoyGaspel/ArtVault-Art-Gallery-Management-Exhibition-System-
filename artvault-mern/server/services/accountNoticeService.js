@@ -1,4 +1,4 @@
-const { sendEmail } = require('../config/mailer');
+const mailer = require('../config/mailer');
 
 const notices = {
   suspended: {
@@ -24,10 +24,17 @@ const notices = {
 };
 
 function sendAccountNoticeInBackground(email, type) {
-  if (!email || !notices[type]) return;
+  if (!email || !notices[type]) return Promise.resolve({ skipped: true });
   const { subject, message } = notices[type];
-  sendEmail({ to: email, subject, text: message, html: `<p>${message}</p>` })
-    .catch((error) => console.error('Account notice email could not be sent:', error.message));
+  return mailer.sendEmail({ to: email, subject, text: message, html: `<p>${message}</p>` })
+    .then((result) => {
+      if (result?.skipped) console.warn(`Account notice email skipped: ${type}; SMTP notifications are disabled.`);
+      return result;
+    })
+    .catch((error) => {
+      console.error(`Account notice email could not be sent (${type}):`, error.message);
+      return { failed: true };
+    });
 }
 
 module.exports = { sendAccountNoticeInBackground };

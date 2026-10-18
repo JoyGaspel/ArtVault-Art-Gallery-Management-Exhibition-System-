@@ -30,6 +30,16 @@ function parseList(value, max, label) {
   return items;
 }
 
+const conflictFields = [
+  ['title', 'Title'], ['description', 'Description'],
+  ['categories', 'Categories'], ['materials', 'Materials'],
+];
+
+function displayConflictValue(value) {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
+  return value || '—';
+}
+
 export default function OfflineWorkspace() {
   const [artworks, setArtworks] = useState([]);
   const [drafts, setDrafts] = useState(readOfflineDrafts);
@@ -120,7 +130,7 @@ export default function OfflineWorkspace() {
         setToken('');
         throw new Error('Your online session expired. Sign in again to continue.');
       }
-      if (error.response?.status === 404 && error.response?.data?.message === 'Not Found') {
+      if (error.response?.status === 404 && /^Route not found:/i.test(error.response?.data?.message || '')) {
         throw new Error('The live server has not deployed the offline sync endpoint yet. Your draft is still saved on this computer.');
       }
       throw new Error(error.response?.data?.message || `Could not sync “${draft.title}”. The draft is still saved locally.`);
@@ -184,8 +194,10 @@ export default function OfflineWorkspace() {
     if (!token || !conflicts[draft.id]) return;
     setSyncing(true);
     try {
-      await sendDraft(draft, token, conflicts[draft.id].updated_at);
-      setMessage('Your draft was saved online after you chose it over the newer version.');
+      const result = await sendDraft(draft, token, conflicts[draft.id].updated_at);
+      setMessage(result === 'synced'
+        ? 'Your draft was saved online after you chose it over the newer version.'
+        : 'The online artwork changed again. Review the new conflict before deciding.');
     } catch (error) { setMessage(error.message); }
     finally { setSyncing(false); }
   }
@@ -199,7 +211,7 @@ export default function OfflineWorkspace() {
         <div className="offline-workspace-panel"><h2>Edit a local draft</h2>{selectedArtwork ? <form onSubmit={saveDraft} className="offline-draft-form"><label>Title<input value={form.title} maxLength={50} required onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Description<textarea value={form.description} maxLength={1000} rows={5} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label><label>Categories (comma-separated)<input value={form.categories} onChange={(event) => setForm({ ...form, categories: event.target.value })} /></label><label>Materials (comma-separated)<input value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} /></label><button className="btn btn-primary" type="submit">Save local draft</button></form> : <p>Select an artwork to start a draft.</p>}</div>
       </div>
       <div className="offline-workspace-panel offline-sync-panel"><h2>Reconnect and sync</h2><p>Sign in with the artist account that owns these artworks. Drafts sync automatically after sign-in or when the connection returns while this page stays open. You decide what to do with conflicts.</p>{!supabaseEnabled && <p className="offline-sync-warning">The client Supabase configuration is missing; reconnect sync is unavailable.</p>}{!token ? <form className="offline-sync-login" onSubmit={signInAndSync}><label>Email<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required /></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label><button className="btn btn-primary" type="submit" disabled={syncing || !supabaseEnabled}>{syncing ? 'Checking…' : 'Sign in and sync'}</button></form> : <div className="offline-sync-actions"><span>Online sign-in verified for this page only.</span><button className="btn btn-primary" type="button" disabled={syncing} onClick={() => syncAll(token)}>{syncing ? 'Syncing…' : 'Sync remaining drafts'}</button><button className="btn btn-ghost" type="button" onClick={() => setToken('')}>End sync session</button></div>}</div>
-      {drafts.length > 0 && <div className="offline-workspace-panel"><h2>Saved on this computer</h2><div className="offline-queue">{drafts.map((draft) => <article key={draft.id}><div><strong>{draft.title}</strong><span>by {draft.artistName} · Saved {new Date(draft.savedLocallyAt).toLocaleString()}</span></div>{conflicts[draft.id] ? <div className="offline-conflict"><p><strong>Conflict:</strong> this artwork changed online after your backup. Your draft remains safe.</p><p>Online title: {conflicts[draft.id].title}</p><p>Local title: {draft.title}</p><button className="btn btn-ghost" type="button" disabled={syncing} onClick={() => removeDraft(draft.id)}>Keep online version</button><button className="btn btn-primary" type="button" disabled={syncing || !token} onClick={() => keepMyDraft(draft)}>Use my local draft</button></div> : <button className="btn btn-ghost" type="button" onClick={() => removeDraft(draft.id)}>Discard draft</button>}</article>)}</div></div>}
+      {drafts.length > 0 && <div className="offline-workspace-panel"><h2>Saved on this computer</h2><div className="offline-queue">{drafts.map((draft) => <article key={draft.id}><div><strong>{draft.title}</strong><span>by {draft.artistName} · Saved {new Date(draft.savedLocallyAt).toLocaleString()}</span></div>{conflicts[draft.id] ? <div className="offline-conflict"><p><strong>Conflict:</strong> this artwork changed online after your backup. Your draft remains safe. Compare every field before choosing a version.</p><div className="offline-conflict-table"><div className="offline-conflict-row offline-conflict-header"><span>Field</span><span>Online now</span><span>Your local draft</span></div>{conflictFields.map(([field, label]) => <div className="offline-conflict-row" key={field}><strong>{label}</strong><span>{displayConflictValue(conflicts[draft.id][field])}</span><span>{displayConflictValue(draft[field])}</span></div>)}</div><button className="btn btn-ghost" type="button" disabled={syncing} onClick={() => removeDraft(draft.id)}>Keep online version</button><button className="btn btn-primary" type="button" disabled={syncing || !token} onClick={() => keepMyDraft(draft)}>Use my local draft</button></div> : <button className="btn btn-ghost" type="button" onClick={() => removeDraft(draft.id)}>Discard draft</button>}</article>)}</div></div>}
     </section>
   );
 }

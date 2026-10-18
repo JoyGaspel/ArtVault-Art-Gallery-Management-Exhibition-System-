@@ -71,6 +71,7 @@ async function restoreArchive(req, res, next) {
     }
     await Model.create(snapshot);
     await archive.deleteOne();
+    recordAudit({ req, action: 'restore', entityType: archive.entityType, entityId: archive.entityId });
     res.json({ message: 'Item restored successfully.' });
   } catch (err) { next(err); }
 }
@@ -110,10 +111,12 @@ async function requestArchiveDeletion(req, res, next) {
     if (!archive) return res.status(404).json({ message: 'Archive item not found.' });
     if (req.user.role !== 'main_admin' && archive.entityType === 'artwork' && archive.snapshot?.visibility === 'private') return res.status(404).json({ message: 'Archive item not found.' });
     if (archive.entityType === 'artist') return res.status(403).json({ message: 'Suspended artist accounts are reviewed by the main administrator.' });
-    if (archive.status === 'pending') return res.status(409).json({ message: 'This deletion is already awaiting main-admin review.' });
-    archive.status = 'pending';
-    archive.deletedBy = req.user._id;
-    await archive.save();
+    const updated = await Archive.findOneAndUpdate(
+      { _id: archive._id, status: mongoose.trusted({ $ne: 'pending' }) },
+      { $set: { status: 'pending', deletedBy: req.user._id } },
+      { new: true },
+    );
+    if (!updated) return res.status(409).json({ message: 'This deletion is already awaiting main-admin review.' });
     recordAudit({ req, action: 'delete_request', entityType: 'archive', entityId: archive._id, details: { archivedEntityType: archive.entityType } });
     res.json({ message: 'Deletion request sent to the main administrator.' });
   } catch (err) { next(err); }

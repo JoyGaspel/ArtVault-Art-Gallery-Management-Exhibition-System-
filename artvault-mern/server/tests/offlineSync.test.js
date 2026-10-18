@@ -58,7 +58,11 @@ test('offline sync uses owner, public visibility, and exact version in atomic up
   const res = response();
   await syncArtworkMetadata(request(), res, (error) => { throw error; });
   assert.equal(String(filter.artist), String(owner));
-  assert.deepEqual(filter.visibility, { $ne: 'private' });
+  assert.equal(filter.visibility.$ne, 'private');
+  // The application enables sanitizeFilter globally. This server-owned
+  // operator must survive sanitization instead of being cast as a value.
+  mongoose.sanitizeFilter(filter);
+  assert.equal(filter.visibility.$ne, 'private');
   assert.equal(filter.updated_at.toISOString(), originalDate);
   assert.equal(res.code, 409);
   assert.equal(res.body.current.title, 'Newer online title');

@@ -58,7 +58,7 @@ export default function ArtistProfile() {
               <span className="chip active" key={s} style={{ cursor: 'default' }}>{s}</span>
             ))}
           </div>
-          {user && String(user.id) === String(artist._id) && (
+          {user?.role === 'artist' && String(user.id) === String(artist._id) && (
             <Link className="btn btn-ghost btn-sm profile-edit-link" to="/settings">Edit profile</Link>
           )}
         </div>

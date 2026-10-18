@@ -1,6 +1,6 @@
 const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
-const Archive = require('../models/Archive');
+const { archiveOnce } = require('../services/archiveService');
 const ArtworkLike = require('../models/ArtworkLike');
 const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
@@ -457,7 +457,7 @@ async function syncArtworkMetadata(req, res, next) {
     const filter = {
       _id: req.params.id,
       artist: req.user._id,
-      visibility: { $ne: 'private' },
+      visibility: mongoose.trusted({ $ne: 'private' }),
       updated_at: expected,
     };
     const artwork = await Artwork.findOneAndUpdate(filter, { $set: {
@@ -488,7 +488,7 @@ async function syncArtworkMetadata(req, res, next) {
 async function deleteArtwork(req, res, next) {
   try {
     const artwork = req.artwork;
-    await Archive.create({ entityType: 'artwork', entityId: artwork._id, snapshot: artwork.toObject(), deletedBy: req.user._id });
+    await archiveOnce({ entityType: 'artwork', snapshot: artwork.toObject(), deletedBy: req.user._id });
     await artwork.deleteOne();
     await ArtworkLike.deleteMany({ artwork: artwork._id });
     await Exhibit.updateMany({}, { $pull: { artworks: artwork._id } });

@@ -2,7 +2,6 @@ const Artist = require('../models/Artist');
 const mongoose = require('mongoose');
 const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
-const Archive = require('../models/Archive');
 const supabase = require('../config/supabase');
 const { ALL_SPECIALIZATIONS } = require('../models/Artist');
 const { recordAudit } = require('../utils/audit');
@@ -10,6 +9,7 @@ const AdminProfile = require('../models/AdminProfile');
 const ArtworkLike = require('../models/ArtworkLike');
 const { publicArtworkFilter } = require('../utils/artworkVisibility');
 const { sendAccountNoticeInBackground } = require('../services/accountNoticeService');
+const { archiveOnce } = require('../services/archiveService');
 
 async function syncAdminProfile(artist) {
   const isAdmin = ['sub_admin', 'main_admin'].includes(artist.role);
@@ -165,6 +165,12 @@ async function updateMyProfile(req, res, next) {
     if (req.user.role !== 'artist') return res.status(403).json({ message: 'Administrator profiles cannot be edited here.' });
     const { name, firstName, lastName, bio, specializations, avatar_path, emailLikes, emailSubmissionStatus, emailExhibits } = req.body;
     const artist = req.user;
+    const previous = {
+      name: artist.name, firstName: artist.firstName, lastName: artist.lastName,
+      bio: artist.bio, specializations: JSON.stringify(artist.specializations || []),
+      avatar_path: artist.avatar_path, emailLikes: artist.emailLikes,
+      emailSubmissionStatus: artist.emailSubmissionStatus, emailExhibits: artist.emailExhibits,
+    };
 
     if (firstName !== undefined || lastName !== undefined) {
       const nextFirst = cleanProfileText(firstName ?? artist.firstName, 50);
@@ -192,10 +198,14 @@ async function updateMyProfile(req, res, next) {
     if (emailSubmissionStatus !== undefined) artist.emailSubmissionStatus = emailSubmissionStatus === true;
     if (emailExhibits !== undefined) artist.emailExhibits = emailExhibits === true;
 
-    await artist.save();
-    const changedFields = ['name', 'bio', 'specializations'];
-    if (avatar_path !== undefined) changedFields.push('profile_picture');
-    await recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { fields: changedFields } });
+    const changedFields = ['name', 'firstName', 'lastName', 'bio', 'emailLikes', 'emailSubmissionStatus', 'emailExhibits']
+      .filter((field) => previous[field] !== artist[field]);
+    if (previous.specializations !== JSON.stringify(artist.specializations || [])) changedFields.push('specializations');
+    if (previous.avatar_path !== artist.avatar_path) changedFields.push('profile_picture');
+    if (changedFields.length) {
+      await artist.save();
+      await recordAudit({ req, action: 'update', entityType: 'artist', entityId: artist._id, details: { fields: changedFields } });
+    }
     res.json({ artist: artist.toSafeObject() });
   } catch (err) {
     next(err);
@@ -210,14 +220,14 @@ async function deleteMyAccount(req, res, next) {
 
     const artworks = await Artwork.find({ artist: req.user._id }).lean();
     if (artworks.length) {
-      await Archive.insertMany(artworks.map((snapshot) => ({
-        entityType: 'artwork', entityId: snapshot._id, snapshot, deletedBy: req.user._id,
-      })));
+      for (const snapshot of artworks) {
+        await archiveOnce({ entityType: 'artwork', snapshot, deletedBy: req.user._id });
+      }
       await Exhibit.updateMany({}, { $pull: { artworks: { $in: artworks.map((item) => item._id) } } });
       await ArtworkLike.deleteMany({ artwork: mongoose.trusted({ $in: artworks.map((item) => item._id) }) });
       await Artwork.deleteMany({ artist: req.user._id });
     }
-    await Archive.create({ entityType: 'artist', entityId: req.user._id, snapshot: req.user.toObject(), deletedBy: req.user._id });
+    await archiveOnce({ entityType: 'artist', snapshot: req.user.toObject(), deletedBy: req.user._id });
     req.user.status = 'suspended';
     req.user.suspendedAt = new Date();
     await req.user.save();
@@ -265,6 +275,7 @@ async function setArtistStatus(req, res, next) {
       return res.status(403).json({ message: 'Sub-admins can only suspend or activate artist accounts.' });
     }
     const previousStatus = artist.status;
+    if (previousStatus === status) return res.json({ artist: artist.toSafeObject(), message: 'Status is already up to date.' });
     artist.status = status;
     artist.suspendedAt = status === 'suspended' ? new Date() : null;
     await artist.save();
@@ -289,6 +300,7 @@ async function setArtistRole(req, res, next) {
     }
     const artist = await Artist.findOne({ _id: req.params.id, role: mongoose.trusted({ $in: ['artist', 'sub_admin'] }) }).select('+supabaseUserId');
     if (!artist) return res.status(404).json({ message: 'Artist account not found.' });
+    if (artist.role === role) return res.json({ artist: artist.toSafeObject(), message: 'Role is already up to date.' });
     artist.role = role;
     await artist.save();
     await syncAdminProfile(artist);
@@ -318,17 +330,14 @@ async function deleteArtistAsAdmin(req, res, next) {
         // trusted, otherwise Mongoose casts the operator object as an ObjectId.
         const artworkFilter = { _id: mongoose.trusted({ $in: artworkIds }) };
         const artworkDocs = await inSession(Artwork.find(artworkFilter).lean());
-        const existingArchives = await inSession(Archive.find({ entityType: 'artwork', entityId: mongoose.trusted({ $in: artworkIds }) }).select('entityId').lean());
-        const archivedIds = new Set(existingArchives.map((entry) => String(entry.entityId)));
-        const missingArchives = artworkDocs
-          .filter((snapshot) => !archivedIds.has(String(snapshot._id)))
-          .map((snapshot) => ({ entityType: 'artwork', entityId: snapshot._id, snapshot, deletedBy: req.user._id }));
-        if (missingArchives.length) await Archive.insertMany(missingArchives, writeOptions);
+        for (const snapshot of artworkDocs) {
+          await archiveOnce({ entityType: 'artwork', snapshot, deletedBy: req.user._id, session });
+        }
         await Exhibit.updateMany({}, { $pull: { artworks: { $in: artworkIds } } }, writeOptions);
         await Artwork.deleteMany(artworkFilter, writeOptions);
         await ArtworkLike.deleteMany({ artwork: mongoose.trusted({ $in: artworkIds }) }, writeOptions);
       }
-      await Archive.create([{ entityType: 'artist', entityId: artist._id, snapshot: artist.toObject(), deletedBy: req.user._id }], writeOptions);
+      await archiveOnce({ entityType: 'artist', snapshot: artist.toObject(), deletedBy: req.user._id, session });
       // Administrator removals intentionally keep the Supabase Auth identity.
       // The MongoDB profile and owned content are archived/deleted here; the
       // authentication account can be reused or handled separately later.

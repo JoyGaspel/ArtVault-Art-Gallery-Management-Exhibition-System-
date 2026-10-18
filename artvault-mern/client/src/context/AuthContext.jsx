@@ -214,8 +214,19 @@ export function AuthProvider({ children }) {
       throw { message };
     }
     const sessionUser = mapSupabaseUser(data.user);
-    if (data.session) setUser(sessionUser);
-    return { user: sessionUser, needsConfirmation: !data.session, needsOtp: !data.session };
+    if (data.session?.access_token) {
+      localStorage.setItem('artvault_token', data.session.access_token);
+      try {
+        const response = await api.get('/auth/me');
+        setUser(response.data.user);
+        return { user: response.data.user, needsConfirmation: false, needsOtp: false };
+      } catch {
+        await supabase.auth.signOut();
+        localStorage.removeItem('artvault_token');
+        throw { message: 'Your account was created, but ArtVault could not confirm the sign-in. Please try signing in.' };
+      }
+    }
+    return { user: sessionUser, needsConfirmation: true, needsOtp: true };
   }, []);
 
   const verifySignupOtp = useCallback(async (email, token) => {

@@ -4,6 +4,8 @@ const likeRoutes = require('../routes/likeRoutes');
 const artistRoutes = require('../routes/artistRoutes');
 const { updateMyProfile } = require('../controllers/artistController');
 const { createArtwork, updateArtwork } = require('../controllers/artworkController');
+const artworkRoutes = require('../routes/artworkRoutes');
+const { requireAuth } = require('../middleware/auth');
 const { signup } = require('../controllers/authController');
 
 function response() {
@@ -77,6 +79,16 @@ test('artwork upload requires an explicit ownership or permission declaration', 
     assert.equal(res.code, 400);
     assert.match(res.body.message, /permission/);
   }
+});
+
+test('new artwork uploads require private proof and keep the proof route authenticated', async () => {
+  const res = response();
+  await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories: ['Digital Art'], ownershipDeclared: true } }, res, (error) => { throw error; });
+  assert.equal(res.code, 400);
+  assert.match(res.body.message, /proof/);
+  const route = artworkRoutes.stack.find((layer) => layer.route?.path === '/:id/ownership-evidence' && layer.route.methods.get);
+  assert.ok(route);
+  assert.equal(route.route.stack[0].handle, requireAuth);
 });
 
 test('artwork upload rejects obvious non-material and repeated materials', async () => {

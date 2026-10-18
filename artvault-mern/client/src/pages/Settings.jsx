@@ -33,6 +33,9 @@ export default function Settings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [accountSaving, setAccountSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletionCodeSent, setDeletionCodeSent] = useState(false);
+  const [deletionCode, setDeletionCode] = useState('');
+  const [deletionSaving, setDeletionSaving] = useState(false);
   const [avatarPath, setAvatarPath] = useState('');
   const [emailLikes, setEmailLikes] = useState(true);
   const [emailSubmissionStatus, setEmailSubmissionStatus] = useState(true);
@@ -125,13 +128,29 @@ export default function Settings() {
     setConfirmDelete(true);
   }
 
-  async function confirmAccountDeletion() {
-    setConfirmDelete(false);
-    setAccountSaving(true);
+  async function requestAccountDeletionCode() {
+    if (deletionSaving) return;
+    setDeletionSaving(true);
     try {
-      await api.delete('/artists/me');
+      await api.post('/artists/me/deletion-code');
+      setConfirmDelete(false);
+      setDeletionCodeSent(true);
+      setDeletionCode('');
+      showToast(`A ${EMAIL_OTP_LENGTH}-digit confirmation code was sent to ${user.email}.`);
+    } catch (err) { showToast(err.response?.data?.message || 'Could not send the deletion code.', true); }
+    finally { setDeletionSaving(false); }
+  }
+
+  async function confirmAccountDeletion() {
+    if (deletionSaving) return;
+    if (!isValidEmailOtp(deletionCode)) return showToast(`Enter the ${EMAIL_OTP_LENGTH}-digit code from your email.`, true);
+    setDeletionSaving(true);
+    try {
+      await api.delete('/artists/me', { data: { code: deletionCode } });
+      setDeletionCodeSent(false);
       logout();
-    } catch (err) { showToast(err.response?.data?.message || 'Could not delete your account.', true); setAccountSaving(false); }
+    } catch (err) { showToast(err.response?.data?.message || 'Could not delete your account.', true); }
+    finally { setDeletionSaving(false); }
   }
 
   return (
@@ -181,8 +200,14 @@ export default function Settings() {
             )}
           </div>
           {!isAdmin && <div className="account-danger-zone">
-            <div><strong>Delete account</strong><div className="hint">Your account and artworks will be suspended and sent to the main administrator for review.</div></div>
-            <button className="btn btn-danger btn-sm" type="button" onClick={deleteAccount} disabled={accountSaving}>Delete account</button>
+            <div><strong>Delete account</strong><div className="hint">We’ll email a confirmation code to {user?.email} first. Your account and artworks will then be suspended for main-administrator review.</div></div>
+            <button className="btn btn-danger btn-sm" type="button" onClick={deleteAccount} disabled={accountSaving || deletionSaving}>Delete account</button>
+            {deletionCodeSent && <div className="account-deletion-code">
+              <label htmlFor="deletion-code">{EMAIL_OTP_LENGTH}-digit email confirmation code</label>
+              <input id="deletion-code" inputMode="numeric" autoComplete="one-time-code" pattern={EMAIL_OTP_PATTERN} maxLength={EMAIL_OTP_LENGTH} value={deletionCode} onChange={(event) => setDeletionCode(normalizeEmailOtp(event.target.value))} placeholder="Enter the code from your email" />
+              <div className="hint">The code expires in 10 minutes. If you didn’t request deletion, leave this blank; nothing will be deleted.</div>
+              <div className="account-deletion-actions"><button className="btn btn-danger btn-sm" type="button" onClick={confirmAccountDeletion} disabled={deletionSaving || !isValidEmailOtp(deletionCode)}>{deletionSaving ? 'Verifying…' : 'Confirm account deletion'}</button><button className="btn btn-ghost btn-sm" type="button" onClick={() => { setDeletionCodeSent(false); setDeletionCode(''); }} disabled={deletionSaving}>Cancel</button></div>
+            </div>}
           </div>}
         </div>
       </div>
@@ -270,10 +295,11 @@ export default function Settings() {
       {confirmDelete && (
         <ConfirmDialog
           title="Delete your account?"
-          message="Your account will be suspended and your artworks moved to Archives. The main administrator can restore or permanently delete it."
-          confirmLabel="Delete account"
+          message={`We'll send a confirmation code to ${user?.email}. Your account and artworks will only be suspended after you enter that code.`}
+          confirmLabel={deletionSaving ? 'Sending…' : 'Send confirmation code'}
           danger
-          onConfirm={confirmAccountDeletion}
+          busy={deletionSaving}
+          onConfirm={requestAccountDeletionCode}
           onCancel={() => setConfirmDelete(false)}
         />
       )}

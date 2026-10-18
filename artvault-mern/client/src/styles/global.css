@@ -821,6 +821,10 @@ button, input, textarea, select{ font-family:inherit; }
 .settings-profile-grid{ order:2; width:100%; margin-top:20px; }
 .settings-page-head .account-security-card{ order:3; position:static; width:100%; margin:28px 0 0; max-width:none; }
 .account-danger-zone{ display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:22px; padding-top:16px; border-top:1px solid rgba(163,72,72,.2); }
+.account-danger-zone{ flex-wrap:wrap; }
+.account-deletion-code{ flex:1 0 100%; display:grid; gap:9px; padding:14px; border:1px solid rgba(163,72,72,.22); border-radius:12px; background:#fffafa; }
+.account-deletion-code input{ width:min(100%,380px); }
+.account-deletion-actions{ display:flex; flex-wrap:wrap; gap:8px; }
 @media (max-width:700px){
   .settings-section{ display:block; }
   .settings-page-head{ display:block; }
@@ -1376,6 +1380,13 @@ button, input, textarea, select{ font-family:inherit; }
 .vault-upload-choice small { color: #635a78; }
 .artwork-ownership-choice { display: flex; align-items: flex-start; gap: .65rem; margin: .5rem 0 1rem; padding: .85rem 1rem; border: 1px solid #ded5ee; border-radius: 14px; background: #fbf9fe; color: var(--ink); line-height: 1.45; cursor: pointer; }
 .artwork-ownership-choice input { flex: 0 0 auto; margin-top: .2rem; accent-color: #6b4db2; }
+.ownership-evidence-field{ margin-top:14px; padding:16px; border:1px solid #ded5ee; border-radius:14px; background:#fbf9fe; }
+.ownership-evidence-field .file-input{ width:100%; }
+.ownership-proof-button{ margin-top:16px; }
+.material-input-row{ display:flex; align-items:stretch; gap:8px; }
+.material-input-row input{ flex:1 1 auto; min-width:0; }
+.material-input-row select{ flex:0 0 auto; max-width:45%; padding:0 12px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--violet-deep); font:600 12px 'Work Sans',sans-serif; cursor:pointer; }
+@media (max-width:620px){ .material-input-row{ flex-wrap:wrap; }.material-input-row select{ max-width:none; width:100%; min-height:42px; } }
 /* Artist collection: use one card language for public work and private Vault work. */
 .collection-page-head { align-items:center; padding:22px 24px; border:1px solid #e4d9f3; border-radius:20px; background:linear-gradient(115deg, #f7f2ff 0%, #fff 76%); }
 .collection-page-head > div { min-width:0; max-width:680px; }

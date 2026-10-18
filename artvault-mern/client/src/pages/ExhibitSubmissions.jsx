@@ -59,8 +59,13 @@ export default function ExhibitSubmissions() {
       const isOpen = Date.now() < deadline(exhibit).getTime(); const selected = choices[exhibit._id] || ''; const existing = selected ? existingFor(exhibit._id, selected) : null; const key = `${exhibit._id}:${selected}`;
       const usedIds = new Set((exhibit.artworks || []).map((artwork) => String(artwork._id || artwork)));
       const exhibitEntries = entries.filter((entry) => String(entry.exhibit?._id || entry.exhibit) === String(exhibit._id));
+      const selectedEntries = exhibitEntries.filter((entry) => String(entry.artwork?._id || entry.artwork) === String(selected));
+      const selectedDeniedCount = selectedEntries.filter((entry) => entry.status === 'denied').length;
+      const selectedBlocked = selectedEntries.some((entry) => ['pending', 'approved'].includes(entry.status)) || selectedDeniedCount >= 2;
       const blockedIds = new Set(exhibitEntries.filter((entry) => entry.status === 'approved' || entry.status === 'pending').map((entry) => String(entry.artwork?._id || entry.artwork)));
-      exhibitEntries.filter((entry) => entry.status === 'denied' && (entry.attempts_used || 0) >= 2).forEach((entry) => blockedIds.add(String(entry.artwork?._id || entry.artwork)));
+      const denialCounts = new Map();
+      exhibitEntries.filter((entry) => entry.status === 'denied').forEach((entry) => { const artworkId = String(entry.artwork?._id || entry.artwork); denialCounts.set(artworkId, (denialCounts.get(artworkId) || 0) + 1); });
+      denialCounts.forEach((count, artworkId) => { if (count >= 2) blockedIds.add(artworkId); });
       const availableArtworks = artworks.filter((artwork) => !usedIds.has(String(artwork._id)) && !blockedIds.has(String(artwork._id)));
       const selectedArtwork = artworks.find((artwork) => String(artwork._id) === String(selected));
       return <article className="submission-opportunity-card" key={exhibit._id}>
@@ -69,12 +74,12 @@ export default function ExhibitSubmissions() {
         <div className="submission-artwork-picker" role="listbox" aria-label={`Artwork options for ${exhibit.name}`}>
           {!isOpen && <div className="submission-picker-empty">Submissions are closed</div>}
           {isOpen && !availableArtworks.length && <div className="submission-picker-empty">No eligible artworks available</div>}
-          {isOpen && availableArtworks.map((artwork) => { const denied = exhibitEntries.find((entry) => String(entry.artwork?._id || entry.artwork) === String(artwork._id) && entry.status === 'denied'); const isSelected = String(selected) === String(artwork._id); return <button className={`submission-artwork-option${isSelected ? ' selected' : ''}`} key={artwork._id} type="button" role="option" aria-selected={isSelected} onClick={() => setChoices((current) => ({ ...current, [exhibit._id]: artwork._id }))}><ArtworkThumbnail artwork={artwork} alt="" /><span className="submission-artwork-option-copy"><span className="submission-artwork-option-title">{artwork.title}</span><span className="submission-artwork-option-meta">{(artwork.categories || []).join(' · ') || 'Uncategorized'}</span></span>{denied && <span className="submission-retry-badge">1 retry remaining</span>}</button>; })}
+          {isOpen && availableArtworks.map((artwork) => { const deniedCount = exhibitEntries.filter((entry) => String(entry.artwork?._id || entry.artwork) === String(artwork._id) && entry.status === 'denied').length; const isSelected = String(selected) === String(artwork._id); return <button className={`submission-artwork-option${isSelected ? ' selected' : ''}`} key={artwork._id} type="button" role="option" aria-selected={isSelected} onClick={() => setChoices((current) => ({ ...current, [exhibit._id]: artwork._id }))}><ArtworkThumbnail artwork={artwork} alt="" /><span className="submission-artwork-option-copy"><span className="submission-artwork-option-title">{artwork.title}</span><span className="submission-artwork-option-meta">{(artwork.categories || []).join(' · ') || 'Uncategorized'}</span></span>{deniedCount === 1 && <span className="submission-retry-badge">1 retry remaining</span>}</button>; })}
         </div>
         {selectedArtwork && <div className="submission-artwork-details"><ArtworkThumbnail artwork={selectedArtwork} alt="" /><div><strong>{selectedArtwork.title}</strong><span>{(selectedArtwork.categories || []).join(' · ') || 'Uncategorized'}</span><span>{(selectedArtwork.materials || []).join(', ') || 'Materials not specified'} · uploaded {formatDate(selectedArtwork.created_at)}</span></div></div>}
         {!selected && availableArtworks.length === 0 && isOpen && <div className="submission-no-artworks">All of your artworks are already submitted to or included in this exhibit.</div>}
-        {existing && <div className={`submission-inline-status ${existing.status}`}>Already submitted ({existing.status})</div>}
-        <button className="btn btn-primary submission-submit-btn" type="button" disabled={!isOpen || !selected || Boolean(existing) || Boolean(saving)} onClick={() => submit(exhibit)}>{saving === key ? 'Submitting…' : 'Submit for review'}</button>
+        {existing && <div className={`submission-inline-status ${existing.status}`}>{selectedDeniedCount === 1 && !selectedBlocked ? 'Previous attempt denied · 1 retry remaining' : `Already submitted (${existing.status})`}</div>}
+        <button className="btn btn-primary submission-submit-btn" type="button" disabled={!isOpen || !selected || selectedBlocked || Boolean(saving)} onClick={() => submit(exhibit)}>{saving === key ? 'Submitting…' : selectedDeniedCount === 1 && !selectedBlocked ? 'Resubmit for review' : 'Submit for review'}</button>
       </article>;
     })}</div>}
   </section>;

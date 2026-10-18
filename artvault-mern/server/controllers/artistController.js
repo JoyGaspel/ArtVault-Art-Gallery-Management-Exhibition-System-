@@ -1,4 +1,5 @@
 const Artist = require('../models/Artist');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Artwork = require('../models/Artwork');
 const Exhibit = require('../models/Exhibit');
@@ -10,6 +11,15 @@ const ArtworkLike = require('../models/ArtworkLike');
 const { publicArtworkFilter } = require('../utils/artworkVisibility');
 const { sendAccountNoticeInBackground } = require('../services/accountNoticeService');
 const { archiveOnce } = require('../services/archiveService');
+const mailer = require('../config/mailer');
+
+const DELETE_CODE_LIFETIME_MS = 10 * 60 * 1000;
+const DELETE_CODE_COOLDOWN_MS = 60 * 1000;
+
+function hashDeleteCode(artistId, code) {
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required for account deletion verification.');
+  return crypto.createHmac('sha256', process.env.JWT_SECRET).update(`${artistId}:${code}`).digest('hex');
+}
 
 async function syncAdminProfile(artist) {
   const isAdmin = ['sub_admin', 'main_admin'].includes(artist.role);
@@ -212,11 +222,57 @@ async function updateMyProfile(req, res, next) {
   }
 }
 
+async function requestDeletionCode(req, res, next) {
+  try {
+    if (req.user.role !== 'artist') return res.status(403).json({ message: 'Only artist accounts can request account deletion.' });
+    if (!mailer.emailNotificationsEnabled()) return res.status(503).json({ message: 'Email verification is unavailable. Contact an ArtVault administrator; your account was not changed.' });
+    const artist = await Artist.findById(req.user._id).select('+deleteCodeSentAt').lean();
+    if (!artist) return res.status(404).json({ message: 'Account not found.' });
+    if (artist.deleteCodeSentAt && Date.now() - new Date(artist.deleteCodeSentAt).getTime() < DELETE_CODE_COOLDOWN_MS) {
+      return res.status(429).json({ message: 'Please wait one minute before requesting another code.' });
+    }
+    const code = String(crypto.randomInt(0, 100_000_000)).padStart(8, '0');
+    const digest = hashDeleteCode(artist._id, code);
+    await Artist.updateOne({ _id: artist._id }, { $set: {
+      deleteCodeHash: digest,
+      deleteCodeExpiresAt: new Date(Date.now() + DELETE_CODE_LIFETIME_MS),
+      deleteCodeSentAt: new Date(),
+      deleteCodeAttempts: 0,
+    } });
+    try {
+      const result = await mailer.sendEmail({
+        to: artist.email,
+        subject: 'Confirm your ArtVault account deletion',
+        text: `Your ArtVault account deletion code is ${code}. It expires in 10 minutes. If you did not request this, do not share the code; your account has not been changed.`,
+        html: `<p>Your ArtVault account deletion code is <strong>${code}</strong>.</p><p>It expires in 10 minutes. If you did not request this, do not share the code; your account has not been changed.</p>`,
+      });
+      if (result?.skipped) throw new Error('Email delivery disabled');
+    } catch (error) {
+      await Artist.updateOne({ _id: artist._id, deleteCodeHash: digest }, { $unset: { deleteCodeHash: '', deleteCodeExpiresAt: '', deleteCodeSentAt: '' } });
+      return res.status(503).json({ message: 'Could not send the verification email. Your account was not changed.' });
+    }
+    return res.json({ message: 'A deletion confirmation code was sent to your registered email.' });
+  } catch (err) { return next(err); }
+}
+
 // DELETE /api/artists/me — suspend the account and archive owned data for
 // main-admin review. Authentication is intentionally retained until approval.
 async function deleteMyAccount(req, res, next) {
   try {
     if (req.user.role !== 'artist') return res.status(403).json({ message: 'Administrator accounts cannot be deleted from profile settings.' });
+    const code = req.body?.code;
+    if (typeof code !== 'string' || !/^\d{8}$/.test(code)) return res.status(400).json({ message: 'Enter the 8-digit deletion code sent to your email.' });
+    const digest = hashDeleteCode(req.user._id, code);
+    const consumed = await Artist.findOneAndUpdate({
+      _id: req.user._id,
+      deleteCodeHash: digest,
+      deleteCodeExpiresAt: { $gt: new Date() },
+      deleteCodeAttempts: { $lt: 5 },
+    }, { $unset: { deleteCodeHash: '', deleteCodeExpiresAt: '', deleteCodeSentAt: '' }, $set: { deleteCodeAttempts: 0 } });
+    if (!consumed) {
+      await Artist.updateOne({ _id: req.user._id, deleteCodeExpiresAt: { $gt: new Date() }, deleteCodeAttempts: { $lt: 5 } }, { $inc: { deleteCodeAttempts: 1 } });
+      return res.status(400).json({ message: 'That deletion code is incorrect, expired, or already used. Request a new code if needed.' });
+    }
 
     const artworks = await Artwork.find({ artist: req.user._id }).lean();
     if (artworks.length) {
@@ -372,6 +428,7 @@ module.exports = {
   getArtistAvatar,
   getArtist,
   updateMyProfile,
+  requestDeletionCode,
   deleteMyAccount,
   listAdminArtists,
   setArtistRole,

@@ -1,6 +1,6 @@
 const express = require('express');
 const {
-  listArtists, getArtist, getArtistAvatar, updateMyProfile, deleteMyAccount,
+  listArtists, getArtist, getArtistAvatar, updateMyProfile, requestDeletionCode, deleteMyAccount,
   listAdminArtists, deleteArtistAsAdmin, setArtistRole,
   setArtistStatus,
 } = require('../controllers/artistController');
@@ -11,6 +11,7 @@ const router = express.Router();
 router.get('/', listArtists);
 router.get('/:id/avatar', getArtistAvatar);
 router.put('/me', requireAuth, updateMyProfile);
+router.post('/me/deletion-code', requireAuth, requestDeletionCode);
 router.delete('/me', requireAuth, deleteMyAccount);
 router.get('/admin', requireAuth, requireAdmin, listAdminArtists);
 router.put('/admin/:id/role', requireAuth, requireAdmin, setArtistRole);

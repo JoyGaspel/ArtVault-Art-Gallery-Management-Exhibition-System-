@@ -42,6 +42,10 @@ const artistSchema = new mongoose.Schema(
     emailLikes: { type: Boolean, default: true },
     emailSubmissionStatus: { type: Boolean, default: true },
     emailExhibits: { type: Boolean, default: true },
+    deleteCodeHash: { type: String, select: false, default: '' },
+    deleteCodeExpiresAt: { type: Date, select: false, default: null },
+    deleteCodeSentAt: { type: Date, select: false, default: null },
+    deleteCodeAttempts: { type: Number, select: false, default: 0 },
   },
   { timestamps: true }
 );

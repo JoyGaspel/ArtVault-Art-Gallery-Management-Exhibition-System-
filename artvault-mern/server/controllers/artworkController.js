@@ -307,7 +307,6 @@ async function createArtwork(req, res, next) {
     if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
     if (visibility === 'private' && req.user.role !== 'artist') return res.status(403).json({ message: 'Only artists can save artworks to a vault.' });
     if (ownershipDeclared !== true) return res.status(400).json({ message: 'Confirm that you created this artwork or have permission to display it on ArtVault.' });
-    if (!ownership_evidence_path) return res.status(400).json({ message: 'Upload one sketch, work-in-progress photo, or editing screenshot as private ownership proof.' });
     const cleanTitle = cleanText(title, 150);
     if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
     if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
@@ -315,6 +314,7 @@ async function createArtwork(req, res, next) {
     if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
     if (typeof description !== 'undefined' && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
     validateArtworkLists(categories, materials);
+    if (!ownership_evidence_path) return res.status(400).json({ message: 'Upload one sketch, work-in-progress photo, editing screenshot, or permission note as private ownership proof.' });
 
     const artwork = await Artwork.create({
       title: cleanTitle,

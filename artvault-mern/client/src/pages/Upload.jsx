@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
 import { materialError } from '../utils/materialValidation';
+import { appendMaterial, suggestedMaterials } from '../utils/materialSuggestions';
 
 const ALL_CATEGORIES = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -117,7 +118,7 @@ export default function Upload() {
       return;
     }
     if (!ownershipEvidence) {
-      showToast('Add one private proof image, such as a sketch, work-in-progress photo, or editing screenshot.', true);
+      showToast('Add one private proof image, such as a sketch, work-in-progress photo, editing screenshot, or permission note.', true);
       evidenceInputRef.current?.focus();
       return;
     }
@@ -218,7 +219,13 @@ export default function Upload() {
         </div>
         <div className="field">
           <label>Materials <span className="optional-mark">(optional)</span></label>
-          <input value={materials} onChange={(e) => setMaterials(e.target.value)} onBlur={() => setMaterialsTouched(true)} aria-invalid={materialsTouched && Boolean(materialError(materials))} aria-describedby="upload-materials-help" placeholder="e.g. Cotton thread, natural dye" />
+          <div className="material-input-row">
+            <input value={materials} onChange={(e) => setMaterials(e.target.value)} onBlur={() => setMaterialsTouched(true)} aria-invalid={materialsTouched && Boolean(materialError(materials))} aria-describedby="upload-materials-help" placeholder="e.g. Cotton thread, natural dye" />
+            <select aria-label="Add a suggested material" value="" onChange={(e) => { setMaterials((current) => appendMaterial(current, e.target.value)); setMaterialsTouched(true); }}>
+              <option value="">Suggestions</option>
+              {suggestedMaterials(categories).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </div>
           <div className="hint" id="upload-materials-help">{materialsTouched && materialError(materials) ? materialError(materials) : 'Separate real material names with commas; custom materials are welcome. Maximum 20, each up to 80 characters.'}</div>
         </div>
 
@@ -234,7 +241,7 @@ export default function Upload() {
         <div className="field ownership-evidence-field">
           <label htmlFor="ownership-evidence">Private ownership proof <span className="required-mark" aria-hidden="true">*</span></label>
           <input ref={evidenceInputRef} id="ownership-evidence" className="file-input" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleEvidenceChange} required />
-          <div className="hint">One sketch, work-in-progress photo, or screenshot of your editing layers. Image only, up to 5 MB. Visible to you and ArtVault administrators—not in the public gallery. This helps review ownership but does not prove it automatically.</div>
+          <div className="hint">One sketch, work-in-progress photo, editing/layer screenshot, or permission note. Image only, up to 5 MB. Visible to you and ArtVault administrators—not in the public gallery. This helps review your claim but does not verify it automatically.</div>
           {ownershipEvidence && <div className="hint">Selected: {ownershipEvidence.name}</div>}
         </div>
         <div className="form-actions upload-actions">

@@ -411,7 +411,7 @@ button, input, textarea, select{ font-family:inherit; }
 .exhibit-artwork-meta{ color:var(--ink-faint); font:11px 'IBM Plex Mono',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .modal-overlay{ position:fixed; inset:0; background:rgba(43,36,64,0.35); display:flex; align-items:center; justify-content:center; z-index:150; padding:24px; }
-.modal-box{ background:#fff; border-radius:20px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto; padding:30px 32px; box-shadow:0 30px 70px -20px rgba(43,36,64,0.35); }
+.modal-box{ background:#fff; color:var(--ink); border-radius:20px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto; padding:30px 32px; box-shadow:0 30px 70px -20px rgba(43,36,64,0.35); }
 .exhibit-modal-box{ max-width:760px; padding:34px 38px; }
 .exhibit-modal-box .checkbox-list{ max-height:360px; padding:14px; gap:10px; }
 .exhibit-modal-box .checkbox-row{ padding:9px 10px; min-height:68px; }

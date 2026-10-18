@@ -333,6 +333,11 @@ button, input, textarea, select{ font-family:inherit; }
 
 .form-card{ background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius); padding:28px; max-width:640px; }
 .upload-form-card{ width:100%; max-width:none !important; padding:24px 28px; }
+.upload-actions{ align-items:center; gap:12px; }
+.upload-actions .btn{ min-width:160px; min-height:44px; justify-content:center; text-align:center; }
+.upload-actions .btn-primary{ box-shadow:0 4px 12px rgba(79,51,139,.16); }
+.upload-actions .btn-ghost{ border-color:rgba(110,79,163,.32); color:var(--violet-deep); }
+.upload-actions .btn-ghost:hover{ background:var(--lilac-soft); border-color:var(--violet); }
 .field{ margin-bottom:18px; }
 .field label{ display:block; font-size:13px; font-weight:600; margin-bottom:7px; }
 .required-mark{ color:#C15656; font-weight:700; margin-left:2px; }

@@ -303,10 +303,11 @@ async function getArtworkImage(req, res, next) {
 // POST /api/artworks  (auth required — artist uploads their own piece)
 async function createArtwork(req, res, next) {
   try {
-    const { title, description, image_path, thumbnail_path, categories, materials, visibility = 'public', ownershipDeclared } = req.body;
+    const { title, description, image_path, thumbnail_path, ownership_evidence_path, categories, materials, visibility = 'public', ownershipDeclared } = req.body;
     if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
     if (visibility === 'private' && req.user.role !== 'artist') return res.status(403).json({ message: 'Only artists can save artworks to a vault.' });
     if (ownershipDeclared !== true) return res.status(400).json({ message: 'Confirm that you created this artwork or have permission to display it on ArtVault.' });
+    if (!ownership_evidence_path) return res.status(400).json({ message: 'Upload one sketch, work-in-progress photo, or editing screenshot as private ownership proof.' });
     const cleanTitle = cleanText(title, 150);
     if (!cleanTitle) return res.status(400).json({ message: 'Title is required.' });
     if (typeof title !== 'string' || title.trim().length > 50) return res.status(400).json({ message: 'Title must be 50 characters or fewer.' });
@@ -320,6 +321,7 @@ async function createArtwork(req, res, next) {
       description: cleanDescription,
       image_path: validateImageData(image_path),
       thumbnail_path: thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '',
+      ownership_evidence_path: validateImageData(ownership_evidence_path, 2 * 1024 * 1024),
       categories: cleanList(categories, MAX_CATEGORIES, 40),
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
@@ -329,7 +331,9 @@ async function createArtwork(req, res, next) {
     });
     recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: visibility === 'private' ? { visibility } : { title: artwork.title } });
 
-    res.status(201).json({ artwork });
+    const safeArtwork = artwork.toObject();
+    delete safeArtwork.ownership_evidence_path;
+    res.status(201).json({ artwork: safeArtwork });
   } catch (err) {
     next(err);
   }
@@ -356,6 +360,7 @@ async function getArtwork(req, res, next) {
         like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
         has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
         has_thumbnail: { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
+        has_ownership_evidence: { $gt: [{ $strLenCP: { $ifNull: ['$ownership_evidence_path', ''] } }, 0] },
       } },
     ]);
     if (!artworkRows) return res.status(404).json({ message: 'Artwork not found.' });
@@ -374,6 +379,22 @@ async function getArtwork(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+// Only the artist and curators can inspect upload evidence.
+async function getOwnershipEvidence(req, res, next) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
+    const artwork = await Artwork.findById(req.params.id).select('artist +ownership_evidence_path').lean();
+    if (!artwork || !artwork.ownership_evidence_path) return res.status(404).json({ message: 'Ownership proof not found.' });
+    const isOwner = String(artwork.artist) === String(req.user._id);
+    if (!isOwner && !['admin', 'sub_admin', 'main_admin'].includes(req.user.role)) return res.status(403).json({ message: 'You cannot view this ownership proof.' });
+    const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,(.+)$/s.exec(artwork.ownership_evidence_path);
+    if (!match) return res.status(404).json({ message: 'Ownership proof not found.' });
+    res.set('Cache-Control', 'private, no-store');
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.type(match[1]).send(Buffer.from(match[2], 'base64'));
+  } catch (err) { return next(err); }
 }
 
 /**
@@ -524,6 +545,7 @@ module.exports = {
   setArtworkVisibility,
   getArtworkImage,
   getArtworkThumbnail,
+  getOwnershipEvidence,
   createArtwork,
   getArtwork,
   updateArtwork,

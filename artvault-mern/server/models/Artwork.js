@@ -6,6 +6,8 @@ const artworkSchema = new mongoose.Schema(
     description: { type: String, trim: true, maxlength: 1000, default: '' },
     image_path: { type: String, trim: true, default: '' },
     thumbnail_path: { type: String, trim: true, default: '' },
+    // Private upload evidence; never included in ordinary artwork queries.
+    ownership_evidence_path: { type: String, select: false, default: '' },
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true },
     // Existing documents without this field remain public for compatibility.
     visibility: { type: String, enum: ['public', 'private'], default: 'public', index: true },

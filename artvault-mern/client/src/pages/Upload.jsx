@@ -28,8 +28,10 @@ export default function Upload() {
   const [visibility, setVisibility] = useState('');
   const [ownershipDeclared, setOwnershipDeclared] = useState(false);
   const [image, setImage] = useState(null);
+  const [ownershipEvidence, setOwnershipEvidence] = useState(null);
   const [preview, setPreview] = useState('');
   const fileInputRef = useRef(null);
+  const evidenceInputRef = useRef(null);
 
   function toggleCategory(cat) {
     if (!categories.includes(cat) && categories.length >= 5) {
@@ -79,6 +81,18 @@ export default function Upload() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  function handleEvidenceChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) { setOwnershipEvidence(null); return; }
+    if (!/\.(png|jpe?g|webp|gif)$/i.test(file.name) || (file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) || !file.size || file.size > 5 * 1024 * 1024) {
+      setOwnershipEvidence(null);
+      event.target.value = '';
+      showToast('Choose a PNG, JPG/JPEG/JPE, WebP, or GIF proof image up to 5 MB.', true);
+      return;
+    }
+    setOwnershipEvidence(file);
+  }
+
   async function publish() {
     if (saving) return;
     if (!title.trim()) {
@@ -102,6 +116,11 @@ export default function Upload() {
       showToast('Confirm that you created this artwork or have permission to display it on ArtVault.', true);
       return;
     }
+    if (!ownershipEvidence) {
+      showToast('Add one private proof image, such as a sketch, work-in-progress photo, or editing screenshot.', true);
+      evidenceInputRef.current?.focus();
+      return;
+    }
     const materialList = materials.split(',').map((s) => s.trim()).filter(Boolean);
     const materialsIssue = materialError(materials);
     if (materialsIssue) {
@@ -120,6 +139,7 @@ export default function Upload() {
         image_path = await fileToDataUrl(image);
       }
       const thumbnail_path = image ? await createGalleryThumbnail(image) : '';
+      const ownership_evidence_path = await createGalleryThumbnail(ownershipEvidence, 1000);
       const cleanTitle = title.trim().replace(/\s+/g, ' ');
       const cleanDescription = description.trim().replace(/\s+/g, ' ');
       const res = await api.post('/artworks', {
@@ -127,6 +147,7 @@ export default function Upload() {
         description: cleanDescription,
         image_path,
         thumbnail_path,
+        ownership_evidence_path,
         materials: materialList,
         categories,
         visibility,
@@ -210,12 +231,18 @@ export default function Upload() {
           <input type="checkbox" checked={ownershipDeclared} onChange={(event) => setOwnershipDeclared(event.target.checked)} />
           <span>I created this artwork or have permission to display it on ArtVault. <span className="required-mark" aria-hidden="true">*</span></span>
         </label>
-        <div className="form-actions">
-          <button className="btn btn-primary" onClick={publish} disabled={saving}>
+        <div className="field ownership-evidence-field">
+          <label htmlFor="ownership-evidence">Private ownership proof <span className="required-mark" aria-hidden="true">*</span></label>
+          <input ref={evidenceInputRef} id="ownership-evidence" className="file-input" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleEvidenceChange} required />
+          <div className="hint">One sketch, work-in-progress photo, or screenshot of your editing layers. Image only, up to 5 MB. Visible to you and ArtVault administrators—not in the public gallery. This helps review ownership but does not prove it automatically.</div>
+          {ownershipEvidence && <div className="hint">Selected: {ownershipEvidence.name}</div>}
+        </div>
+        <div className="form-actions upload-actions">
+          <button className="btn btn-primary" type="button" onClick={publish} disabled={saving}>
             {saving ? <span className="spinner" /> : null}
             {saving ? 'Saving…' : visibility === 'private' ? 'Save to Vault' : visibility === 'public' ? 'Publish artwork' : 'Choose where to save'}
           </button>
-          <button className="btn btn-ghost" onClick={() => navigate('/')}>Cancel</button>
+          <button className="btn btn-ghost" type="button" onClick={() => navigate('/')} disabled={saving}>Cancel</button>
         </div>
       </div>
     </section>

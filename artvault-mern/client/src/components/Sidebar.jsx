@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
+import ConfirmDialog from './ConfirmDialog';
 
 const browseLinks = [
   { to: '/', label: 'Gallery', icon: '⌂', end: true },
@@ -29,12 +31,14 @@ export default function Sidebar() {
   const offlineReadOnly = import.meta.env.VITE_OFFLINE_READONLY === 'true';
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
   const isMainAdmin = user?.role === 'main_admin';
   const isArtist = user?.role === 'artist';
   const hasAdminActivity = ['sub_admin', 'main_admin'].includes(user?.role);
 
   function signOut() {
+    setConfirmSignOut(false);
     logout();
     navigate('/login', { replace: true });
   }
@@ -107,7 +111,7 @@ export default function Sidebar() {
               <div className="role">{user.role === 'main_admin' ? 'Main administrator' : user.role === 'sub_admin' ? 'Sub administrator' : isAdmin ? 'Administrator' : 'Artist account'}</div>
             </div>
           </NavLink>
-          <button className="signout-btn" type="button" title="Sign out" aria-label="Sign out" onClick={signOut}><Icon name="logout" size={16} /><span>Sign out</span></button>
+          <button className="signout-btn" type="button" title="Sign out" aria-label="Sign out" onClick={() => setConfirmSignOut(true)}><Icon name="logout" size={16} /><span>Sign out</span></button>
         </div>
       ) : (
         <div className="guest-panel">
@@ -115,6 +119,7 @@ export default function Sidebar() {
           {!offlineReadOnly && <><NavLink to="/login" className="guest-signin">Sign in</NavLink><NavLink to="/signup" className="guest-signup">Create an artist account</NavLink></>}
         </div>
       )}
+      {confirmSignOut && <ConfirmDialog title="Sign out of ArtVault?" message="You'll need to sign in again to access your account." confirmLabel="Sign out" onConfirm={signOut} onCancel={() => setConfirmSignOut(false)} />}
     </aside>
   );
 }

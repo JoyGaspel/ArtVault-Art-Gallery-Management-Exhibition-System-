@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from './Icon';
 import NotificationBell from './NotificationBell';
+import ConfirmDialog from './ConfirmDialog';
 
 function initials(name = '') {
   return name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase() || '?';
@@ -28,6 +29,7 @@ export default function ResponsiveNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [query, setQuery] = useState(() => new URLSearchParams(location.search).get('search') || '');
   const isAdmin = ['admin', 'sub_admin', 'main_admin'].includes(user?.role);
   const isMainAdmin = user?.role === 'main_admin';
@@ -40,6 +42,7 @@ export default function ResponsiveNav() {
   }, [location.pathname, location.search]);
 
   function signOut() {
+    setConfirmSignOut(false);
     logout();
     navigate('/login', { replace: true });
   }
@@ -108,7 +111,7 @@ export default function ResponsiveNav() {
           <span className="responsive-menu-heading">Account</span>
           <LinkItem to="/settings" icon="settings">Account security</LinkItem>
         </>}
-        {user && <button type="button" className="responsive-menu-signout" onClick={signOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} /><span>Sign out</span></button>}
+        {user && <button type="button" className="responsive-menu-signout" onClick={() => setConfirmSignOut(true)} aria-label="Sign out" title="Sign out"><Icon name="logout" size={18} /><span>Sign out</span></button>}
       </div>
 
       <button className="responsive-menu-toggle" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen}>
@@ -127,6 +130,7 @@ export default function ResponsiveNav() {
           <NavLink className="responsive-join" to="/signup">Sign up</NavLink>
         </>}
       </div>
+      {confirmSignOut && <ConfirmDialog title="Sign out of ArtVault?" message="You'll need to sign in again to access your account." confirmLabel="Sign out" onConfirm={signOut} onCancel={() => setConfirmSignOut(false)} />}
     </nav>
   );
 }

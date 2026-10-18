@@ -8,6 +8,7 @@ const {
   setArtworkVisibility,
   getArtworkImage,
   getArtworkThumbnail,
+  getOwnershipEvidence,
   createArtwork,
   getArtwork,
   updateArtwork,
@@ -27,6 +28,7 @@ router.get('/vault', requireAuth, requireRole('artist'), listVaultArtworks);
 router.get('/admin/vault', requireAuth, requireRole('sub_admin', 'main_admin'), listVaultArtworks);
 router.get('/:id/image', authorizeArtworkRead, getArtworkImage);
 router.get('/:id/thumbnail', authorizeArtworkRead, getArtworkThumbnail);
+router.get('/:id/ownership-evidence', requireAuth, getOwnershipEvidence);
 router.get('/:id', authorizeArtworkRead, getArtwork);
 router.patch('/:id/visibility', requireAuth, setArtworkVisibility);
 router.patch('/:id/sync-metadata', requireAuth, requireRole('artist'), syncArtworkMetadata);

@@ -41,6 +41,7 @@ export default function ArtworkDetail() {
   const [lightboxLoading, setLightboxLoading] = useState(false);
   const [changingVisibility, setChangingVisibility] = useState(false);
   const [pendingVisibility, setPendingVisibility] = useState(null);
+  const [proofLoading, setProofLoading] = useState(false);
   const currentIdRef = useRef(id);
   currentIdRef.current = id;
   const privateThumbnail = useArtworkMedia(artwork, 'thumbnail');
@@ -137,6 +138,23 @@ export default function ArtworkDetail() {
       setEditing(false);
       navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`);
     }
+  }
+
+  async function downloadOwnershipProof() {
+    if (proofLoading || !artwork?.has_ownership_evidence) return;
+    setProofLoading(true);
+    try {
+      const response = await api.get(`/artworks/${id}/ownership-evidence`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `artvault-ownership-proof-${id}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) { showToast(err.response?.data?.message || 'Could not load the private proof.', true); }
+    finally { setProofLoading(false); }
   }
 
   function toggleCategory(cat) {
@@ -251,6 +269,7 @@ export default function ArtworkDetail() {
                   <div className="val">{exhibits.length ? exhibits.map((e) => e.name).join(', ') : 'Not currently featured'}</div>
                 </div>
               </div>
+              {artwork.has_ownership_evidence && user && (isOwner || ['admin', 'sub_admin', 'main_admin'].includes(user.role)) && <button type="button" className="btn btn-ghost ownership-proof-button" onClick={downloadOwnershipProof} disabled={proofLoading}>{proofLoading ? 'Loading proof…' : 'Download private ownership proof'}</button>}
               {canManage && (
                 <div className="detail-actions">
                   {isOwner && user.role !== 'sub_admin' && <button className="btn btn-primary" onClick={() => setPendingVisibility(artwork.visibility === 'private' ? 'public' : 'private')} disabled={changingVisibility}>{changingVisibility ? 'Saving…' : artwork.visibility === 'private' ? 'Make public' : 'Move to Vault'}</button>}

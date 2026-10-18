@@ -30,9 +30,11 @@ export default function Upload() {
   const [ownershipDeclared, setOwnershipDeclared] = useState(false);
   const [image, setImage] = useState(null);
   const [ownershipEvidence, setOwnershipEvidence] = useState(null);
+  const [proofError, setProofError] = useState('');
   const [preview, setPreview] = useState('');
   const fileInputRef = useRef(null);
   const evidenceInputRef = useRef(null);
+  const evidenceSectionRef = useRef(null);
 
   function toggleCategory(cat) {
     if (!categories.includes(cat) && categories.length >= 5) {
@@ -87,11 +89,13 @@ export default function Upload() {
     if (!file) { setOwnershipEvidence(null); return; }
     if (!/\.(png|jpe?g|webp|gif)$/i.test(file.name) || (file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) || !file.size || file.size > 5 * 1024 * 1024) {
       setOwnershipEvidence(null);
+      setProofError('Choose a valid image file up to 5 MB.');
       event.target.value = '';
       showToast('Choose a PNG, JPG/JPEG/JPE, WebP, or GIF proof image up to 5 MB.', true);
       return;
     }
     setOwnershipEvidence(file);
+    setProofError('');
   }
 
   async function publish() {
@@ -118,7 +122,9 @@ export default function Upload() {
       return;
     }
     if (!ownershipEvidence) {
+      setProofError('Upload one proof image before saving this artwork.');
       showToast('Add one private proof image, such as a sketch, work-in-progress photo, editing screenshot, or permission note.', true);
+      evidenceSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       evidenceInputRef.current?.focus();
       return;
     }
@@ -234,16 +240,17 @@ export default function Upload() {
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} /> Save privately to my Vault</label>
             <small>Choose where to save your artwork before continuing.</small>
         </div>
+        <div ref={evidenceSectionRef} className={`field ownership-evidence-field${proofError ? ' has-error' : ''}`}>
+          <div className="ownership-evidence-heading"><span className="ownership-evidence-number" aria-hidden="true">1</span><div><label htmlFor="ownership-evidence">Upload ownership proof <span className="required-mark" aria-hidden="true">*</span></label><div className="hint">Add one sketch, work-in-progress photo, editing/layer screenshot, or photo of a permission note.</div></div></div>
+          <input ref={evidenceInputRef} id="ownership-evidence" className="file-input" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleEvidenceChange} aria-invalid={Boolean(proofError)} aria-describedby="ownership-proof-help" required />
+          <div className="hint" id="ownership-proof-help">PNG, JPG/JPEG/JPE, WebP, or GIF up to 5 MB. Only you and ArtVault administrators can view this file; it won’t appear in the public gallery.</div>
+          {ownershipEvidence && <div className="ownership-evidence-selected" role="status">✓ Proof selected: {ownershipEvidence.name}</div>}
+          {proofError && <div className="required-feedback" role="alert">{proofError}</div>}
+        </div>
         <label className="artwork-ownership-choice">
           <input type="checkbox" checked={ownershipDeclared} onChange={(event) => setOwnershipDeclared(event.target.checked)} />
-          <span>I created this artwork or have permission to display it on ArtVault. <span className="required-mark" aria-hidden="true">*</span></span>
+          <span><strong>2. Confirm ownership</strong><br />I created this artwork or have permission to display it on ArtVault. <span className="required-mark" aria-hidden="true">*</span></span>
         </label>
-        <div className="field ownership-evidence-field">
-          <label htmlFor="ownership-evidence">Private ownership proof <span className="required-mark" aria-hidden="true">*</span></label>
-          <input ref={evidenceInputRef} id="ownership-evidence" className="file-input" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleEvidenceChange} required />
-          <div className="hint">One sketch, work-in-progress photo, editing/layer screenshot, or permission note. Image only, up to 5 MB. Visible to you and ArtVault administrators—not in the public gallery. This helps review your claim but does not verify it automatically.</div>
-          {ownershipEvidence && <div className="hint">Selected: {ownershipEvidence.name}</div>}
-        </div>
         <div className="form-actions upload-actions">
           <button className="btn btn-primary" type="button" onClick={publish} disabled={saving}>
             {saving ? <span className="spinner" /> : null}

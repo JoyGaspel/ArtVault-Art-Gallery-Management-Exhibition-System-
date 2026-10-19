@@ -208,25 +208,22 @@ export default function ArtworkDetail() {
 
   return (
     <section>
-      {exhibitContext && exhibitArtworkIndex >= 0 ? (
-        <>
-          <Link className="back-link" to={`/exhibits/${exhibitContext._id}`} replace><span className="back-link-icon" aria-hidden="true">←</span><span>Back to exhibit</span></Link>
-          <div className="exhibit-artwork-nav" aria-label={`Artwork navigation for ${exhibitContext.name}`}>
-            <button type="button" onClick={() => moveInExhibit(-1)} aria-label="Previous artwork">‹</button>
-            <span>{exhibitArtworkIndex + 1} of {exhibitArtworkCount} · {exhibitContext.name}</span>
-            <button type="button" onClick={() => moveInExhibit(1)} aria-label="Next artwork">›</button>
-          </div>
-        </>
-      ) : <button className="back-link" type="button" onClick={() => goBackOr(navigate, artwork?.visibility === 'private' && isOwner ? '/vault' : '/')}><span className="back-link-icon" aria-hidden="true">←</span><span>Back</span></button>}
-
-      {artwork.has_image && (
-        <div className="image-zoom-controls" aria-label="Artwork image zoom controls">
+      <div className="detail-toolbar">
+        {exhibitContext && exhibitArtworkIndex >= 0
+          ? <Link className="back-link" to={`/exhibits/${exhibitContext._id}`} replace><span className="back-link-icon" aria-hidden="true">←</span><span>Back to exhibit</span></Link>
+          : <button className="back-link" type="button" onClick={() => goBackOr(navigate, artwork?.visibility === 'private' && isOwner ? '/vault' : '/')}><span className="back-link-icon" aria-hidden="true">←</span><span>Back</span></button>}
+        {artwork.has_image && <div className="image-zoom-controls" aria-label="Artwork image zoom controls">
           <button type="button" onClick={() => setZoom((value) => Math.max(1, value - 0.25))} disabled={zoom <= 1} aria-label="Zoom out">−</button>
           <span>{Math.round(zoom * 100)}%</span>
           <button type="button" onClick={() => setZoom((value) => Math.min(2, value + 0.25))} disabled={zoom >= 2} aria-label="Zoom in">+</button>
           <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1}>Reset</button>
-        </div>
-      )}
+        </div>}
+      </div>
+      {exhibitContext && exhibitArtworkIndex >= 0 && <div className="exhibit-artwork-nav" aria-label={`Artwork navigation for ${exhibitContext.name}`}>
+        <button type="button" onClick={() => moveInExhibit(-1)} aria-label="Previous artwork">‹</button>
+        <span>{exhibitArtworkIndex + 1} of {exhibitArtworkCount} · {exhibitContext.name}</span>
+        <button type="button" onClick={() => moveInExhibit(1)} aria-label="Next artwork">›</button>
+      </div>}
       <div className="detail-layout">
               <div className={`detail-hero${detailImage ? ' is-viewable' : ''}`} role={detailImage ? 'button' : undefined} tabIndex={detailImage ? 0 : undefined} onClick={() => detailImage && openLightbox()} onKeyDown={(event) => { if (detailImage && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openLightbox(); } }}>{detailImage ? <><img src={detailImage} alt={artwork.title} loading="eager" decoding="async" fetchPriority="high" /><span className="detail-hero-hint">Open full view</span><button type="button" className="detail-full-view-button" aria-label="Open full artwork view" onClick={(event) => { event.stopPropagation(); openLightbox(); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" /></svg></button></> : '🖼️'}</div>
         <div className="detail-body">

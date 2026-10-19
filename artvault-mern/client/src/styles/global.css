@@ -189,12 +189,20 @@ button, input, textarea, select{ font-family:inherit; }
 .art-info .tags{ margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; }
 .tiny-tag{ font-size:10.5px; padding:3px 9px; border-radius:999px; background:var(--lilac-soft); color:var(--violet-deep); font-family:'IBM Plex Mono', monospace; }
 
-.back-link{ display:inline-flex; align-items:center; justify-content:center; gap:9px; min-height:42px; max-width:100%; padding:5px 14px 5px 6px; margin-bottom:20px; border:1px solid var(--line); border-radius:999px; background:var(--bg-card); box-shadow:0 3px 10px rgba(56,39,97,.06); color:var(--violet-deep); font:600 13px 'Work Sans',sans-serif; line-height:1.2; text-align:left; text-decoration:none; cursor:pointer; transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
-.back-link:hover{ color:var(--violet-deep); border-color:var(--violet); background:var(--lilac-soft); box-shadow:0 5px 15px rgba(56,39,97,.12); transform:translateX(-2px); }
+.back-link{ display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:34px; max-width:100%; padding:2px 8px 2px 2px; margin-bottom:8px; border:1px solid transparent; border-radius:999px; background:transparent; color:var(--ink-soft); font:500 12.5px 'Work Sans',sans-serif; line-height:1.2; text-align:left; text-decoration:none; cursor:pointer; transition:background .16s ease,color .16s ease,transform .16s ease; }
+.back-link:hover{ color:var(--violet-deep); background:var(--lilac-soft); transform:translateX(-2px); }
 .back-link:focus-visible{ outline:3px solid var(--violet); outline-offset:3px; }
-.back-link-icon{ display:grid; place-items:center; flex:0 0 29px; width:29px; height:29px; border-radius:50%; background:var(--lilac-soft); color:var(--violet-deep); font:700 18px/1 'Work Sans',sans-serif; }
+.back-link-icon{ display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border-radius:50%; background:var(--lilac-soft); color:var(--violet-deep); font:600 17px/1 'Work Sans',sans-serif; }
 .back-link:hover .back-link-icon{ background:var(--bg-card); }
-@media (max-width:620px){ .back-link{ min-height:44px; margin-bottom:16px; font-size:12px; }.back-link-icon{ flex-basis:30px; width:30px; height:30px; } }
+@media (max-width:620px){ .back-link{ min-height:40px; margin-bottom:8px; font-size:12px; }.back-link-icon{ flex-basis:28px; width:28px; height:28px; } }
+.detail-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:38px; margin-bottom:12px; }
+.detail-toolbar .back-link,.detail-toolbar .image-zoom-controls{ margin-bottom:0; }
+@media (max-width:620px){ .detail-toolbar{ flex-wrap:wrap; gap:6px; }.detail-toolbar .image-zoom-controls{ margin-left:auto; } }
+.back-to-top{ position:fixed; right:24px; bottom:24px; z-index:90; display:inline-flex; align-items:center; gap:7px; min-height:42px; padding:8px 13px; border:1px solid rgba(107,79,176,.24); border-radius:999px; background:rgba(255,255,255,.94); color:var(--violet-deep); box-shadow:0 7px 22px rgba(43,36,64,.14); font:600 12px 'Work Sans',sans-serif; cursor:pointer; backdrop-filter:blur(8px); }
+.back-to-top:hover{ background:var(--lilac-soft); border-color:var(--violet); }
+.back-to-top:focus-visible{ outline:3px solid var(--violet); outline-offset:3px; }
+.back-to-top > span:first-child{ font-size:18px; line-height:1; }
+@media (max-width:620px){ .back-to-top{ right:14px; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); width:42px; height:42px; justify-content:center; padding:0; }.back-to-top > span:last-child{ display:none; } }
 .exhibit-artwork-nav{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; padding:8px 10px; border:1px solid var(--line); border-radius:12px; background:var(--lilac-soft); color:var(--ink-soft); font:11px 'IBM Plex Mono',monospace; }
 .exhibit-artwork-nav button{ width:36px; height:36px; display:grid; place-items:center; border:1px solid rgba(110,79,163,.25); border-radius:9px; background:#fff; color:var(--violet-deep); font-size:27px; line-height:1; cursor:pointer; }
 .exhibit-artwork-nav button:hover{ background:var(--accent-soft); border-color:var(--violet); }

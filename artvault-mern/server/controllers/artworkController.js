@@ -3,10 +3,13 @@ const Exhibit = require('../models/Exhibit');
 const { archiveOnce } = require('../services/archiveService');
 const { artistRecoveryDeadline } = require('../services/artistArtworkRecovery');
 const ArtworkLike = require('../models/ArtworkLike');
+const Notification = require('../models/Notification');
+const { sendNotificationEmailInBackground } = require('../services/notificationEmailService');
 const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
 const { requireAuth } = require('../middleware/auth');
 const { isPrivateArtwork, publicArtworkFilter, canViewArtwork } = require('../utils/artworkVisibility');
+const { checkArtworkOnWeb } = require('../services/artworkWebCheck');
 const knownMaterialTerms = new Set(require('../data/materialTerms.json'));
 
 const ALLOWED_IMAGE_TYPES = new Map([
@@ -31,7 +34,7 @@ function privateCardThumbnail() {
   return {
     $cond: [
       { $and: [
-        { $eq: ['$visibility', 'private'] },
+        { $or: [{ $eq: ['$visibility', 'private'] }, { $in: ['$reviewStatus', ['pending', 'rejected']] }] },
         { $gt: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, 0] },
         { $lte: [{ $strLenCP: { $ifNull: ['$thumbnail_path', ''] } }, MAX_INLINE_PRIVATE_THUMBNAIL_CHARS] },
       ] },
@@ -95,6 +98,60 @@ function validateImageData(imagePath, maxBytes = MAX_IMAGE_BYTES) {
 }
 
 // GET /api/artworks?category=&artist=&page=&limit=
+async function getAdminArtworkSummary(req, res, next) {
+  try {
+    const [publicCount, vaultCount, pendingCount, contributingArtists] = await Promise.all([
+      Artwork.countDocuments(publicArtworkFilter()),
+      Artwork.countDocuments({ visibility: 'private', reviewStatus: mongoose.trusted({ $nin: ['pending', 'rejected'] }) }),
+      Artwork.countDocuments({ reviewStatus: 'pending' }),
+      Artwork.distinct('artist', publicArtworkFilter()),
+    ]);
+    res.set('Cache-Control', 'no-store');
+    res.json({ publicCount, vaultCount, pendingCount, contributingArtistCount: contributingArtists.length });
+  } catch (err) { next(err); }
+}
+
+async function listPendingArtworkReviews(req, res, next) {
+  try {
+    const rows = await Artwork.find({ reviewStatus: 'pending' })
+      .select('title artist visibility reviewStatus reviewReason thumbnail_path image_path ownershipDeclared created_at +webMatchUrls')
+      .populate('artist', 'name email')
+      .sort({ created_at: -1 }).limit(100).lean();
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ artworks: rows.map(({ image_path, thumbnail_path, ...row }) => ({
+      ...row,
+      has_image: Boolean(image_path),
+      thumbnail_data: thumbnail_path && thumbnail_path.length <= MAX_INLINE_PRIVATE_THUMBNAIL_CHARS ? thumbnail_path : '',
+    })) });
+  } catch (err) { next(err); }
+}
+
+async function reviewArtwork(req, res, next) {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
+    if (!['approve', 'reject'].includes(req.body?.decision)) return res.status(400).json({ message: 'Choose approve or reject.' });
+    const approved = req.body.decision === 'approve';
+    const artwork = await Artwork.findOneAndUpdate(
+      { _id: req.params.id, reviewStatus: 'pending' },
+      { $set: { reviewStatus: approved ? 'clear' : 'rejected', ...(approved ? { reviewReason: '' } : {}), reviewedAt: new Date(), reviewedBy: req.user._id } },
+      { new: true, runValidators: true }
+    ).select('title artist visibility reviewStatus').lean();
+    if (!artwork) return res.status(409).json({ message: 'This artwork is no longer pending review.' });
+    recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: { reviewDecision: req.body.decision } });
+    Notification.create({
+      recipient: artwork.artist,
+      type: 'artwork_review',
+      title: req.body.decision === 'approve' ? 'Artwork review approved' : 'Artwork review not approved',
+      message: req.body.decision === 'approve'
+        ? `Your artwork “${artwork.title}” was reviewed and is now ${artwork.visibility === 'private' ? 'in your Vault' : 'visible in the public gallery'}.`
+        : `Your artwork “${artwork.title}” was not approved and remains hidden. Contact an administrator if you need clarification.`,
+      artwork: artwork._id,
+    }).then(sendNotificationEmailInBackground).catch((error) => console.error('Artwork review notification could not be created:', error.message));
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ artwork });
+  } catch (err) { next(err); }
+}
+
 async function listArtworks(req, res, next) {
   try {
     // Artwork uploads should appear immediately in the deployed gallery;
@@ -156,7 +213,7 @@ async function listArtworks(req, res, next) {
 async function authorizeArtworkRead(req, res, next) {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
-    const artwork = await Artwork.findById(req.params.id).select('artist visibility').lean();
+    const artwork = await Artwork.findById(req.params.id).select('artist visibility reviewStatus').lean();
     if (!artwork) return res.status(404).json({ message: 'Artwork not found.' });
     if (!isPrivateArtwork(artwork)) {
       req.accessArtwork = artwork;
@@ -179,7 +236,7 @@ async function listVaultArtworks(req, res, next) {
     res.set('Cache-Control', 'private, no-store');
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
-    const filter = { visibility: 'private' };
+    const filter = { visibility: 'private', reviewStatus: mongoose.trusted({ $nin: ['pending', 'rejected'] }) };
     if (!['main_admin', 'sub_admin'].includes(req.user.role)) filter.artist = req.user._id;
     const [artworks, total] = await Promise.all([
       Artwork.aggregate([
@@ -219,19 +276,20 @@ async function listMyPortfolio(req, res, next) {
     res.set('Cache-Control', 'private, no-store');
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(48, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
-    const visibility = ['public', 'private'].includes(req.query.visibility) ? req.query.visibility : 'all';
+    const visibility = ['public', 'private', 'pending', 'rejected'].includes(req.query.visibility) ? req.query.visibility : 'all';
     const owner = req.user._id;
     const publicFilter = { artist: owner, ...publicArtworkFilter() };
-    const privateFilter = { artist: owner, visibility: 'private' };
-    const filter = visibility === 'private' ? privateFilter : visibility === 'public' ? publicFilter : { artist: owner };
-    const [artworks, total, publicCount, privateCount] = await Promise.all([
+    const privateFilter = { artist: owner, visibility: 'private', reviewStatus: mongoose.trusted({ $nin: ['pending', 'rejected'] }) };
+    const filter = visibility === 'private' ? privateFilter : visibility === 'public' ? publicFilter
+      : ['pending', 'rejected'].includes(visibility) ? { artist: owner, reviewStatus: visibility } : { artist: owner };
+    const [artworks, total, publicCount, privateCount, pendingCount, rejectedCount] = await Promise.all([
       Artwork.aggregate([
         { $match: filter }, { $sort: { created_at: -1 } }, { $skip: (page - 1) * limit }, { $limit: limit },
         { $lookup: { from: 'artwork_likes', let: { artworkId: '$_id' }, pipeline: [
           { $match: { $expr: { $eq: ['$artwork', '$$artworkId'] } } }, { $count: 'count' },
         ], as: 'like_stats' } },
         { $project: {
-          title: 1, description: 1, categories: 1, visibility: { $ifNull: ['$visibility', 'public'] },
+          title: 1, description: 1, categories: 1, visibility: { $ifNull: ['$visibility', 'public'] }, reviewStatus: 1,
           created_at: 1, updated_at: 1,
           like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
           has_image: { $gt: [{ $strLenCP: { $ifNull: ['$image_path', ''] } }, 0] },
@@ -241,16 +299,18 @@ async function listMyPortfolio(req, res, next) {
       Artwork.countDocuments(filter),
       Artwork.countDocuments(publicFilter),
       Artwork.countDocuments(privateFilter),
+      Artwork.countDocuments({ artist: owner, reviewStatus: 'pending' }),
+      Artwork.countDocuments({ artist: owner, reviewStatus: 'rejected' }),
     ]);
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     res.json({
       artworks: artworks.map((artwork) => ({
         ...artwork,
         artist: { _id: req.user._id, name: req.user.name, specializations: req.user.specializations || [] },
-        thumbnail_url: artwork.visibility === 'public' && artwork.has_image
+        thumbnail_url: artwork.visibility === 'public' && !['pending', 'rejected'].includes(artwork.reviewStatus) && artwork.has_image
           ? `${imageOrigin}/api/artworks/${artwork._id}/thumbnail?v=${encodeURIComponent(artwork.updated_at || '')}` : '',
       })),
-      total, publicCount, privateCount, page, pages: Math.ceil(total / limit),
+      total, publicCount, privateCount, pendingCount, rejectedCount, page, pages: Math.ceil(total / limit),
     });
   } catch (err) { next(err); }
 }
@@ -316,25 +376,32 @@ async function createArtwork(req, res, next) {
     if (typeof description !== 'undefined' && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
     validateArtworkLists(categories, materials);
     if (!ownership_evidence_path) return res.status(400).json({ message: 'Upload one sketch, work-in-progress photo, editing screenshot, or permission note as private ownership proof.' });
+    if (!image_path) return res.status(400).json({ message: 'Upload an artwork image before saving.' });
 
+    const validatedImage = validateImageData(image_path);
+    const check = await checkArtworkOnWeb(validatedImage);
+    const reviewStatus = ['possible_match', 'unavailable'].includes(check.status) ? 'pending' : 'clear';
     const artwork = await Artwork.create({
       title: cleanTitle,
       description: cleanDescription,
-      image_path: validateImageData(image_path),
+      image_path: validatedImage,
       thumbnail_path: thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '',
       ownership_evidence_path: validateImageData(ownership_evidence_path, 2 * 1024 * 1024),
       categories: cleanList(categories, MAX_CATEGORIES, 40),
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
       visibility,
+      reviewStatus,
+      reviewReason: reviewStatus === 'pending' ? (check.status === 'possible_match' ? 'possible_match' : 'check_unavailable') : '',
+      webMatchUrls: check.urls,
       ownershipDeclared: true,
       ownershipDeclaredAt: new Date(),
     });
-    recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: visibility === 'private' ? { visibility } : { title: artwork.title } });
+    recordAudit({ req, action: 'create', entityType: 'artwork', entityId: artwork._id, details: { visibility, reviewStatus } });
 
     const safeArtwork = artwork.toObject();
     delete safeArtwork.ownership_evidence_path;
-    res.status(201).json({ artwork: safeArtwork });
+    res.status(201).json({ artwork: safeArtwork, webCheckStatus: check.status });
   } catch (err) {
     next(err);
   }
@@ -355,7 +422,7 @@ async function getArtwork(req, res, next) {
         { $count: 'count' },
       ], as: 'like_stats' } },
       { $project: {
-        title: 1, description: 1, categories: 1, materials: 1, visibility: 1,
+        title: 1, description: 1, categories: 1, materials: 1, visibility: 1, reviewStatus: 1, reviewReason: 1,
         created_at: 1, updated_at: 1,
         artist: { $arrayElemAt: ['$artist', 0] },
         like_count: { $ifNull: [{ $arrayElemAt: ['$like_stats.count', 0] }, 0] },
@@ -434,6 +501,7 @@ async function setArtworkVisibility(req, res, next) {
     if (!['public', 'private'].includes(visibility)) return res.status(400).json({ message: 'Choose Public or Save to Vault.' });
     const artwork = await Artwork.findOne({ _id: req.params.id, artist: req.user._id });
     if (!artwork) return res.status(404).json({ message: 'Artwork not found.' });
+    if (['pending', 'rejected'].includes(artwork.reviewStatus)) return res.status(409).json({ message: 'Artwork visibility cannot change while it is pending or rejected. Contact an administrator.' });
     const storedImage = /^data:image\/(?:png|jpeg|webp|gif);base64,/i;
     if (visibility === 'private' && ((artwork.image_path && !storedImage.test(artwork.image_path)) || (artwork.thumbnail_path && !storedImage.test(artwork.thumbnail_path)))) {
       return res.status(409).json({ message: 'This older artwork uses an external image URL. Re-upload its image before moving it to the Vault.' });
@@ -462,7 +530,16 @@ async function updateArtwork(req, res, next) {
     if (categories !== undefined || materials !== undefined) validateArtworkLists(categories ?? artwork.categories, materials);
     if (title !== undefined) artwork.title = cleanText(title, 50);
     if (description !== undefined) artwork.description = cleanText(description, 1000);
-    if (image_path !== undefined) artwork.image_path = validateImageData(image_path);
+    if (image_path !== undefined) {
+      if (!image_path) return res.status(400).json({ message: 'Artwork image cannot be empty.' });
+      artwork.image_path = validateImageData(image_path);
+      const check = await checkArtworkOnWeb(artwork.image_path);
+      artwork.reviewStatus = ['possible_match', 'unavailable'].includes(check.status) || (check.status === 'disabled' && ['pending', 'rejected'].includes(artwork.reviewStatus)) ? 'pending' : 'clear';
+      artwork.reviewReason = artwork.reviewStatus === 'pending' ? (check.status === 'possible_match' ? 'possible_match' : 'check_unavailable') : '';
+      artwork.webMatchUrls = check.urls;
+      artwork.reviewedAt = null;
+      artwork.reviewedBy = null;
+    }
     if (thumbnail_path !== undefined) artwork.thumbnail_path = thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '';
     if (categories !== undefined) artwork.categories = cleanList(categories, MAX_CATEGORIES, 40);
     if (materials !== undefined) artwork.materials = cleanList(materials, MAX_MATERIALS, 80);
@@ -496,6 +573,7 @@ async function syncArtworkMetadata(req, res, next) {
       _id: req.params.id,
       artist: req.user._id,
       visibility: mongoose.trusted({ $ne: 'private' }),
+      reviewStatus: mongoose.trusted({ $nin: ['pending', 'rejected'] }),
       updated_at: expected,
     };
     const artwork = await Artwork.findOneAndUpdate(filter, { $set: {
@@ -540,6 +618,9 @@ async function deleteArtwork(req, res, next) {
 }
 
 module.exports = {
+  listPendingArtworkReviews,
+  reviewArtwork,
+  getAdminArtworkSummary,
   listArtworks,
   listMyArtworks,
   listVaultArtworks,

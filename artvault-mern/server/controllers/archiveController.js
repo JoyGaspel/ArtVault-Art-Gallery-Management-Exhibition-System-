@@ -8,13 +8,14 @@ const { recordAudit } = require('../utils/audit');
 const supabase = require('../config/supabase');
 const { sendAccountNoticeInBackground } = require('../services/accountNoticeService');
 const { isArtistRecoverable } = require('../services/artistArtworkRecovery');
+const { notifyArtworkRestored } = require('../services/artworkRestorationNotice');
 
 function artistArtworkFilter(userId, now = new Date()) {
   return {
     entityType: 'artwork',
     deletedBy: userId,
     'snapshot.artist': userId,
-    artistRecoverUntil: { $gt: now },
+    artistRecoverUntil: mongoose.trusted({ $gt: now }),
   };
 }
 
@@ -46,6 +47,7 @@ async function restoreMyRemovedArtwork(req, res, next) {
     await Artwork.create(archive.snapshot);
     await archive.deleteOne();
     recordAudit({ req, action: 'restore', entityType: 'artwork', entityId: archive.entityId, details: { source: 'artist_recovery' } });
+    await notifyArtworkRestored(archive);
     res.json({ message: 'Artwork restored.', artworkId: archive.entityId, visibility: archive.snapshot.visibility || 'public' });
   } catch (err) { next(err); }
 }
@@ -60,7 +62,7 @@ async function listArchives(req, res, next) {
     // A date filter moves them into this admin list without a background job.
     filter.$or = [
       { artistRecoverUntil: null },
-      { artistRecoverUntil: { $lte: new Date() } },
+      { artistRecoverUntil: mongoose.trusted({ $lte: new Date() }) },
     ];
     // Archive snapshots retain image data for restoration, but the archive
     // list only needs labels and timestamps. Excluding base64 image fields
@@ -99,11 +101,16 @@ async function restoreArchive(req, res, next) {
         await Artist.create(snapshot);
       }
       const artworkArchives = await Archive.find({ entityType: 'artwork', 'snapshot.artist': archive.entityId });
+      const restoredArtworks = [];
       for (const artworkArchive of artworkArchives) {
-        if (!(await Artwork.exists({ _id: artworkArchive.entityId }))) await Artwork.create(artworkArchive.snapshot);
+        if (!(await Artwork.exists({ _id: artworkArchive.entityId }))) {
+          await Artwork.create(artworkArchive.snapshot);
+          restoredArtworks.push(artworkArchive);
+        }
         await artworkArchive.deleteOne();
       }
       await archive.deleteOne();
+      for (const artworkArchive of restoredArtworks) await notifyArtworkRestored(artworkArchive);
       sendAccountNoticeInBackground(existing?.email || archive.snapshot?.email, 'active');
       recordAudit({ req, action: 'restore', entityType: 'artist', entityId: archive.entityId });
       return res.json({ message: 'Artist account and artworks restored successfully.' });
@@ -120,6 +127,7 @@ async function restoreArchive(req, res, next) {
     await Model.create(snapshot);
     await archive.deleteOne();
     recordAudit({ req, action: 'restore', entityType: archive.entityType, entityId: archive.entityId });
+    if (archive.entityType === 'artwork') await notifyArtworkRestored(archive);
     res.json({ message: 'Item restored successfully.' });
   } catch (err) { next(err); }
 }

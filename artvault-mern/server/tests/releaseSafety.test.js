@@ -7,6 +7,7 @@ const { createArtwork, updateArtwork } = require('../controllers/artworkControll
 const artworkRoutes = require('../routes/artworkRoutes');
 const { requireAuth } = require('../middleware/auth');
 const { signup } = require('../controllers/authController');
+const Artwork = require('../models/Artwork');
 
 function response() {
   return {
@@ -89,6 +90,17 @@ test('new artwork uploads require private proof and keep the proof route authent
   const route = artworkRoutes.stack.find((layer) => layer.route?.path === '/:id/ownership-evidence' && layer.route.methods.get);
   assert.ok(route);
   assert.equal(route.route.stack[0].handle, requireAuth);
+});
+
+test('new artwork uploads require a display image before any database write', async (t) => {
+  t.mock.method(Artwork, 'create', () => { throw new Error('Artwork must not be created without an image.'); });
+  const res = response();
+  await createArtwork({ user: { role: 'artist' }, body: {
+    title: 'Test work', categories: ['Digital Art'], ownershipDeclared: true,
+    ownership_evidence_path: 'proof-present',
+  } }, res, (error) => { throw error; });
+  assert.equal(res.code, 400);
+  assert.match(res.body.message, /artwork image/);
 });
 
 test('artwork upload rejects obvious non-material and repeated materials', async () => {

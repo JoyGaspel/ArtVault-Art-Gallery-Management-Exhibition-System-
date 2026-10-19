@@ -5,7 +5,7 @@ import api from '../api';
 // carry the artist's token. Revoke temporary blob URLs when the work changes.
 export default function useArtworkMedia(artwork, variant = 'thumbnail') {
   const id = artwork?._id;
-  const isPrivate = artwork?.visibility === 'private';
+  const isPrivate = artwork?.visibility === 'private' || ['pending', 'rejected'].includes(artwork?.reviewStatus);
   const inlineThumbnail = isPrivate && variant === 'thumbnail' &&
     typeof artwork?.thumbnail_data === 'string' && artwork.thumbnail_data.startsWith('data:image/')
     ? artwork.thumbnail_data : '';

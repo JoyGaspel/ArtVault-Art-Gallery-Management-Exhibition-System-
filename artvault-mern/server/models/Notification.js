@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema(
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true, index: true },
     type: {
       type: String,
-      enum: ['like', 'submission_status', 'exhibit'],
+      enum: ['like', 'submission_status', 'exhibit', 'artwork_restored', 'artwork_review'],
       required: true,
       index: true,
     },

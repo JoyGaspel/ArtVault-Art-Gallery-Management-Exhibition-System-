@@ -28,7 +28,7 @@ export default function ExhibitDetail() {
 
   return (
     <section>
-      <button className="back-link" type="button" onClick={() => goBackOr(navigate, '/exhibits')}>← Back to exhibits</button>
+      <button className="back-link" type="button" onClick={() => goBackOr(navigate, '/exhibits')}><span className="back-link-icon" aria-hidden="true">←</span><span>Back to exhibits</span></button>
       <div className="exhibit-detail-hero">
         <div><div className="eyebrow">Digital exhibition · {exhibitPhase(exhibit) === 'current' ? 'Happening now' : exhibitPhase(exhibit) === 'past' ? 'Past exhibit' : 'Upcoming'}</div><h1>{exhibit.name}</h1><p>{exhibitScheduleLabel(exhibit)}</p><p>{exhibit.description || 'A curated collection of works from the ArtVault community.'}</p></div>
         <div className="exhibit-detail-count"><strong>{exhibit.artworks.length}</strong><span>works on view</span></div>

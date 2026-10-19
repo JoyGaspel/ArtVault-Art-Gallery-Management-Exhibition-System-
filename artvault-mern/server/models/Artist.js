@@ -42,6 +42,7 @@ const artistSchema = new mongoose.Schema(
     emailLikes: { type: Boolean, default: true },
     emailSubmissionStatus: { type: Boolean, default: true },
     emailExhibits: { type: Boolean, default: true },
+    emailArtworkRestored: { type: Boolean, default: true },
     deleteCodeHash: { type: String, select: false, default: '' },
     deleteCodeExpiresAt: { type: Date, select: false, default: null },
     deleteCodeSentAt: { type: Date, select: false, default: null },
@@ -84,6 +85,7 @@ artistSchema.methods.toSafeObject = function toSafeObject() {
     emailLikes: this.emailLikes !== false,
     emailSubmissionStatus: this.emailSubmissionStatus !== false,
     emailExhibits: this.emailExhibits !== false,
+    emailArtworkRestored: this.emailArtworkRestored !== false,
   };
 };
 

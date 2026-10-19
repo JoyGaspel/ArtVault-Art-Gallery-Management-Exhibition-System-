@@ -46,7 +46,7 @@ export default function ArtistProfile() {
 
   return (
     <section>
-      <button className="back-link" type="button" onClick={() => goBackOr(navigate, '/artists')}>← Back</button>
+      <button className="back-link" type="button" onClick={() => goBackOr(navigate, '/artists')}><span className="back-link-icon" aria-hidden="true">←</span><span>Back to artists</span></button>
       <div className="profile-hero">
       <div className="profile-head">
         {artist.avatar_url ? <img className="profile-avatar-xl" src={artist.avatar_url} alt={`${artist.name} profile`} loading="eager" fetchPriority="high" decoding="async" /> : <div className="av-xl">{artist.name.slice(0, 2).toUpperCase()}</div>}

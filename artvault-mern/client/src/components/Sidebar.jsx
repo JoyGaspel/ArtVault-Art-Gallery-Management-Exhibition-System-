@@ -81,6 +81,7 @@ export default function Sidebar() {
           <div className="nav-group">
             <div className="nav-heading">Curation</div>
             <NavigationLink to="/manage-gallery" label="Manage gallery" icon="manageGallery" />
+            {hasAdminActivity && <NavigationLink to="/pending-artworks" label="Pending artworks" icon="status" />}
             {hasAdminActivity && <NavigationLink to="/manage-vault" label="Artist Vaults" icon="vault" />}
             <NavigationLink to="/manage-exhibits" label="Manage exhibits" icon="manageExhibits" />
             <NavigationLink to="/manage-exhibit-entries" label="Exhibit entries" icon="entries" />

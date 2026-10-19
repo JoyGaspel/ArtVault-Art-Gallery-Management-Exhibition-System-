@@ -1,6 +1,9 @@
 const express = require('express');
 const {
   listArtworks,
+  listPendingArtworkReviews,
+  reviewArtwork,
+  getAdminArtworkSummary,
   listMyArtworks,
   listVaultArtworks,
   listMyPortfolio,
@@ -16,11 +19,13 @@ const {
   deleteArtwork,
   loadArtworkAndAuthorize,
 } = require('../controllers/artworkController');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
 router.get('/', listArtworks);                                  // GET  /api/artworks
+router.get('/admin/summary', requireAuth, requireAdmin, getAdminArtworkSummary);
+router.get('/admin/pending', requireAuth, requireRole('sub_admin', 'main_admin'), listPendingArtworkReviews);
 router.post('/', requireAuth, createArtwork);                    // POST /api/artworks
 router.get('/mine', requireAuth, requireRole('artist'), listMyArtworks); // GET /api/artworks/mine
 router.get('/mine/portfolio', requireAuth, requireRole('artist'), listMyPortfolio);
@@ -31,6 +36,7 @@ router.get('/:id/thumbnail', authorizeArtworkRead, getArtworkThumbnail);
 router.get('/:id/ownership-evidence', requireAuth, getOwnershipEvidence);
 router.get('/:id', authorizeArtworkRead, getArtwork);
 router.patch('/:id/visibility', requireAuth, setArtworkVisibility);
+router.patch('/:id/review', requireAuth, requireRole('main_admin'), reviewArtwork);
 router.patch('/:id/sync-metadata', requireAuth, requireRole('artist'), syncArtworkMetadata);
 router.put('/:id', requireAuth, loadArtworkAndAuthorize, updateArtwork);    // PUT    /api/artworks/:id
 router.delete('/:id', requireAuth, loadArtworkAndAuthorize, deleteArtwork); // DELETE /api/artworks/:id

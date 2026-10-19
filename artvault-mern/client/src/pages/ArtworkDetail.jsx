@@ -4,6 +4,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import OwnershipProofModal from '../components/OwnershipProofModal';
 import ArtworkLikeButton from '../components/ArtworkLikeButton';
 import PageLoadState from '../components/PageLoadState';
 import ArtCard from '../components/ArtCard';
@@ -42,7 +43,7 @@ export default function ArtworkDetail() {
   const [lightboxLoading, setLightboxLoading] = useState(false);
   const [changingVisibility, setChangingVisibility] = useState(false);
   const [pendingVisibility, setPendingVisibility] = useState(null);
-  const [proofLoading, setProofLoading] = useState(false);
+  const [proofOpen, setProofOpen] = useState(false);
   const currentIdRef = useRef(id);
   currentIdRef.current = id;
   const privateThumbnail = useArtworkMedia(artwork, 'thumbnail');
@@ -82,8 +83,9 @@ export default function ArtworkDetail() {
     return () => { cancelled = true; };
   }, [exhibitId]);
   useEffect(() => {
-    const thumbnail = artwork?.visibility === 'private' ? privateThumbnail : (artwork?.thumbnail_url || '');
-    const full = artwork?.visibility === 'private' ? privateImage : (artwork?.image_url || '');
+    const protectedArtwork = artwork?.visibility === 'private' || ['pending', 'rejected'].includes(artwork?.reviewStatus);
+    const thumbnail = protectedArtwork ? privateThumbnail : (artwork?.thumbnail_url || '');
+    const full = protectedArtwork ? privateImage : (artwork?.image_url || '');
     setDisplayImage(thumbnail || full);
     if (!full || full === thumbnail) return undefined;
     const preload = new Image();
@@ -101,6 +103,7 @@ export default function ArtworkDetail() {
     return () => { cancelled = true; };
   }, [artwork?.artist?._id, id]);
   useEffect(() => setZoom(1), [id]);
+  useEffect(() => setProofOpen(false), [id]);
   useEffect(() => {
     document.documentElement.style.setProperty('--detail-zoom', String(zoom));
     return () => document.documentElement.style.removeProperty('--detail-zoom');
@@ -114,7 +117,7 @@ export default function ArtworkDetail() {
 
   function openLightbox() {
     if (!detailImage) return;
-    const fullImage = artwork?.visibility === 'private' ? (privateImage || detailImage) : (artwork?.image_url || detailImage);
+    const fullImage = artwork?.visibility === 'private' || ['pending', 'rejected'].includes(artwork?.reviewStatus) ? (privateImage || detailImage) : (artwork?.image_url || detailImage);
     setLightboxImage(detailImage);
     setLightboxOpen(true);
     if (fullImage === detailImage) { setLightboxLoading(false); return; }
@@ -126,7 +129,8 @@ export default function ArtworkDetail() {
   }
 
   const isOwner = Boolean(user && artwork && user.id === artwork.artist?._id);
-  const canManage = user && artwork && !(artwork.visibility === 'private' && user.role === 'sub_admin') && (isOwner || user.role === 'main_admin' || (artwork.visibility !== 'private' && ['admin', 'sub_admin'].includes(user.role)));
+  const protectedArtwork = artwork?.visibility === 'private' || ['pending', 'rejected'].includes(artwork?.reviewStatus);
+  const canManage = user && artwork && !(protectedArtwork && user.role === 'sub_admin') && (isOwner || user.role === 'main_admin' || (!protectedArtwork && ['admin', 'sub_admin'].includes(user.role)));
   const detailImage = displayImage;
   const exhibitArtworkIndex = exhibitContext?.artworks?.findIndex((item) => String(item._id) === String(id)) ?? -1;
   const exhibitArtworkCount = exhibitContext?.artworks?.length || 0;
@@ -140,23 +144,6 @@ export default function ArtworkDetail() {
       // Carousel steps should not fill browser history; Back returns to the exhibit.
       navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`, { replace: true });
     }
-  }
-
-  async function downloadOwnershipProof() {
-    if (proofLoading || !artwork?.has_ownership_evidence) return;
-    setProofLoading(true);
-    try {
-      const response = await api.get(`/artworks/${id}/ownership-evidence`, { responseType: 'blob' });
-      const url = URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `artvault-ownership-proof-${id}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err) { showToast(err.response?.data?.message || 'Could not load the private proof.', true); }
-    finally { setProofLoading(false); }
   }
 
   function toggleCategory(cat) {
@@ -223,14 +210,14 @@ export default function ArtworkDetail() {
     <section>
       {exhibitContext && exhibitArtworkIndex >= 0 ? (
         <>
-          <Link className="back-link" to={`/exhibits/${exhibitContext._id}`} replace>← Back to exhibit</Link>
+          <Link className="back-link" to={`/exhibits/${exhibitContext._id}`} replace><span className="back-link-icon" aria-hidden="true">←</span><span>Back to exhibit</span></Link>
           <div className="exhibit-artwork-nav" aria-label={`Artwork navigation for ${exhibitContext.name}`}>
             <button type="button" onClick={() => moveInExhibit(-1)} aria-label="Previous artwork">‹</button>
             <span>{exhibitArtworkIndex + 1} of {exhibitArtworkCount} · {exhibitContext.name}</span>
             <button type="button" onClick={() => moveInExhibit(1)} aria-label="Next artwork">›</button>
           </div>
         </>
-      ) : <button className="back-link" type="button" onClick={() => goBackOr(navigate, artwork?.visibility === 'private' && isOwner ? '/vault' : '/')}>← Back</button>}
+      ) : <button className="back-link" type="button" onClick={() => goBackOr(navigate, artwork?.visibility === 'private' && isOwner ? '/vault' : '/')}><span className="back-link-icon" aria-hidden="true">←</span><span>Back</span></button>}
 
       {artwork.has_image && (
         <div className="image-zoom-controls" aria-label="Artwork image zoom controls">
@@ -248,7 +235,9 @@ export default function ArtworkDetail() {
               <div className="eyebrow">{artwork.visibility === 'private' ? (isOwner ? 'Private · My artwork Vault' : 'Private · Artist Vault') : 'Artwork detail'}</div>
               <div className="eyebrow">{(artwork.categories || []).join(' · ')}</div>
               <h1>{artwork.title}</h1>
-              {artwork.visibility !== 'private' && <div className="detail-like"><ArtworkLikeButton artworkId={artwork._id} initialCount={artwork.like_count} /></div>}
+              {artwork.reviewStatus === 'pending' && <p role="status">Pending review. This artwork is hidden from the gallery and exhibits until approved.</p>}
+              {artwork.reviewStatus === 'rejected' && <p role="status">Not approved. This artwork remains hidden; contact an administrator for details.</p>}
+              {artwork.visibility !== 'private' && !['pending', 'rejected'].includes(artwork.reviewStatus) && <div className="detail-like"><ArtworkLikeButton artworkId={artwork._id} initialCount={artwork.like_count} /></div>}
               {artwork.artist && (
                 <Link to={`/artists/${artwork.artist._id}`} className="detail-artist">
                   <span className="av">{(artwork.artist.name || '?').slice(0, 2).toUpperCase()}</span>
@@ -274,10 +263,10 @@ export default function ArtworkDetail() {
                   <div className="val">{exhibits.length ? exhibits.map((e) => e.name).join(', ') : 'Not currently featured'}</div>
                 </div>
               </div>
-              {artwork.has_ownership_evidence && ['admin', 'sub_admin', 'main_admin'].includes(user?.role) && <button type="button" className="btn btn-ghost ownership-proof-button" onClick={downloadOwnershipProof} disabled={proofLoading}>{proofLoading ? 'Loading proof…' : 'Download ownership proof'}</button>}
+              {['admin', 'sub_admin', 'main_admin'].includes(user?.role) && <button type="button" className="btn btn-ghost ownership-proof-button" onClick={() => setProofOpen(true)}>{artwork.has_ownership_evidence ? 'View ownership proof' : 'No proof on file'}</button>}
               {canManage && (
                 <div className="detail-actions">
-                  {isOwner && user.role !== 'sub_admin' && <button className="btn btn-primary" onClick={() => setPendingVisibility(artwork.visibility === 'private' ? 'public' : 'private')} disabled={changingVisibility}>{changingVisibility ? 'Saving…' : artwork.visibility === 'private' ? 'Make public' : 'Move to Vault'}</button>}
+                  {isOwner && user.role !== 'sub_admin' && !['pending', 'rejected'].includes(artwork.reviewStatus) && <button className="btn btn-primary" onClick={() => setPendingVisibility(artwork.visibility === 'private' ? 'public' : 'private')} disabled={changingVisibility}>{changingVisibility ? 'Saving…' : artwork.visibility === 'private' ? 'Make public' : 'Move to Vault'}</button>}
                   <button className="btn btn-ghost" onClick={() => setEditing(true)}>Edit details</button>
                   <button className="btn btn-danger" onClick={remove}>Remove artwork</button>
                 </div>
@@ -327,6 +316,7 @@ export default function ArtworkDetail() {
       </div>
       {!editing && relatedArtworks.length > 0 && <section className="related-artworks"><div className="section-kicker">More from this artist</div><h2>Continue exploring</h2><div className="gallery-grid related-gallery">{relatedArtworks.map((item) => <ArtCard key={item._id} artwork={item} />)}</div></section>}
       {lightboxOpen && lightboxImage && <div className="art-lightbox" role="dialog" aria-modal="true" aria-label={`${artwork.title} full view`} onClick={() => setLightboxOpen(false)}><button type="button" className="art-lightbox-close" aria-label="Close full view" onClick={() => setLightboxOpen(false)}>×</button><div className="art-lightbox-frame"><img src={lightboxImage} alt={artwork.title} onClick={(event) => event.stopPropagation()} />{lightboxLoading && <span className="art-lightbox-loading" role="status">Loading full resolution…</span>}</div></div>}
+      {proofOpen && <OwnershipProofModal artworkId={id} artworkTitle={artwork.title} onClose={() => setProofOpen(false)} />}
       {pendingDelete && <ConfirmDialog title="Are you sure you want to remove this artwork?" message={isOwner && user?.role === 'artist'
         ? `“${artwork.title}” will disappear from your artworks, the public gallery, and exhibits. You can restore it from Recently removed for 30 days; after that, only administrators can restore it.`
         : `“${artwork.title}” will disappear from the gallery and exhibits and move to administrator Archives.`} confirmLabel="Yes, remove artwork" danger onConfirm={confirmRemove} onCancel={() => setPendingDelete(false)} />}

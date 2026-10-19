@@ -10,7 +10,7 @@ import useAutoRefresh from '../hooks/useAutoRefresh';
 export default function MyArtworks() {
   const { user } = useAuth();
   const [artworks, setArtworks] = useState([]);
-  const [counts, setCounts] = useState({ public: 0, private: 0 });
+  const [counts, setCounts] = useState({ public: 0, private: 0, pending: 0, rejected: 0 });
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -22,7 +22,7 @@ export default function MyArtworks() {
     return api.get('/artworks/mine/portfolio', { params: { visibility: filter, page, limit: 24 } })
       .then(({ data }) => {
         setArtworks(data.artworks || []);
-        setCounts({ public: data.publicCount || 0, private: data.privateCount || 0 });
+        setCounts({ public: data.publicCount || 0, private: data.privateCount || 0, pending: data.pendingCount || 0, rejected: data.rejectedCount || 0 });
         setPages(Math.max(1, data.pages || 1));
         setError('');
       })
@@ -39,9 +39,11 @@ export default function MyArtworks() {
   }
 
   const filters = [
-    { value: 'all', label: 'All', count: counts.public + counts.private },
+    { value: 'all', label: 'All', count: counts.public + counts.private + counts.pending + counts.rejected },
     { value: 'public', label: 'Public', count: counts.public },
     { value: 'private', label: 'In my Vault', count: counts.private },
+    { value: 'pending', label: 'Pending review', count: counts.pending },
+    { value: 'rejected', label: 'Not approved', count: counts.rejected },
   ];
 
   return <section className="my-artworks-page">
@@ -66,7 +68,7 @@ export default function MyArtworks() {
         </div>
         <div className="my-artwork-info">
           <span className={`my-artwork-status${artwork.visibility === 'private' ? ' private' : ''}`}>
-            {artwork.visibility === 'private' ? 'In Vault' : 'Not in Vault'}
+            {artwork.reviewStatus === 'pending' ? 'Pending review' : artwork.reviewStatus === 'rejected' ? 'Not approved' : artwork.visibility === 'private' ? 'In Vault' : 'Not in Vault'}
           </span>
           <div className="collection-card-title-row"><h2 title={artwork.title}>{artwork.title}</h2><span className="collection-card-likes" aria-label={`${artwork.like_count || 0} likes`}>♡ {artwork.like_count || 0}</span></div>
           <ArtworkCardDetails artwork={artwork} fallbackArtist={user} />

@@ -97,6 +97,7 @@ export default function ResponsiveNav() {
         {isAdmin && <>
           <span className="responsive-menu-heading">Curation</span>
           <LinkItem to="/manage-gallery" icon="manageGallery">Manage gallery</LinkItem>
+          {hasAdminActivity && <LinkItem to="/pending-artworks" icon="status">Pending artworks</LinkItem>}
           {hasAdminActivity && <LinkItem to="/manage-vault" icon="vault">Artist Vaults</LinkItem>}
           <LinkItem to="/manage-exhibits" icon="manageExhibits">Manage exhibits</LinkItem>
           <LinkItem to="/manage-exhibit-entries" icon="entries">Exhibit entries</LinkItem>

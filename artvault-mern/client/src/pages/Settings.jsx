@@ -40,6 +40,7 @@ export default function Settings() {
   const [emailLikes, setEmailLikes] = useState(true);
   const [emailSubmissionStatus, setEmailSubmissionStatus] = useState(true);
   const [emailExhibits, setEmailExhibits] = useState(true);
+  const [emailArtworkRestored, setEmailArtworkRestored] = useState(true);
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailSaved, setEmailSaved] = useState(false);
 
@@ -54,6 +55,7 @@ export default function Settings() {
       setEmailLikes(user.emailLikes !== false);
       setEmailSubmissionStatus(user.emailSubmissionStatus !== false);
       setEmailExhibits(user.emailExhibits !== false);
+      setEmailArtworkRestored(user.emailArtworkRestored !== false);
     }
   }, [user]);
 
@@ -93,7 +95,7 @@ export default function Settings() {
   async function saveEmailPreferences() {
     setEmailSaving(true);
     try {
-      const res = await api.put('/artists/me', { emailLikes, emailSubmissionStatus, emailExhibits });
+      const res = await api.put('/artists/me', { emailLikes, emailSubmissionStatus, emailExhibits, emailArtworkRestored });
       updateUser(res.data.artist);
       setEmailSaved(true);
       showToast('Email notification preferences updated.');
@@ -282,6 +284,7 @@ export default function Settings() {
             <label className="checkbox-row"><input type="checkbox" checked={emailLikes} onChange={(e) => { setEmailLikes(e.target.checked); setEmailSaved(false); }} /> Artwork likes</label>
             <label className="checkbox-row"><input type="checkbox" checked={emailSubmissionStatus} onChange={(e) => { setEmailSubmissionStatus(e.target.checked); setEmailSaved(false); }} /> Exhibit submission decisions</label>
             <label className="checkbox-row"><input type="checkbox" checked={emailExhibits} onChange={(e) => { setEmailExhibits(e.target.checked); setEmailSaved(false); }} /> New exhibit opportunities</label>
+            <label className="checkbox-row"><input type="checkbox" checked={emailArtworkRestored} onChange={(e) => { setEmailArtworkRestored(e.target.checked); setEmailSaved(false); }} /> Restored artworks</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
               <button className="btn btn-primary" type="button" onClick={saveEmailPreferences} disabled={emailSaving}>
                 {emailSaving ? <span className="spinner" /> : null}

@@ -18,6 +18,8 @@ function notificationTitle(notification) {
   if (notification.type === 'like') return 'Someone loved your artwork';
   if (notification.type === 'submission_status') return notification.title || 'Your submission was updated';
   if (notification.type === 'exhibit') return notification.title === 'New exhibit opportunity' ? 'A new exhibit is calling' : notification.title || 'Exhibit update';
+  if (notification.type === 'artwork_restored') return notification.title || 'Your artwork was restored';
+    if (notification.type === 'artwork_review') return notification.title || 'Artwork review updated';
   return notification.title || 'ArtVault update';
 }
 
@@ -25,6 +27,8 @@ function notificationIcon(type) {
   if (type === 'like') return 'likes';
   if (type === 'submission_status') return 'status';
   if (type === 'exhibit') return 'exhibits';
+  if (type === 'artwork_restored') return 'photo';
+    if (type === 'artwork_review') return 'status';
   return 'bell';
 }
 
@@ -32,6 +36,8 @@ function notificationTypeLabel(type) {
   if (type === 'like') return 'Like';
   if (type === 'submission_status') return 'Submission';
   if (type === 'exhibit') return 'Exhibit';
+  if (type === 'artwork_restored') return 'Restored';
+    if (type === 'artwork_review') return 'Artwork review';
   return 'Update';
 }
 

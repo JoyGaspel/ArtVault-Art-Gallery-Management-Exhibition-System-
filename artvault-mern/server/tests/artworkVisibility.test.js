@@ -29,10 +29,10 @@ test('owner and administrator reviewers can see private artwork', () => {
 
 test('public query excludes private works and keeps legacy documents', () => {
   const filter = publicArtworkFilter();
-  assert.deepEqual(JSON.parse(JSON.stringify(filter)), { visibility: { $ne: 'private' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(filter)), { visibility: { $ne: 'private' }, reviewStatus: { $nin: ['pending', 'rejected'] } });
   const query = Artwork.find(filter);
   query._castConditions();
-  assert.deepEqual(JSON.parse(JSON.stringify(query.getFilter())), { visibility: { $ne: 'private' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(query.getFilter())), { visibility: { $ne: 'private' }, reviewStatus: { $nin: ['pending', 'rejected'] } });
 });
 
 test('detail and media routes check access before serving content', () => {
@@ -144,6 +144,6 @@ test('sub-admin Vault review lists all private artworks, not only their own', as
     set() {},
     json(data) { response = data; },
   }, (error) => { throw error; });
-  assert.deepEqual(filter, { visibility: 'private' });
+  assert.deepEqual(JSON.parse(JSON.stringify(filter)), { visibility: 'private', reviewStatus: { $nin: ['pending', 'rejected'] } });
   assert.deepEqual(response.artworks, []);
 });

@@ -29,6 +29,7 @@ export default function RemovedArtworks() {
     try {
       await api.post(`/archives/mine/artworks/${archiveId}/restore`);
       setArtworks((current) => current.filter((item) => item.archiveId !== archiveId));
+      window.dispatchEvent(new Event('artvault:notifications-changed'));
       toast('Artwork restored to your original Public or Vault location.');
       load({ silent: true });
     } catch (err) {
@@ -41,7 +42,7 @@ export default function RemovedArtworks() {
     <div className="page-head collection-page-head"><div>
       <div className="eyebrow">MY STUDIO · RECOVERY</div>
       <h1>Recently removed artworks</h1>
-      <div className="sub">Restore an artwork within 30 days of removing it. After that, only administrators can review it in Archives. Restoring keeps its original Public or Vault setting; previous exhibit placements and likes do not return.</div>
+      <div className="sub">Changed your mind? Restore a removed artwork here within 30 days. It will return to its original Public or Vault setting. Previous exhibit placements and likes will not return.</div>
     </div><Link className="btn btn-ghost" to="/my-artworks">My artworks</Link></div>
 
     {loading ? <PageLoadState loading label="removed artworks" />

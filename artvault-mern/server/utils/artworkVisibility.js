@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 
 function isPrivateArtwork(artwork) {
-  return artwork?.visibility === 'private';
+  return artwork?.visibility === 'private' || ['pending', 'rejected'].includes(artwork?.reviewStatus);
 }
 
 function publicArtworkFilter() {
   // Legacy artwork documents have no visibility field and must stay public.
-  return { visibility: mongoose.trusted({ $ne: 'private' }) };
+  return { visibility: mongoose.trusted({ $ne: 'private' }), reviewStatus: mongoose.trusted({ $nin: ['pending', 'rejected'] }) };
 }
 
 function canViewArtwork(artwork, user) {

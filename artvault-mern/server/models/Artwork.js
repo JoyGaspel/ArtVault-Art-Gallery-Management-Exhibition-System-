@@ -11,6 +11,11 @@ const artworkSchema = new mongoose.Schema(
     artist: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', required: true },
     // Existing documents without this field remain public for compatibility.
     visibility: { type: String, enum: ['public', 'private'], default: 'public', index: true },
+    reviewStatus: { type: String, enum: ['pending', 'rejected', 'clear'], default: 'clear', index: true },
+    reviewReason: { type: String, enum: ['', 'possible_match', 'check_unavailable'], default: '' },
+    webMatchUrls: { type: [String], select: false, default: [] },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Artist', default: null },
     ownershipDeclared: { type: Boolean, default: false },
     ownershipDeclaredAt: { type: Date, default: null },
     categories: { type: [String], default: [] },

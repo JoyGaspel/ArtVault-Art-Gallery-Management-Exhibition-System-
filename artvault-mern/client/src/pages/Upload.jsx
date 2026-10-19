@@ -29,6 +29,7 @@ export default function Upload() {
   const [visibility, setVisibility] = useState('');
   const [ownershipDeclared, setOwnershipDeclared] = useState(false);
   const [image, setImage] = useState(null);
+  const [imageError, setImageError] = useState('');
   const [ownershipEvidence, setOwnershipEvidence] = useState(null);
   const [proofError, setProofError] = useState('');
   const [preview, setPreview] = useState('');
@@ -46,12 +47,13 @@ export default function Upload() {
 
   function handleImageChange(event) {
     const file = event.target.files?.[0];
-    if (!file) { setImage(null); setPreview(''); return; }
+    if (!file) { setImage(null); setPreview(''); setImageError('An artwork image is required.'); return; }
     const extensionLooksValid = /\.(png|jpe?g|jpe|webp|gif)$/i.test(file.name);
     if ((file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) || !extensionLooksValid) {
       if (preview) URL.revokeObjectURL(preview);
       setImage(null);
       setPreview('');
+      setImageError('Choose a PNG, JPG/JPEG/JPE, WebP, or GIF image.');
       showToast('Only PNG, JPG/JPEG/JPE, WebP, or GIF images are allowed.', true);
       event.target.value = '';
       return;
@@ -60,6 +62,7 @@ export default function Upload() {
       if (preview) URL.revokeObjectURL(preview);
       setImage(null);
       setPreview('');
+      setImageError('Choose an image no larger than 10 MB.');
       showToast('Image must be 10 MB or smaller.', true);
       event.target.value = '';
       return;
@@ -68,12 +71,14 @@ export default function Upload() {
       if (preview) URL.revokeObjectURL(preview);
       setImage(null);
       setPreview('');
+      setImageError('The selected image is empty. Choose another file.');
       showToast('The selected image is empty. Choose another file.', true);
       event.target.value = '';
       return;
     }
     if (preview) URL.revokeObjectURL(preview);
     setImage(file);
+    setImageError('');
     setPreview(URL.createObjectURL(file));
   }
 
@@ -81,6 +86,7 @@ export default function Upload() {
     if (preview) URL.revokeObjectURL(preview);
     setImage(null);
     setPreview('');
+    setImageError('An artwork image is required.');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -100,6 +106,13 @@ export default function Upload() {
 
   async function publish() {
     if (saving) return;
+    if (!image) {
+      setImageError('Upload an artwork image before saving.');
+      showToast('Upload an artwork image before saving.', true);
+      fileInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      fileInputRef.current?.focus();
+      return;
+    }
     if (!title.trim()) {
       setTitleErr(true);
       showToast('Give this artwork a title before saving.', true);
@@ -135,17 +148,14 @@ export default function Upload() {
       showToast(materialsIssue, true);
       return;
     }
-    if (image && ((image.type && !ALLOWED_IMAGE_TYPES.includes(image.type)) || image.size > MAX_IMAGE_BYTES || !image.size)) {
+    if ((image.type && !ALLOWED_IMAGE_TYPES.includes(image.type)) || image.size > MAX_IMAGE_BYTES || !image.size) {
       showToast('Choose a valid image up to 10 MB.', true);
       return;
     }
     setSaving(true);
     try {
-      let image_path = '';
-      if (image) {
-        image_path = await fileToDataUrl(image);
-      }
-      const thumbnail_path = image ? await createGalleryThumbnail(image) : '';
+      const image_path = await fileToDataUrl(image);
+      const thumbnail_path = await createGalleryThumbnail(image);
       const ownership_evidence_path = await createGalleryThumbnail(ownershipEvidence, 1000);
       const cleanTitle = title.trim().replace(/\s+/g, ' ');
       const cleanDescription = description.trim().replace(/\s+/g, ' ');
@@ -160,8 +170,9 @@ export default function Upload() {
         visibility,
         ownershipDeclared,
       });
-      showToast(visibility === 'private' ? `"${res.data.artwork.title}" saved to your Vault.` : `"${res.data.artwork.title}" published to the gallery.`);
-      navigate(visibility === 'private' ? '/vault' : `/artworks/${res.data.artwork._id}`);
+      const pending = res.data.artwork.reviewStatus === 'pending';
+      showToast(pending ? `"${res.data.artwork.title}" is pending review before it appears in your chosen destination.` : visibility === 'private' ? `"${res.data.artwork.title}" saved to your Vault.` : `"${res.data.artwork.title}" published to the gallery.`);
+      navigate(pending ? '/my-artworks' : visibility === 'private' ? '/vault' : `/artworks/${res.data.artwork._id}`);
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Could not publish this artwork.', true);
     } finally {
@@ -181,9 +192,10 @@ export default function Upload() {
 
       <div className="form-card upload-form-card">
         <div className="field">
-          <label htmlFor="artwork-image">Artwork image <span className="optional-mark">(optional)</span></label>
-          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} />
-          <div className="hint">PNG, JPG/JPEG/JPE, WebP, or GIF only. Maximum 10 MB.</div>
+          <label htmlFor="artwork-image">Artwork image <span className="required-mark" aria-hidden="true">*</span></label>
+          <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} required aria-required="true" aria-invalid={Boolean(imageError)} aria-describedby="artwork-image-help" />
+          <div className="hint" id="artwork-image-help">PNG, JPG/JPEG/JPE, WebP, or GIF only. Maximum 10 MB.</div>
+          {imageError && <div className="required-feedback" role="alert">{imageError}</div>}
           {preview && (
             <div className="upload-preview-wrap">
               <img className="upload-preview" src={preview} alt="Artwork preview" />

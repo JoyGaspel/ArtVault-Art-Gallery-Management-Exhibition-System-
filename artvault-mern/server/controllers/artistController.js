@@ -173,13 +173,14 @@ async function getArtist(req, res, next) {
 async function updateMyProfile(req, res, next) {
   try {
     if (req.user.role !== 'artist') return res.status(403).json({ message: 'Administrator profiles cannot be edited here.' });
-    const { name, firstName, lastName, bio, specializations, avatar_path, emailLikes, emailSubmissionStatus, emailExhibits } = req.body;
+    const { name, firstName, lastName, bio, specializations, avatar_path, emailLikes, emailSubmissionStatus, emailExhibits, emailArtworkRestored } = req.body;
     const artist = req.user;
     const previous = {
       name: artist.name, firstName: artist.firstName, lastName: artist.lastName,
       bio: artist.bio, specializations: JSON.stringify(artist.specializations || []),
       avatar_path: artist.avatar_path, emailLikes: artist.emailLikes,
       emailSubmissionStatus: artist.emailSubmissionStatus, emailExhibits: artist.emailExhibits,
+      emailArtworkRestored: artist.emailArtworkRestored,
     };
 
     if (firstName !== undefined || lastName !== undefined) {
@@ -207,8 +208,9 @@ async function updateMyProfile(req, res, next) {
     if (emailLikes !== undefined) artist.emailLikes = emailLikes === true;
     if (emailSubmissionStatus !== undefined) artist.emailSubmissionStatus = emailSubmissionStatus === true;
     if (emailExhibits !== undefined) artist.emailExhibits = emailExhibits === true;
+    if (emailArtworkRestored !== undefined) artist.emailArtworkRestored = emailArtworkRestored === true;
 
-    const changedFields = ['name', 'firstName', 'lastName', 'bio', 'emailLikes', 'emailSubmissionStatus', 'emailExhibits']
+    const changedFields = ['name', 'firstName', 'lastName', 'bio', 'emailLikes', 'emailSubmissionStatus', 'emailExhibits', 'emailArtworkRestored']
       .filter((field) => previous[field] !== artist[field]);
     if (previous.specializations !== JSON.stringify(artist.specializations || [])) changedFields.push('specializations');
     if (previous.avatar_path !== artist.avatar_path) changedFields.push('profile_picture');

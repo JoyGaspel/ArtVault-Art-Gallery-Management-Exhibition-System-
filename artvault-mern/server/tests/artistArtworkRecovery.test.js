@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const Archive = require('../models/Archive');
 const { archiveOnce } = require('../services/archiveService');
 const { RECOVERY_DAYS, artistRecoveryDeadline, isArtistRecoverable } = require('../services/artistArtworkRecovery');
-const { restoreMyRemovedArtwork } = require('../controllers/archiveController');
+const { listArchives, listMyRemovedArtworks, restoreMyRemovedArtwork } = require('../controllers/archiveController');
 
 test('artist artwork recovery ends after exactly 30 days', () => {
   const removedAt = new Date('2026-10-19T00:00:00.000Z');
@@ -40,4 +40,29 @@ test('an artist cannot restore another artist’s removed artwork', async (t) =>
   const response = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
   await restoreMyRemovedArtwork({ user: { _id: artistId }, params: { id: String(archiveId) } }, response, (error) => { throw error; });
   assert.equal(response.code, 404);
+});
+
+test('artist recovery list keeps its server-created date filter under query sanitization', async (t) => {
+  const artistId = new mongoose.Types.ObjectId();
+  t.mock.method(Archive, 'find', (filter) => {
+    const safeFilter = mongoose.sanitizeFilter(filter);
+    assert.ok(safeFilter.artistRecoverUntil.$gt instanceof Date);
+    assert.equal(safeFilter.artistRecoverUntil.$eq, undefined);
+    return { select() { return this; }, sort() { return this; }, async lean() { return []; } };
+  });
+  const response = { set() {}, json(body) { this.body = body; } };
+  await listMyRemovedArtworks({ user: { _id: artistId } }, response, (error) => { throw error; });
+  assert.deepEqual(response.body.artworks, []);
+});
+
+test('admin archive list keeps the 30-day cutoff under query sanitization', async (t) => {
+  t.mock.method(Archive, 'find', (filter) => {
+    const safeFilter = mongoose.sanitizeFilter(filter);
+    assert.ok(safeFilter.$or[1].artistRecoverUntil.$lte instanceof Date);
+    assert.equal(safeFilter.$or[1].artistRecoverUntil.$eq, undefined);
+    return { select() { return this; }, sort() { return this; }, populate() { return this; }, async lean() { return []; } };
+  });
+  const response = { set() {}, json(body) { this.body = body; } };
+  await listArchives({ user: { role: 'main_admin' } }, response, (error) => { throw error; });
+  assert.deepEqual(response.body.archives, []);
 });

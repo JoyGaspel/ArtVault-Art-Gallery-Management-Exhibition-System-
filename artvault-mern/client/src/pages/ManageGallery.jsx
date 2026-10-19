@@ -7,6 +7,7 @@ import useAutoRefresh from '../hooks/useAutoRefresh';
 import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing';
 import PageLoadState from '../components/PageLoadState';
 import { materialError } from '../utils/materialValidation';
+import { useAuth } from '../context/AuthContext';
 
 const categories = [
   'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
@@ -31,7 +32,9 @@ function ModerationThumbnail({ artwork }) {
 
 export default function ManageGallery() {
   const showToast = useToast();
+  const { user } = useAuth();
   const [artworks, setArtworks] = useState([]);
+  const [summary, setSummary] = useState({ publicCount: 0, vaultCount: 0, contributingArtistCount: 0 });
   const [params] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,8 +50,8 @@ export default function ManageGallery() {
   function load({ silent = false } = {}) {
     if (!silent) setLoading(true);
     if (!silent) setError('');
-    api.get('/artworks', { params: { limit: 100 } })
-      .then((response) => { setArtworks(response.data.artworks || []); setError(''); })
+    Promise.all([api.get('/artworks', { params: { limit: 100 } }), api.get('/artworks/admin/summary')])
+      .then(([response, counts]) => { setArtworks(response.data.artworks || []); setSummary(counts.data); setError(''); })
       .catch((error) => { const message = error.response?.data?.message || 'Could not load gallery moderation.'; if (!silent) { setError(message); showToast(message, true); } })
       .finally(() => { if (!silent) setLoading(false); });
   }
@@ -166,14 +169,16 @@ export default function ManageGallery() {
         <div>
           <div className="eyebrow">Admin moderation</div>
           <h1>Manage gallery</h1>
-          <div className="sub">Review every published artwork and correct or remove content quickly.</div>
+          <div className="sub">Review published artworks and see how many artists are keeping works in their Vaults.</div>
         </div>
       </div>
 
-      <div className="stat-row">
-        <div className="stat-box"><div className="num">{artworks.length}</div><div className="lbl">Published artworks</div></div>
-        <div className="stat-box"><div className="num">{new Set(artworks.map((artwork) => artwork.artist?._id).filter(Boolean)).size}</div><div className="lbl">Contributing artists</div></div>
-        <div className="stat-box"><div className="num">{visible.length}</div><div className="lbl">Current review results</div></div>
+      <div className="stat-row manage-gallery-stats">
+        <div className="stat-box"><div className="num">{summary.publicCount}</div><div className="lbl">Public gallery</div></div>
+        <div className="stat-box"><div className="num">{summary.vaultCount}</div><div className="lbl">In artist Vaults</div></div>
+        {user?.role !== 'admin' && <Link className="stat-box" to="/pending-artworks" aria-label={`Review ${summary.pendingCount || 0} pending artworks`}><div className="num">{summary.pendingCount || 0}</div><div className="lbl">Pending review →</div></Link>}
+        <div className="stat-box"><div className="num">{summary.contributingArtistCount}</div><div className="lbl">Contributing artists</div></div>
+        <div className="stat-box"><div className="num">{visible.length}</div><div className="lbl">Shown in review</div></div>
       </div>
 
       <div className="moderation-toolbar">

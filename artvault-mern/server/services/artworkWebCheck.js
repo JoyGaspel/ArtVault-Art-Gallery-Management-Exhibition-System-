@@ -2,7 +2,7 @@ const sharp = require('sharp');
 
 // A web match is a review signal, never a finding that an artist copied work.
 async function checkArtworkOnWeb(imageDataUrl) {
-  if (process.env.ARTWORK_WEB_CHECK_ENABLED !== 'true') return { status: 'disabled', urls: [] };
+  if (process.env.ARTWORK_WEB_CHECK_ENABLED === 'false') return { status: 'disabled', urls: [] };
   const key = process.env.GOOGLE_VISION_API_KEY;
   if (!key) return { status: 'unavailable', urls: [] };
   try {
@@ -17,7 +17,7 @@ async function checkArtworkOnWeb(imageDataUrl) {
     if (!response.ok) return { status: 'unavailable', urls: [] };
     const data = await response.json();
     const result = data.responses?.[0];
-    if (!result || result.error) return { status: 'unavailable', urls: [] };
+    if (!result || result.error || !result.webDetection || typeof result.webDetection !== 'object') return { status: 'unavailable', urls: [] };
     const matches = [...(result.webDetection?.fullMatchingImages || []), ...(result.webDetection?.partialMatchingImages || [])];
     const urls = [...new Set(matches.map((match) => match.url).filter((url) => {
       try { return new URL(url).protocol === 'https:'; } catch { return false; }

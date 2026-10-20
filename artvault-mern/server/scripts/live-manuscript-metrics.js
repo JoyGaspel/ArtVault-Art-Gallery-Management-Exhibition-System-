@@ -21,7 +21,7 @@ async function main() {
   const counts = Object.fromEntries(await Promise.all(Object.entries(collections)
     .map(async ([key, name]) => [key, await db.collection(name).countDocuments()])));
   const [artists, artworks, exhibits, likes, entries, notifications, auditLogs] = await Promise.all([
-    db.collection(collections.artists).find({}, { projection: { role: 1, status: 1 } }).toArray(),
+    db.collection(collections.artists).find({}, { projection: { role: 1, status: 1, specializations: 1 } }).toArray(),
     db.collection(collections.artworks).find({}, { projection: { visibility: 1, categories: 1, created_at: 1 } }).toArray(),
     db.collection(collections.exhibits).find({}, { projection: { artworks: 1 } }).toArray(),
     db.collection(collections.likes).find({}, { projection: { artwork: 1 } }).toArray(),
@@ -40,6 +40,7 @@ async function main() {
     counts,
     artistsByRole: tally(artists.map((item) => item.role)),
     artistsByStatus: tally(artists.map((item) => item.status)),
+    artistSpecializations: tally(artists.flatMap((item) => [...new Set(item.specializations || [])])),
     artworkVisibility: tally(artworks.map((item) => item.visibility || 'public')),
     artworkCategories: tally(artworks.flatMap((item) => [...new Set(item.categories || [])])),
     artworksByMonth: tally(artworks.map((item) => month(item.created_at))),

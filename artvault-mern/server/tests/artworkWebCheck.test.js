@@ -7,9 +7,9 @@ const sharp = require('sharp');
 
 const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/fN8AAAAASUVORK5CYII=';
 
-test('unconfigured checker is explicit and does not claim to have scanned', async () => {
+test('explicitly disabled checker does not claim to have scanned', async () => {
   const original = process.env.ARTWORK_WEB_CHECK_ENABLED;
-  delete process.env.ARTWORK_WEB_CHECK_ENABLED;
+  process.env.ARTWORK_WEB_CHECK_ENABLED = 'false';
   try { assert.deepEqual(await checkArtworkOnWeb(image), { status: 'disabled', urls: [] }); }
   finally { if (original === undefined) delete process.env.ARTWORK_WEB_CHECK_ENABLED; else process.env.ARTWORK_WEB_CHECK_ENABLED = original; }
 });

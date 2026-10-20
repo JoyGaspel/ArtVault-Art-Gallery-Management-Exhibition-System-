@@ -44,6 +44,8 @@ export default function ManageGallery() {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [image, setImage] = useState(null);
+  const [proof, setProof] = useState(null);
+  const [ownershipDeclared, setOwnershipDeclared] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
   const imageInputRef = useRef(null);
 
@@ -70,6 +72,8 @@ export default function ManageGallery() {
   function openEdit(artwork) {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setEditing(artwork);
+    setProof(null);
+    setOwnershipDeclared(false);
     setImage(null);
     setImagePreview(`${(api.defaults.baseURL || '/api').replace(/\/$/, '')}/artworks/${artwork._id}/image`);
     setForm({
@@ -116,6 +120,10 @@ export default function ManageGallery() {
   }
 
   async function save() {
+    if (image && (!proof || !ownershipDeclared)) {
+      showToast('Add ownership proof and confirm ownership or permission for the replacement image.', true);
+      return;
+    }
     if (!form.title.trim()) {
       showToast('Artwork title is required.', true);
       return;
@@ -132,10 +140,11 @@ export default function ManageGallery() {
       };
       if (image) {
         payload.image_path = await fileToDataUrl(image);
-        payload.thumbnail_path = await createGalleryThumbnail(image);
+        payload.ownership_evidence_path = await createGalleryThumbnail(proof, 1000);
+        payload.ownershipDeclared = ownershipDeclared;
       }
-      const response = await api.put(`/artworks/${editing._id}`, payload);
-      showToast(`"${form.title}" updated.`);
+      const response = await api.put(`/artworks/${editing._id}`, payload, { timeout: 90000 });
+      showToast(response.data.artwork.reviewStatus === 'pending' ? `"${form.title}" updated and awaiting review.` : `"${form.title}" updated.`);
       setEditing(null);
       setArtworks((current) => current.map((item) => item._id === editing._id ? { ...item, ...response.data.artwork } : item));
       if (imagePreview) URL.revokeObjectURL(imagePreview);
@@ -221,6 +230,19 @@ export default function ManageGallery() {
             <div className="field"><label>Title <span className="required-mark" aria-hidden="true">*</span></label><input maxLength={50} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></div>
             <div className="field"><label>Description <span className="optional-mark">(optional)</span></label><textarea maxLength={1000} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /><div className="hint">{form.description.length}/1000 characters</div></div>
             <div className="field"><label htmlFor="moderation-artwork-image">Artwork image <span className="optional-mark">(optional)</span></label><input ref={imageInputRef} className="file-input" id="moderation-artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} /><div className="hint">Choose a replacement image. PNG, JPG/JPEG/JPE, WebP, or GIF up to 10 MB.</div>{imagePreview && <div className="moderation-edit-preview"><img src={imagePreview} alt="Artwork preview" /><button type="button" className="upload-preview-remove" onClick={clearImageSelection} aria-label="Clear replacement image">×</button></div>}</div>
+            {image && <div className="field">
+              <label htmlFor="replacement-proof">Ownership proof for replacement image (required)</label>
+              <input id="replacement-proof" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif" onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) { setProof(null); return; }
+                if (!/\.(png|jpe?g|jpe|webp|gif)$/i.test(file.name) || !file.size || file.size > 5 * 1024 * 1024) {
+                  setProof(null); event.target.value = ''; showToast('Choose a proof image up to 5 MB.', true); return;
+                }
+                setProof(file);
+              }} />
+              <div className="hint">Show creation progress or permission. Sexual-content screening runs locally. When configured, Gemini receives artwork and proof for ownership assessment and Google Cloud Vision receives artwork for online matching.</div>
+              <label><input type="checkbox" checked={ownershipDeclared} onChange={(event) => setOwnershipDeclared(event.target.checked)} /> I confirm the artist created this work or has permission to display it.</label>
+            </div>}
             <div className="field">
               <label>Categories <span className="optional-mark">(optional)</span></label>
               <div className="chip-select">{categories.map((item) => <button key={item} type="button" className={`chip-toggle${form.categories.includes(item) ? ' on' : ''}`} onClick={() => toggleCategory(item)}>{item}</button>)}</div>

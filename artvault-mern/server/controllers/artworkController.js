@@ -9,7 +9,8 @@ const mongoose = require('mongoose');
 const { recordAudit } = require('../utils/audit');
 const { requireAuth } = require('../middleware/auth');
 const { isPrivateArtwork, publicArtworkFilter, canViewArtwork } = require('../utils/artworkVisibility');
-const { checkArtworkOnWeb } = require('../services/artworkWebCheck');
+const { checkArtworkOwnership, createArtworkThumbnail } = require('../services/artworkOwnershipCheck');
+const { requireSafeArtworkImages } = require('../services/artworkContentCheck');
 const knownMaterialTerms = new Set(require('../data/materialTerms.json'));
 
 const ALLOWED_IMAGE_TYPES = new Map([
@@ -114,7 +115,7 @@ async function getAdminArtworkSummary(req, res, next) {
 async function listPendingArtworkReviews(req, res, next) {
   try {
     const rows = await Artwork.find({ reviewStatus: 'pending' })
-      .select('title artist visibility reviewStatus reviewReason thumbnail_path image_path ownershipDeclared created_at +webMatchUrls')
+      .select('title artist visibility reviewStatus reviewReason thumbnail_path image_path ownershipDeclared created_at updated_at +webMatchUrls')
       .populate('artist', 'name email')
       .sort({ created_at: -1 }).limit(100).lean();
     res.set('Cache-Control', 'private, no-store');
@@ -131,8 +132,14 @@ async function reviewArtwork(req, res, next) {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Artwork not found.' });
     if (!['approve', 'reject'].includes(req.body?.decision)) return res.status(400).json({ message: 'Choose approve or reject.' });
     const approved = req.body.decision === 'approve';
+    if (approved && req.body.ownershipVerified !== true) return res.status(400).json({ message: 'Review the ownership proof and online sources, then confirm that ownership or permission has been verified.' });
+    const candidate = await Artwork.findById(req.params.id).select('artist ownershipDeclared updated_at +ownership_evidence_path').lean();
+    if (!candidate) return res.status(404).json({ message: 'Artwork not found.' });
+    if (approved && (!candidate.ownershipDeclared || !candidate.ownership_evidence_path)) return res.status(409).json({ message: 'Ownership declaration and private evidence are required before approval.' });
+    if (approved && String(candidate.artist) === String(req.user._id)) return res.status(403).json({ message: 'You cannot approve your own artwork.' });
+    if (!req.body.expectedUpdatedAt || new Date(req.body.expectedUpdatedAt).getTime() !== new Date(candidate.updated_at).getTime()) return res.status(409).json({ message: 'This artwork changed. Refresh and review the latest submission.' });
     const artwork = await Artwork.findOneAndUpdate(
-      { _id: req.params.id, reviewStatus: 'pending' },
+      { _id: req.params.id, reviewStatus: 'pending', updated_at: candidate.updated_at },
       { $set: { reviewStatus: approved ? 'clear' : 'rejected', ...(approved ? { reviewReason: '' } : {}), reviewedAt: new Date(), reviewedBy: req.user._id } },
       { new: true, runValidators: true }
     ).select('title artist visibility reviewStatus').lean();
@@ -379,21 +386,24 @@ async function createArtwork(req, res, next) {
     if (!image_path) return res.status(400).json({ message: 'Upload an artwork image before saving.' });
 
     const validatedImage = validateImageData(image_path);
-    const check = await checkArtworkOnWeb(validatedImage);
-    const reviewStatus = ['possible_match', 'unavailable'].includes(check.status) ? 'pending' : 'clear';
+    const validatedEvidence = validateImageData(ownership_evidence_path, 2 * 1024 * 1024);
+    await requireSafeArtworkImages([validatedImage, validatedEvidence]);
+    const validatedThumbnail = await createArtworkThumbnail(validatedImage);
+    const check = await checkArtworkOwnership(validatedImage, validatedEvidence, ownershipDeclared);
+    const reviewStatus = check.reviewStatus;
     const artwork = await Artwork.create({
       title: cleanTitle,
       description: cleanDescription,
       image_path: validatedImage,
-      thumbnail_path: thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '',
-      ownership_evidence_path: validateImageData(ownership_evidence_path, 2 * 1024 * 1024),
+      thumbnail_path: validatedThumbnail,
+      ownership_evidence_path: validatedEvidence,
       categories: cleanList(categories, MAX_CATEGORIES, 40),
       materials: cleanList(materials, MAX_MATERIALS, 80),
       artist: req.user._id,
       visibility,
       reviewStatus,
-      reviewReason: reviewStatus === 'pending' ? (check.status === 'possible_match' ? 'possible_match' : 'check_unavailable') : '',
-      webMatchUrls: check.urls,
+      reviewReason: check.reviewReason,
+      webMatchUrls: check.web.urls,
       ownershipDeclared: true,
       ownershipDeclaredAt: new Date(),
     });
@@ -401,7 +411,7 @@ async function createArtwork(req, res, next) {
 
     const safeArtwork = artwork.toObject();
     delete safeArtwork.ownership_evidence_path;
-    res.status(201).json({ artwork: safeArtwork, webCheckStatus: check.status });
+    res.status(201).json({ artwork: safeArtwork, webCheckStatus: check.web.status });
   } catch (err) {
     next(err);
   }
@@ -520,7 +530,13 @@ async function setArtworkVisibility(req, res, next) {
 async function updateArtwork(req, res, next) {
   try {
     const artwork = req.artwork;
-    const { title, description, image_path, thumbnail_path, categories, materials } = req.body;
+    const { title, description, image_path, thumbnail_path, ownership_evidence_path, ownershipDeclared, categories, materials } = req.body;
+    const replacingImage = image_path !== undefined;
+    const replacingProof = ownership_evidence_path !== undefined;
+    if (replacingImage || replacingProof) {
+      if (ownershipDeclared !== true) return res.status(400).json({ message: 'Confirm ownership or permission again when replacing artwork or proof.' });
+      if (!ownership_evidence_path) return res.status(400).json({ message: 'Upload ownership proof for this artwork before submitting the replacement.' });
+    }
     if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
       return res.status(400).json({ message: 'Artwork title cannot be empty.' });
     }
@@ -528,25 +544,36 @@ async function updateArtwork(req, res, next) {
     if (description !== undefined && typeof description !== 'string') return res.status(400).json({ message: 'Description must be text.' });
     if (typeof description === 'string' && description.trim().length > 1000) return res.status(400).json({ message: 'Description must be 1,000 characters or fewer.' });
     if (categories !== undefined || materials !== undefined) validateArtworkLists(categories ?? artwork.categories, materials);
+    const replacementImage = image_path ? validateImageData(image_path) : '';
+    const replacementProof = replacingProof ? validateImageData(ownership_evidence_path, 2 * 1024 * 1024) : '';
+    if (replacingImage && !replacementImage) return res.status(400).json({ message: 'Artwork image cannot be empty.' });
+    await requireSafeArtworkImages([replacementImage, replacementProof].filter(Boolean));
     if (title !== undefined) artwork.title = cleanText(title, 50);
     if (description !== undefined) artwork.description = cleanText(description, 1000);
-    if (image_path !== undefined) {
-      if (!image_path) return res.status(400).json({ message: 'Artwork image cannot be empty.' });
-      artwork.image_path = validateImageData(image_path);
-      const check = await checkArtworkOnWeb(artwork.image_path);
-      artwork.reviewStatus = ['possible_match', 'unavailable'].includes(check.status) || (check.status === 'disabled' && ['pending', 'rejected'].includes(artwork.reviewStatus)) ? 'pending' : 'clear';
-      artwork.reviewReason = artwork.reviewStatus === 'pending' ? (check.status === 'possible_match' ? 'possible_match' : 'check_unavailable') : '';
-      artwork.webMatchUrls = check.urls;
+    if (replacingImage || replacingProof) {
+      if (replacingImage) {
+        artwork.image_path = replacementImage;
+      }
+      const check = await checkArtworkOwnership(artwork.image_path, replacementProof, ownershipDeclared);
+      artwork.reviewStatus = check.reviewStatus;
+      artwork.reviewReason = check.reviewReason;
+      artwork.webMatchUrls = check.web.urls;
+      artwork.ownership_evidence_path = replacementProof;
+      artwork.ownershipDeclared = true;
+      artwork.ownershipDeclaredAt = new Date();
       artwork.reviewedAt = null;
       artwork.reviewedBy = null;
     }
-    if (thumbnail_path !== undefined) artwork.thumbnail_path = thumbnail_path ? validateImageData(thumbnail_path, 2 * 1024 * 1024) : '';
+    if (replacingImage || thumbnail_path !== undefined) artwork.thumbnail_path = await createArtworkThumbnail(artwork.image_path);
     if (categories !== undefined) artwork.categories = cleanList(categories, MAX_CATEGORIES, 40);
     if (materials !== undefined) artwork.materials = cleanList(materials, MAX_MATERIALS, 80);
 
     await artwork.save();
     recordAudit({ req, action: 'update', entityType: 'artwork', entityId: artwork._id, details: isPrivateArtwork(artwork) ? { visibility: 'private' } : { title: artwork.title } });
-    res.json({ artwork });
+    const safeArtwork = artwork.toObject();
+    delete safeArtwork.ownership_evidence_path;
+    delete safeArtwork.webMatchUrls;
+    res.json({ artwork: safeArtwork });
   } catch (err) {
     next(err);
   }

@@ -155,7 +155,6 @@ export default function Upload() {
     setSaving(true);
     try {
       const image_path = await fileToDataUrl(image);
-      const thumbnail_path = await createGalleryThumbnail(image);
       const ownership_evidence_path = await createGalleryThumbnail(ownershipEvidence, 1000);
       const cleanTitle = title.trim().replace(/\s+/g, ' ');
       const cleanDescription = description.trim().replace(/\s+/g, ' ');
@@ -163,13 +162,12 @@ export default function Upload() {
         title: cleanTitle,
         description: cleanDescription,
         image_path,
-        thumbnail_path,
         ownership_evidence_path,
         materials: materialList,
         categories,
         visibility,
         ownershipDeclared,
-      });
+      }, { timeout: 90000 });
       const pending = res.data.artwork.reviewStatus === 'pending';
       showToast(pending ? `"${res.data.artwork.title}" is pending review before it appears in your chosen destination.` : visibility === 'private' ? `"${res.data.artwork.title}" saved to your Vault.` : `"${res.data.artwork.title}" published to the gallery.`);
       navigate(pending ? '/my-artworks' : visibility === 'private' ? '/vault' : `/artworks/${res.data.artwork._id}`);
@@ -186,7 +184,7 @@ export default function Upload() {
         <div>
           <div className="eyebrow">ARTIST STUDIO · NEW WORK</div>
           <h1>Upload an artwork</h1>
-          <div className="sub">Add a new piece to your portfolio, then choose whether to publish it or keep it in your Vault.</div>
+          <div className="sub">Submit your original artwork or work you have permission to display. Safe artwork with credible creation proof and no online matches goes straight to your chosen gallery or Vault. Uncertain submissions wait for review.</div>
         </div>
       </div>
 
@@ -194,7 +192,7 @@ export default function Upload() {
         <div className="field">
           <label htmlFor="artwork-image">Artwork image <span className="required-mark" aria-hidden="true">*</span></label>
           <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} required aria-required="true" aria-invalid={Boolean(imageError)} aria-describedby="artwork-image-help" />
-          <div className="hint" id="artwork-image-help">PNG, JPG/JPEG/JPE, WebP, or GIF only. Maximum 10 MB.</div>
+          <div className="hint" id="artwork-image-help">Still PNG, JPG/JPEG/JPE, WebP, or GIF only. Maximum 10 MB. Artwork and proof are screened locally for nudity, pornography, and sexually suggestive content. Uploads pause when screening is unavailable. Automated screening can make mistakes.</div>
           {imageError && <div className="required-feedback" role="alert">{imageError}</div>}
           {preview && (
             <div className="upload-preview-wrap">
@@ -255,7 +253,7 @@ export default function Upload() {
         <div ref={evidenceSectionRef} className={`field ownership-evidence-field${proofError ? ' has-error' : ''}`}>
           <div className="ownership-evidence-heading"><span className="ownership-evidence-number" aria-hidden="true">1</span><div><label htmlFor="ownership-evidence">Upload ownership proof <span className="required-mark" aria-hidden="true">*</span></label><div className="hint">Add one sketch, work-in-progress photo, editing/layer screenshot, or photo of a permission note.</div></div></div>
           <input ref={evidenceInputRef} id="ownership-evidence" className="file-input" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleEvidenceChange} aria-invalid={Boolean(proofError)} aria-describedby="ownership-proof-help" required />
-          <div className="hint" id="ownership-proof-help">PNG, JPG/JPEG/JPE, WebP, or GIF up to 5 MB. Only you and ArtVault administrators can view this file; it won’t appear in the public gallery.</div>
+          <div className="hint" id="ownership-proof-help">PNG, JPG/JPEG/JPE, WebP, or GIF up to 5 MB. Show the same artwork in progress, a related sketch, or editable layers. A copy of the finished artwork alone is insufficient. Permission notes require manual review. Sexual-content screening runs locally; when configured, Gemini receives artwork and proof for ownership assessment and Google Cloud Vision receives the artwork for online matching.</div>
           {ownershipEvidence && <div className="ownership-evidence-selected" role="status">✓ Proof selected: {ownershipEvidence.name}</div>}
           {proofError && <div className="required-feedback" role="alert">{proofError}</div>}
         </div>

@@ -14,6 +14,7 @@ export default function PendingArtworks() {
   const [artworks, setArtworks] = useState([]);
   const [proofArtwork, setProofArtwork] = useState(null);
   const [reviewingId, setReviewingId] = useState('');
+  const [verified, setVerified] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -31,7 +32,7 @@ export default function PendingArtworks() {
   async function decideReview(artwork, decision) {
     setReviewingId(artwork._id);
     try {
-      await api.patch(`/artworks/${artwork._id}/review`, { decision });
+      await api.patch(`/artworks/${artwork._id}/review`, { decision, ownershipVerified: verified[artwork._id] === artwork.updated_at, expectedUpdatedAt: artwork.updated_at });
       setArtworks((current) => current.filter((item) => item._id !== artwork._id));
       showToast(decision === 'approve'
         ? `"${artwork.title}" approved for ${artwork.visibility === 'private' ? 'the artist’s Vault' : 'the public gallery'}.`
@@ -47,7 +48,7 @@ export default function PendingArtworks() {
       <div>
         <div className="eyebrow">Curation · artwork checks</div>
         <h1>Pending artworks</h1>
-        <p className="sub">An online match is a review signal, not proof of copying. Compare the artwork, match links, and private ownership proof before deciding.</p>
+        <p className="sub">These submissions need a closer check because online matches were found, proof was uncertain, or automated checking was unavailable. Compare the artwork and online sources with creation or permission evidence before deciding.</p>
       </div>
       <Link className="back-link" to="/manage-gallery"><span className="back-link-icon" aria-hidden="true">←</span><span>Back to gallery management</span></Link>
     </div>
@@ -60,14 +61,15 @@ export default function PendingArtworks() {
         <div className="admin-artist-info">
           <h2>{artwork.title}</h2>
           <p>by {artwork.artist?.name || 'Unknown artist'} · Chosen: {artwork.visibility === 'private' ? 'Vault' : 'Public gallery'}</p>
-          <p>{artwork.reviewReason === 'possible_match' ? 'Possible online match' : 'Image check unavailable; manual review required'}</p>
+          <p>{artwork.reviewReason === 'possible_match' ? 'Possible online match — verify the source and permission' : artwork.reviewReason === 'ownership_review' ? 'Creation evidence needs manual verification' : artwork.reviewReason === 'proof_check_unavailable' ? 'Automated proof assessment unavailable — review the proof manually' : 'Online check unavailable or disabled — manually check sources and ownership'}</p>
           {(artwork.webMatchUrls || []).map((url, index) => <p key={url}><a href={url} target="_blank" rel="noopener noreferrer">Review match {index + 1}</a></p>)}
         </div>
         <div className="exhibit-row-actions">
           <Link className="btn btn-ghost btn-sm" to={`/artworks/${artwork._id}`}>View artwork</Link>
           <button className="btn btn-ghost btn-sm" type="button" onClick={() => setProofArtwork(artwork)}>View proof</button>
           {user?.role === 'main_admin' && <>
-            <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(reviewingId)} onClick={() => decideReview(artwork, 'approve')}>Approve</button>
+            <label><input type="checkbox" checked={verified[artwork._id] === artwork.updated_at} onChange={(event) => setVerified((current) => ({ ...current, [artwork._id]: event.target.checked ? artwork.updated_at : null }))} /> I reviewed the proof and online sources and verified ownership or permission.</label>
+            <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(reviewingId) || verified[artwork._id] !== artwork.updated_at} onClick={() => decideReview(artwork, 'approve')}>Approve</button>
             <button className="btn btn-danger btn-sm" type="button" disabled={Boolean(reviewingId)} onClick={() => decideReview(artwork, 'reject')}>Reject</button>
           </>}
         </div>

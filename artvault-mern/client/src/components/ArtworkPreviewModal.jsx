@@ -4,6 +4,7 @@ import api from '../api';
 
 export default function ArtworkPreviewModal({ artwork, onClose }) {
   const [image, setImage] = useState('');
+  const [extension, setExtension] = useState('jpg');
   const [error, setError] = useState('');
   const [details, setDetails] = useState(null);
   const [detailsError, setDetailsError] = useState('');
@@ -21,6 +22,7 @@ export default function ArtworkPreviewModal({ artwork, onClose }) {
       .then(({ data }) => {
         if (controller.signal.aborted) return;
         if (!data.type.startsWith('image/')) throw new Error('Invalid image');
+        setExtension(({ 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' })[data.type] || 'jpg');
         objectUrl = URL.createObjectURL(data);
         setImage(objectUrl);
       })
@@ -68,7 +70,7 @@ export default function ArtworkPreviewModal({ artwork, onClose }) {
         </>}
       </div>
       <div className="modal-actions">
-        {image && <a className="btn btn-ghost" href={image} download="artwork-review">Save image for source review</a>}
+        {image && <a className="btn btn-ghost" href={image} download={`artwork-review.${extension}`}>Save image for source review</a>}
         <button className="btn btn-primary" type="button" onClick={onClose}>Close preview</button>
       </div>
     </div>

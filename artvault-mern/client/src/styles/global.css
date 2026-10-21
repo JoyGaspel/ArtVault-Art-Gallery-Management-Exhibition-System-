@@ -1763,3 +1763,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .artwork-preview-details dt { font-weight: 600; margin-top: 12px; }
 .artwork-preview-details dd { margin: 3px 0 0; }
 .artwork-preview-description { white-space: pre-wrap; }
+.pending-artworks-page .moderation-preview-button {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 10px;
+}
+.pending-artworks-page .moderation-preview-button:focus-visible {
+  outline: 3px solid #6b4db5;
+  outline-offset: 4px;
+}

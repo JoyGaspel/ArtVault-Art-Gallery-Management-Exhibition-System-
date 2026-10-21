@@ -59,7 +59,7 @@ export default function PendingArtworks() {
     {!loading && !error && !artworks.length && <div className="empty">No artworks awaiting review.</div>}
     {!loading && !error && artworks.length > 0 && <div className="admin-list">
       {artworks.map((artwork) => <article className="admin-artist-card moderation-card" key={artwork._id}>
-        <div className="moderation-art-preview"><ArtworkThumbnail artwork={artwork} alt={artwork.title} /></div>
+        <button className="moderation-art-preview moderation-preview-button" type="button" onClick={() => setPreviewArtwork(artwork)} aria-label={`View artwork: ${artwork.title}`}><ArtworkThumbnail artwork={artwork} alt={artwork.title} /></button>
         <div className="admin-artist-info">
           <h2>{artwork.title}</h2>
           <p>Local duplicates: {artwork.localCheckStatus === 'possible_duplicate' ? 'Possible similar image in ArtVault — review required' : artwork.localCheckStatus === 'no_local_match' ? 'No match among fingerprinted ArtVault records (not an internet search)' : 'Not checked or unavailable'}.</p>
@@ -82,8 +82,15 @@ export default function PendingArtworks() {
                 <li>Compare any matching pages, publication dates, and the artist's creation or permission evidence.</li>
               </ol>
               <div className="manual-source-review-links">
-                <a className="btn btn-ghost btn-sm" href="https://lens.google/" target="_blank" rel="noopener noreferrer">Open Google Lens (new tab)</a>
+                <a className="btn btn-ghost btn-sm" href="https://lens.google.com/" target="_blank" rel="noopener noreferrer">Open Google Lens (new tab)</a>
                 <a className="btn btn-ghost btn-sm" href="https://tineye.com/" target="_blank" rel="noopener noreferrer">Open TinEye (new tab)</a>
+              </div>
+              <p><strong>On a phone:</strong> save the artwork from its preview. In the Google app, tap the Lens camera icon and select the saved image. For TinEye, open its website and choose Upload image. If your browser cannot save the file, take a screenshot of only the artwork and crop out account information.</p>
+              <p><strong>In desktop Chrome:</strong> open the artwork preview, then use Chrome's menu → Search with Google Lens and select only the artwork. No Lens extension is required. If that option is missing, save the image and upload it on the Lens website.</p>
+              <p><strong>TinEye extension:</strong> it can search public image URLs, but a private ArtVault image may not be accessible to the service. Upload the saved image instead if the extension fails.</p>
+              <div className="manual-source-review-links">
+                <a href="https://support.google.com/chrome/answer/15086890" target="_blank" rel="noopener noreferrer">Chrome Lens instructions (new tab)</a>
+                <a href="https://tineye.com/extensions" target="_blank" rel="noopener noreferrer">Official TinEye extensions (new tab)</a>
               </div>
               <p className="manual-source-review-note">Only upload the artwork to these services, never private proof. These buttons open a new tab; they do not run a check inside ArtVault. No matches does not prove ownership.</p>
             </div>

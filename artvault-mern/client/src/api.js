@@ -9,11 +9,20 @@ const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
 // Keep a production fallback so an accidentally missing Vercel variable does
 // not silently send image/API requests to the retired Render service.
 export const deployedApiUrl = 'https://artvault-art-gallery-management-exhibition-syste-production.up.railway.app/api';
-const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(configuredApiUrl);
-// Honor a single valid deployment URL. Reject accidental comma-separated values
-// and localhost production URLs; preserve the existing Railway fallback.
-const validConfiguredUrl = /^https?:\/\/[^\s,]+$/i.test(configuredApiUrl) && !configuredIsLocal;
-const apiBaseUrl = isLocal ? '/api' : validConfiguredUrl ? configuredApiUrl.replace(/\/$/, '') : deployedApiUrl;
+// Accept either the backend origin or its /api URL. Every server route is
+// mounted under /api, including the session check after password sign-in.
+let productionApiUrl = deployedApiUrl;
+try {
+  if (/^https?:\/\/[^\s,]+$/i.test(configuredApiUrl)) {
+    const parsed = new URL(configuredApiUrl);
+    if (!['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
+      && !parsed.username && !parsed.password && !parsed.search && !parsed.hash) {
+      const path = parsed.pathname.replace(/\/+$/, '');
+      if (path === '' || path === '/api') productionApiUrl = `${parsed.origin}/api`;
+    }
+  }
+} catch { /* Use the known backend when the configured URL is invalid. */ }
+const apiBaseUrl = isLocal ? '/api' : productionApiUrl;
 
 // Fail predictably when the API is offline instead of leaving pages on an
 // indefinite loading state.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import ArtworkThumbnail from '../components/ArtworkThumbnail';
+import ArtworkPreviewModal from '../components/ArtworkPreviewModal';
 import OwnershipProofModal from '../components/OwnershipProofModal';
 import PageLoadState from '../components/PageLoadState';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +14,7 @@ export default function PendingArtworks() {
   const showToast = useToast();
   const [artworks, setArtworks] = useState([]);
   const [proofArtwork, setProofArtwork] = useState(null);
+  const [previewArtwork, setPreviewArtwork] = useState(null);
   const [reviewingId, setReviewingId] = useState('');
   const [verified, setVerified] = useState({});
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ export default function PendingArtworks() {
       <div>
         <div className="eyebrow">Curation · artwork checks</div>
         <h1>Pending artworks</h1>
-        <p className="sub">These submissions need a closer check because online matches were found, proof was uncertain, or automated checking was unavailable. Compare the artwork and online sources with creation or permission evidence before deciding.</p>
+        <p className="sub">Review each artwork and its creation or permission evidence before deciding. When automatic online search is not enabled, submissions wait here for manual review. Being pending does not mean the artist copied the work.</p>
       </div>
       <Link className="back-link" to="/manage-gallery"><span className="back-link-icon" aria-hidden="true">←</span><span>Back to gallery management</span></Link>
     </div>
@@ -62,15 +64,30 @@ export default function PendingArtworks() {
           <h2>{artwork.title}</h2>
           <p>Local duplicates: {artwork.localCheckStatus === 'possible_duplicate' ? 'Possible similar image in ArtVault — review required' : artwork.localCheckStatus === 'no_local_match' ? 'No match among fingerprinted ArtVault records (not an internet search)' : 'Not checked or unavailable'}.</p>
           <p>Creation proof: {artwork.proofCheckStatus === 'credible' ? 'AI assessment supports creation evidence; not a guarantee of ownership' : artwork.proofCheckStatus === 'uncertain' ? 'Needs human review' : 'Not checked or assessment unavailable'}.</p>
-          <p>Online search: {artwork.webCheckStatus === 'no_match' ? 'Cloud Vision returned no matches' : artwork.webCheckStatus === 'possible_match' ? 'Possible matches found' : 'Not checked successfully — manual search needed'}.</p>
+          <p>Online search: {artwork.webCheckStatus === 'no_match' ? 'Cloud Vision returned no matches; this does not establish ownership' : artwork.webCheckStatus === 'possible_match' ? 'Possible matches found — compare the sources' : artwork.webCheckStatus === 'disabled' ? 'Automatic search was off for this submission — use manual source review' : 'No successful automatic search recorded — use manual source review'}.</p>
           <p>by {artwork.artist?.name || 'Unknown artist'} · Chosen: {artwork.visibility === 'private' ? 'Vault' : 'Public gallery'}</p>
-          <p>{artwork.reviewReason === 'possible_match' ? 'Possible online match — verify the source and permission' : artwork.reviewReason === 'ownership_review' ? 'Creation evidence needs manual verification' : artwork.reviewReason === 'proof_check_unavailable' ? 'Automated proof assessment unavailable — review the proof manually' : 'Online check unavailable or disabled — manually check sources and ownership'}</p>
+          <p className="pending-review-reason">{artwork.reviewReason === 'local_duplicate' ? 'Possible duplicate in ArtVault — compare the submissions and permission evidence.' : artwork.reviewReason === 'possible_match' ? 'Possible online match — verify the source and permission.' : artwork.reviewReason === 'ownership_review' ? 'Creation evidence needs manual verification.' : artwork.reviewReason === 'proof_check_unavailable' ? 'Review the proof manually; no successful automated proof assessment was recorded.' : 'Awaiting manual ownership review. Review the proof and check online sources using the tools below.'}</p>
           {(artwork.webMatchUrls || []).map((url, index) => <p key={url}><a href={url} target="_blank" rel="noopener noreferrer">Review match {index + 1}</a></p>)}
         </div>
         <div className="exhibit-row-actions">
-          <Link className="btn btn-ghost btn-sm" to={`/artworks/${artwork._id}`}>View artwork</Link>
+          <button className="btn btn-ghost btn-sm" type="button" onClick={() => setPreviewArtwork(artwork)}>View artwork</button>
           <button className="btn btn-ghost btn-sm" type="button" onClick={() => setProofArtwork(artwork)}>View proof</button>
-          <details className="upload-check-notice"><summary>Manual online-source review</summary><p>Open the artwork to inspect it, then use Google Lens or TinEye to upload the artwork image manually. This sends that image to the selected service; do not upload private ownership proof. An empty search result does not establish ownership. Compare sources, dates, and permission evidence before approving.</p><a className="btn btn-ghost btn-sm" href="https://lens.google/" target="_blank" rel="noopener noreferrer">Open Google Lens</a> <a className="btn btn-ghost btn-sm" href="https://tineye.com/" target="_blank" rel="noopener noreferrer">Open TinEye</a></details>
+          <details className="upload-check-notice manual-source-review">
+            <summary>Check online sources manually</summary>
+            <div className="manual-source-review-body">
+              <p>Automatic online search is optional. Use these external tools to help review this submission.</p>
+              <ol>
+                <li>Open the artwork and save its image to your device.</li>
+                <li>Open Google Lens or TinEye below, then upload the saved artwork image.</li>
+                <li>Compare any matching pages, publication dates, and the artist's creation or permission evidence.</li>
+              </ol>
+              <div className="manual-source-review-links">
+                <a className="btn btn-ghost btn-sm" href="https://lens.google/" target="_blank" rel="noopener noreferrer">Open Google Lens (new tab)</a>
+                <a className="btn btn-ghost btn-sm" href="https://tineye.com/" target="_blank" rel="noopener noreferrer">Open TinEye (new tab)</a>
+              </div>
+              <p className="manual-source-review-note">Only upload the artwork to these services, never private proof. These buttons open a new tab; they do not run a check inside ArtVault. No matches does not prove ownership.</p>
+            </div>
+          </details>
           {user?.role === 'main_admin' && <>
             <label><input type="checkbox" checked={verified[artwork._id] === artwork.updated_at} onChange={(event) => setVerified((current) => ({ ...current, [artwork._id]: event.target.checked ? artwork.updated_at : null }))} /> I reviewed the proof and online sources and verified ownership or permission.</label>
             <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(reviewingId) || verified[artwork._id] !== artwork.updated_at} onClick={() => decideReview(artwork, 'approve')}>Approve</button>
@@ -80,5 +97,6 @@ export default function PendingArtworks() {
       </article>)}
     </div>}
     {proofArtwork && <OwnershipProofModal artworkId={proofArtwork._id} artworkTitle={proofArtwork.title} onClose={() => setProofArtwork(null)} />}
+    {previewArtwork && <ArtworkPreviewModal key={previewArtwork._id} artwork={previewArtwork} onClose={() => setPreviewArtwork(null)} />}
   </section>;
 }

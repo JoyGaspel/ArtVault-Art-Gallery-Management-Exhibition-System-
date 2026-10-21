@@ -1695,3 +1695,71 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .account-security-card .security-action-row .btn, .account-mfa-settings > .btn { width:100%; margin-right:0; }
   .account-security-card { padding:20px; }
 }
+.pending-artworks-page .moderation-card {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 18px;
+}
+.pending-artworks-page .admin-artist-info {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+.pending-artworks-page .admin-artist-info p {
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.pending-artworks-page .pending-review-reason {
+  padding: 10px 12px;
+  border: 1px solid #d9d0ed;
+  border-radius: 10px;
+  background: #f5f2fc;
+  color: #40315e;
+}
+.pending-artworks-page .moderation-card > .exhibit-row-actions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px;
+}
+.pending-artworks-page .exhibit-row-actions .upload-check-notice {
+  flex: 1 1 100%;
+  color: #40315e;
+}
+.pending-artworks-page .exhibit-row-actions > label {
+  flex: 1 1 100%;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.pending-artworks-page .manual-source-review-body {
+  max-width: 850px;
+  padding-top: 6px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.pending-artworks-page .manual-source-review-body ol {
+  margin: 12px 0 16px;
+  padding-left: 22px;
+}
+.pending-artworks-page .manual-source-review-body li + li {
+  margin-top: 6px;
+}
+.pending-artworks-page .manual-source-review-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.pending-artworks-page .manual-source-review .manual-source-review-note {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #ded5eb;
+  font-size: 12px;
+  color: #51445f;
+}
+.artwork-preview-details { margin: 18px 0; font-size: 13px; line-height: 1.6; color: #40315e; overflow-wrap: anywhere; }
+.artwork-preview-details .artwork-preview-artist { font-weight: 600; margin-bottom: 14px; }
+.artwork-preview-details dl { margin: 0; }
+.artwork-preview-details dt { font-weight: 600; margin-top: 12px; }
+.artwork-preview-details dd { margin: 3px 0 0; }
+.artwork-preview-description { white-space: pre-wrap; }

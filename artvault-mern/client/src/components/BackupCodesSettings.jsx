@@ -32,7 +32,9 @@ export default function BackupCodesSettings({ email }) {
     let active = true;
     setStatusError('');
     api.get('/auth/backup-codes').then(({ data }) => { if (active) setStatus(data); })
-      .catch((err) => { if (active) setStatusError(err.response?.data?.message || 'Could not load backup-code status. Please retry.'); });
+      .catch((err) => { if (active) setStatusError(err.response?.status === 404
+        ? 'Backup codes are unavailable on this backend deployment. The deployment administrator must deploy the updated server. Codes created on localhost work here only when both servers use the same database, Supabase project, and backup-code signing secret.'
+        : err.response?.data?.message || 'Could not load backup-code status. Please retry.'); });
     return () => { active = false; };
   }, [retry]);
   if (!supabase) return null;

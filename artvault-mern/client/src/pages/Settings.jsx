@@ -4,6 +4,8 @@ import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../api';
 import PasswordToggle from '../components/PasswordToggle';
+import MfaSettings from '../components/MfaSettings';
+import BackupCodesSettings from '../components/BackupCodesSettings';
 import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp } from '../lib/emailOtp';
 
 const ALL_CATEGORIES = [
@@ -29,6 +31,11 @@ export default function Settings() {
   const [passwordOtp, setPasswordOtp] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [passwordOtpSent, setPasswordOtpSent] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState('');
+  const [passwordFeedbackType, setPasswordFeedbackType] = useState('info');
+  const [passwordAction, setPasswordAction] = useState('');
+  const [deletionFeedback, setDeletionFeedback] = useState('');
+  const [deletionFeedbackType, setDeletionFeedbackType] = useState('info');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [accountSaving, setAccountSaving] = useState(false);
@@ -76,7 +83,7 @@ export default function Settings() {
         avatar_path: avatarPath,
       };
       if (!isAdmin) Object.assign(payload, { bio: cleanBio, specializations });
-      const res = await api.put('/artists/me', payload);
+      const res = await api.put(isAdmin ? '/admin-profiles/me' : '/artists/me', isAdmin ? { firstName: cleanFirstName, lastName: cleanLastName, avatar_path: avatarPath } : payload);
       updateUser(res.data.artist);
       window.dispatchEvent(new Event('artvault:data-changed'));
       setName(res.data.artist.name);
@@ -107,23 +114,41 @@ export default function Settings() {
   }
 
   async function changePassword() {
+    if (accountSaving) return;
     if (!currentPassword) return showToast('Enter your current password.', true);
     if (newPassword.length < 8) return showToast('Password must be at least 8 characters.', true);
     if (newPassword !== confirmPassword) return showToast('Passwords do not match.', true);
     if (passwordOtpSent && !isValidEmailOtp(passwordOtp)) return showToast(`Enter the ${EMAIL_OTP_LENGTH}-digit email verification code.`, true);
     setAccountSaving(true);
+    setPasswordAction(passwordOtpSent ? 'verifying' : 'sending');
+    setPasswordFeedbackType('info');
+    setPasswordFeedback(passwordOtpSent ? 'Verifying your code and updating your password…' : `Sending a verification email to ${user.email}…`);
     try {
       if (!passwordOtpSent) {
         await requestPasswordOtp(currentPassword);
         setPasswordOtpSent(true);
+        setPasswordFeedbackType('success');
+        setPasswordFeedback(`Verification email sent to ${user.email}. Check your inbox and spam folder; delivery may take a few minutes. Enter the code below to finish changing your password.`);
         showToast('A verification code was sent to your email.');
       } else {
         await updatePassword(newPassword, passwordOtp);
         setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordOtp(''); setPasswordOtpSent(false);
         showToast('Password updated successfully.');
+        setPasswordFeedbackType('success'); setPasswordFeedback('Password updated successfully.');
       }
-    } catch (err) { showToast(err.message || 'Could not change password.', true); }
-    finally { setAccountSaving(false); }
+    } catch (err) { const message = err.message || 'Could not complete the password change. Please try again.'; setPasswordFeedbackType('error'); setPasswordFeedback(message); showToast(message, true); }
+    finally { setAccountSaving(false); setPasswordAction(''); }
+  }
+
+  async function resendPasswordCode() {
+    if (accountSaving) return;
+    setAccountSaving(true); setPasswordAction('sending'); setPasswordFeedbackType('info'); setPasswordFeedback(`Sending another verification email to ${user.email}…`);
+    try {
+      await requestPasswordOtp(currentPassword); setPasswordOtp('');
+      setPasswordFeedbackType('success'); setPasswordFeedback(`A new verification email was sent to ${user.email}. Use the latest code and check your spam folder if needed.`);
+      showToast('New verification email sent.');
+    } catch (err) { const message = err.message || 'Could not send another verification email. Please try again.'; setPasswordFeedbackType('error'); setPasswordFeedback(message); showToast(message, true); }
+    finally { setAccountSaving(false); setPasswordAction(''); }
   }
 
   async function deleteAccount() {
@@ -133,13 +158,15 @@ export default function Settings() {
   async function requestAccountDeletionCode() {
     if (deletionSaving) return;
     setDeletionSaving(true);
+    setDeletionFeedbackType('info'); setDeletionFeedback(`Sending a confirmation email to ${user.email}…`);
     try {
       await api.post('/artists/me/deletion-code');
       setConfirmDelete(false);
       setDeletionCodeSent(true);
       setDeletionCode('');
+      setDeletionFeedbackType('success'); setDeletionFeedback(`Confirmation email sent to ${user.email}. Check your inbox and spam folder. Your account has not been deleted; enter the code below only if you want to continue.`);
       showToast(`A ${EMAIL_OTP_LENGTH}-digit confirmation code was sent to ${user.email}.`);
-    } catch (err) { showToast(err.response?.data?.message || 'Could not send the deletion code.', true); }
+    } catch (err) { const message = err.response?.data?.message || 'Could not confirm the email was sent. Your account has not been deleted. Please retry.'; setDeletionFeedbackType('error'); setDeletionFeedback(message); showToast(message, true); }
     finally { setDeletionSaving(false); }
   }
 
@@ -160,8 +187,8 @@ export default function Settings() {
       <div className="page-head settings-page-head">
         <div>
           <div className="eyebrow">Account</div>
-          <h1>{isAdmin ? 'Account security' : 'Profile settings'}</h1>
-          <div className="sub">{isAdmin ? 'Manage your account password.' : 'This is what other visitors see on your artist profile.'}</div>
+          <h1>Profile settings</h1>
+          <div className="sub">{isAdmin ? 'Manage your administrator details and account security. You do not have a public artist profile.' : 'This is what other visitors see on your artist profile.'}</div>
         </div>
 
         <div className="form-card account-security-card">
@@ -188,22 +215,26 @@ export default function Settings() {
               <PasswordToggle visible={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
             </div>
             <div className="security-action-row">
-              <button className="btn btn-ghost security-primary-btn" type="button" onClick={changePassword} disabled={accountSaving}>Update password</button>
+              <button className="btn btn-ghost security-primary-btn" type="button" onClick={changePassword} disabled={accountSaving}>{accountSaving ? passwordAction === 'sending' ? 'Sending email…' : 'Verifying…' : 'Update password'}</button>
             </div>
+            {passwordFeedback && <div className={`security-feedback ${passwordFeedbackType}`} role={passwordFeedbackType === 'error' ? 'alert' : 'status'}>{passwordFeedback}</div>}
             {passwordOtpSent && (
               <div className="field" style={{ marginTop: 12 }}>
                 <label htmlFor="password-otp">{EMAIL_OTP_LENGTH}-digit email verification code <span className="required-mark" aria-hidden="true">*</span></label>
                 <input id="password-otp" inputMode="numeric" autoComplete="one-time-code" pattern={EMAIL_OTP_PATTERN} maxLength={EMAIL_OTP_LENGTH} value={passwordOtp} onChange={(e) => setPasswordOtp(normalizeEmailOtp(e.target.value))} placeholder="Enter your code" />
                 <div className="hint">Enter the {EMAIL_OTP_LENGTH}-digit code sent to {user?.email} and press Update password again.</div>
                 <div className="security-action-row security-otp-actions">
-                  <button className="btn btn-ghost security-secondary-btn" type="button" onClick={async () => { try { setPasswordOtp(''); await requestPasswordOtp(currentPassword); showToast('A new verification code was sent to your email.'); } catch (err) { showToast(err.message || 'Could not send another code.', true); } }} disabled={accountSaving}>Send another code</button>
+                  <button className="btn btn-ghost security-secondary-btn" type="button" onClick={resendPasswordCode} disabled={accountSaving}>{accountSaving && passwordAction === 'sending' ? 'Sending email…' : 'Send another code'}</button>
                 </div>
               </div>
             )}
           </div>
+          <MfaSettings />
+          <BackupCodesSettings email={user?.email} />
           {!isAdmin && <div className="account-danger-zone">
             <div><strong>Delete account</strong><div className="hint">We’ll email a confirmation code to {user?.email} first. Your account and artworks will then be suspended for main-administrator review.</div></div>
             <button className="btn btn-danger btn-sm" type="button" onClick={deleteAccount} disabled={accountSaving || deletionSaving}>Delete account</button>
+            {deletionFeedback && <div className={`security-feedback ${deletionFeedbackType}`} role={deletionFeedbackType === 'error' ? 'alert' : 'status'}>{deletionFeedback}</div>}
             {deletionCodeSent && <div className="account-deletion-code">
               <label htmlFor="deletion-code">{EMAIL_OTP_LENGTH}-digit email confirmation code</label>
               <input id="deletion-code" inputMode="numeric" autoComplete="one-time-code" pattern={EMAIL_OTP_PATTERN} maxLength={EMAIL_OTP_LENGTH} value={deletionCode} onChange={(event) => setDeletionCode(normalizeEmailOtp(event.target.value))} placeholder="Enter the code from your email" />
@@ -214,7 +245,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {!isAdmin && <div className="settings-profile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 32 }}>
+      <div className="settings-profile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 32 }}>
         <div className="form-card">
           <div className="field">
             <label htmlFor="profile-picture">Profile picture <span className="optional-mark">(optional)</span></label>
@@ -277,7 +308,8 @@ export default function Settings() {
               {specializations.map((s) => <span className="tiny-tag" key={s}>{s}</span>)}
             </div></>}
           </div>
-          <div className="form-card notification-preferences" style={{ marginTop: 18 }}>
+          {isAdmin && <div className="form-card" style={{ marginTop: 18 }}><div className="eyebrow">Account emails</div><h2 style={{ fontSize: 16 }}>Security notifications</h2><p className="hint">Verification codes and security notices are sent to your own registered email: {user?.email}. These required messages have no opt-out. Artist activity preferences do not apply to administrator accounts. Sub-admin moderation email alerts are not currently implemented. Sending-service credentials are managed in the backend environment, not in profile settings.</p></div>}
+          {!isAdmin && <div className="form-card notification-preferences" style={{ marginTop: 18 }}>
             <div className="eyebrow">Notifications</div>
             <h2 style={{ margin: '4px 0 8px' }}>Email notifications</h2>
             <div className="hint">Choose which ArtVault activity should also arrive by email. In-app notifications remain enabled.</div>
@@ -292,9 +324,9 @@ export default function Settings() {
               </button>
               {emailSaved && <span style={{ fontSize: 12.5, color: '#3F8452' }}>✓ Saved</span>}
             </div>
-          </div>
+          </div>}
         </div>
-      </div>}
+      </div>
       {confirmDelete && (
         <ConfirmDialog
           title="Delete your account?"

@@ -22,9 +22,11 @@ const {
 const { requireAuth, requireRole, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+const { getAnalytics } = require('../controllers/analyticsController');
 
 router.get('/', listArtworks);                                  // GET  /api/artworks
 router.get('/admin/summary', requireAuth, requireAdmin, getAdminArtworkSummary);
+router.get('/admin/analytics', requireAuth, requireRole('sub_admin', 'main_admin'), getAnalytics);
 router.get('/admin/pending', requireAuth, requireRole('sub_admin', 'main_admin'), listPendingArtworkReviews);
 router.post('/', requireAuth, createArtwork);                    // POST /api/artworks
 router.get('/mine', requireAuth, requireRole('artist'), listMyArtworks); // GET /api/artworks/mine

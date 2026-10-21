@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import ArtworkCategoryPicker from '../components/ArtworkCategoryPicker';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -13,10 +14,6 @@ import useAutoRefresh from '../hooks/useAutoRefresh';
 import { materialError } from '../utils/materialValidation';
 import { goBackOr } from '../utils/navigation';
 
-const ALL_CATEGORIES = [
-  'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
-  'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
-];
 
 export default function ArtworkDetail() {
   const { id } = useParams();
@@ -144,13 +141,6 @@ export default function ArtworkDetail() {
       // Carousel steps should not fill browser history; Back returns to the exhibit.
       navigate(`/artworks/${nextArtwork._id}?exhibit=${exhibitContext._id}&position=${nextIndex}`, { replace: true });
     }
-  }
-
-  function toggleCategory(cat) {
-    setForm((f) => ({
-      ...f,
-      categories: f.categories.includes(cat) ? f.categories.filter((c) => c !== cat) : [...f.categories, cat],
-    }));
   }
 
   async function saveEdit() {
@@ -283,17 +273,7 @@ export default function ArtworkDetail() {
               </div>
               <div className="field">
                 <label>Categories <span className="optional-mark">(optional)</span></label>
-                <div className="chip-select">
-                  {ALL_CATEGORIES.map((c) => (
-                    <button
-                      type="button" key={c}
-                      className={`chip-toggle${form.categories.includes(c) ? ' on' : ''}`}
-                      onClick={() => toggleCategory(c)}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
+                <ArtworkCategoryPicker value={form.categories} onChange={(categories) => setForm((current) => ({ ...current, categories }))} />
               </div>
               <div className="field">
                 <label>Materials <span className="optional-mark">(optional)</span></label>

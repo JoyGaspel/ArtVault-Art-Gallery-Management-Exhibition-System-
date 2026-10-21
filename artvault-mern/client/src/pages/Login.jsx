@@ -60,6 +60,7 @@ export default function Login() {
       const signedInUser = await login(email, password);
       navigate(['admin', 'sub_admin', 'main_admin'].includes(signedInUser?.role) ? '/manage-gallery' : '/');
     } catch (err) {
+      if (err.code === 'MFA_REQUIRED') { navigate('/mfa'); return; }
       if (err.locked) {
         setLockSeconds(err.secondsLeft || 300);
         setAttemptsRemaining(0);

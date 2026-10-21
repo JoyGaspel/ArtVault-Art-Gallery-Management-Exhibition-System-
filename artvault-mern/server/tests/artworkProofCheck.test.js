@@ -4,6 +4,7 @@ const sharp = require('sharp');
 const { assessOwnershipProof, checkArtworkOwnership } = require('../services/artworkOwnershipCheck');
 
 test('proof assessment conservatively handles duplicate evidence and unavailable or malformed responses', async (t) => {
+  t.mock.method(require('../services/artworkDuplicates'), 'checkDuplicates', async () => ({ status: 'no_local_match' }));
   const oldFetch = global.fetch;
   const names = ['GEMINI_API_KEY', 'GOOGLE_VISION_API_KEY', 'ARTWORK_WEB_CHECK_ENABLED'];
   const original = names.map((name) => process.env[name]);

@@ -15,7 +15,7 @@ const AuthContext = createContext(null);
 // PROTOTYPE MODE: set this to false when the MongoDB-backed API session is ready.
 // The production replacement should use the server's HttpOnly/Secure cookie session.
 const OFFLINE_READONLY = import.meta.env.VITE_OFFLINE_READONLY === 'true';
-const PROTOTYPE_AUTH = !supabaseEnabled && !OFFLINE_READONLY;
+const PROTOTYPE_AUTH = import.meta.env.DEV && !supabaseEnabled && !OFFLINE_READONLY;
 
 function mapSupabaseUser(authUser) {
   if (!authUser) return null;
@@ -36,25 +36,30 @@ function mapSupabaseUser(authUser) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const sessionGeneration = useRef(0);
   const idleTimer = useRef(null);
 
   const logout = useCallback(() => {
+    sessionGeneration.current++;
+    localStorage.setItem('artvault_explicit_logout', 'true');
+    setSessionError(''); setLoading(false);
     window.clearTimeout(idleTimer.current);
-    if (!PROTOTYPE_AUTH && supabase) supabase.auth.signOut();
+    const token = localStorage.getItem('artvault_token');
+    if (token && !PROTOTYPE_AUTH) {
+      // Persist revocation while Supabase still accepts the access token.
+      api.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {
+        console.warn('Server sign-out could not be confirmed; the token expires according to its configured lifetime.');
+      }).then(() => supabase?.auth.signOut()).catch(() => console.warn('Provider sign-out could not be confirmed.'));
+    } else if (!PROTOTYPE_AUTH && supabase) supabase.auth.signOut();
     clearPrototypeSession();
     localStorage.removeItem('artvault_token');
     setUser(null);
   }, []);
 
-  const resetIdleTimer = useCallback(() => {
-    if (!user) return;
-    if (PROTOTYPE_AUTH) refreshPrototypeSession();
-    window.clearTimeout(idleTimer.current);
-    idleTimer.current = window.setTimeout(logout, 30 * 60 * 1000);
-  }, [logout, user]);
-
   useEffect(() => {
-    if (OFFLINE_READONLY) {
+    if (OFFLINE_READONLY || (!supabase && !PROTOTYPE_AUTH)) {
       localStorage.removeItem('artvault_token');
       setUser(null);
       setLoading(false);
@@ -67,44 +72,87 @@ export function AuthProvider({ children }) {
     }
 
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      if (data.session?.access_token) localStorage.setItem('artvault_token', data.session.access_token);
-      if (data.session?.access_token) {
-        api.get('/auth/me').then((response) => setUser(response.data.user)).catch(() => setUser(null)).finally(() => setLoading(false));
-      } else {
-        setUser(null);
+    let timer;
+    async function restore(session) {
+      const generation = ++sessionGeneration.current;
+      const current = () => mounted && generation === sessionGeneration.current;
+      if (localStorage.getItem('artvault_explicit_logout') === 'true') {
+        setUser(null); setLoading(false); return;
+      }
+      if (!session?.access_token) {
+        const legacy = localStorage.getItem('artvault_token');
+        if (!legacy) { setUser(null); setSessionError(''); setLoading(false); return; }
+      } else localStorage.setItem('artvault_token', session.access_token);
+      try {
+        const response = await api.get('/auth/me');
+        if (!current()) return;
+        setUser(response.data.user); setSessionError(''); setLoading(false);
+      } catch (error) {
+        if (!current()) return;
+        if (error.response?.status === 401 || error.response?.status === 423) {
+          setUser(null); localStorage.removeItem('artvault_token'); setSessionError('');
+        } else if (error.response?.data?.code === 'MFA_REQUIRED') {
+          setUser(null); setSessionError('');
+        } else {
+          setSessionError('Your session is saved, but we could not verify it with the server. Check your connection and retry.');
+        }
         setLoading(false);
       }
+    }
+    function schedule(session) {
+      clearTimeout(timer);
+      // Do provider work outside the auth event callback to avoid lock races.
+      timer = setTimeout(() => restore(session), 0);
+    }
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) { setSessionError('Could not restore your saved session. Check your connection and retry.'); setLoading(false); return; }
+      schedule(data.session);
+    }).catch(() => { if (mounted) { setSessionError('Could not restore your saved session. Please retry.'); setLoading(false); } });
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        sessionGeneration.current++; clearTimeout(timer);
+        localStorage.removeItem('artvault_token'); setUser(null); setSessionError(''); setLoading(false);
+      } else schedule(session);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.access_token) {
-        localStorage.setItem('artvault_token', session.access_token);
-        api.get('/auth/me').then((response) => setUser(response.data.user)).catch(() => setUser(null));
-      } else {
-        localStorage.removeItem('artvault_token');
-        setUser(null);
-      }
-    });
+    const retry = () => setRestoreAttempt((value) => value + 1);
+    const syncLogout = (event) => {
+      if (event.key === 'artvault_explicit_logout') retry();
+    };
+    window.addEventListener('online', retry);
+    window.addEventListener('pageshow', retry);
+    window.addEventListener('storage', syncLogout);
     return () => {
       mounted = false;
+      clearTimeout(timer); sessionGeneration.current++;
+      window.removeEventListener('online', retry);
+      window.removeEventListener('pageshow', retry);
+      window.removeEventListener('storage', syncLogout);
       listener.subscription.unsubscribe();
     };
 
-  }, []);
+  }, [restoreAttempt]);
 
   useEffect(() => {
     if (!user) return undefined;
+    const resetIdleTimer = () => {
+      if (PROTOTYPE_AUTH) refreshPrototypeSession();
+      window.clearTimeout(idleTimer.current);
+      idleTimer.current = window.setTimeout(logout, 30 * 60 * 1000);
+    };
     const events = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'mousemove'];
-    events.forEach((event) => window.addEventListener(event, resetIdleTimer));
+    events.forEach((event) => window.addEventListener(event, resetIdleTimer, { passive: true }));
     resetIdleTimer();
     return () => {
       events.forEach((event) => window.removeEventListener(event, resetIdleTimer));
       window.clearTimeout(idleTimer.current);
     };
-  }, [resetIdleTimer, user]);
+  }, [Boolean(user), logout]);
 
   const login = useCallback(async (email, password, requestedRole = '') => {
+    localStorage.removeItem('artvault_explicit_logout');
+    setSessionError('');
+    if (!supabase && !PROTOTYPE_AUTH) throw { message: 'Authentication is not configured. Contact the deployment administrator.' };
     if (OFFLINE_READONLY) throw { message: 'This offline copy is read-only. Sign in when you are back online.' };
     if (PROTOTYPE_AUTH) {
       const prototypeUser = await prototypeLogin(email, password);
@@ -167,6 +215,7 @@ export function AuthProvider({ children }) {
       setUser(response.data.user);
       return response.data.user;
     } catch (verificationError) {
+      if (verificationError.response?.data?.code === 'MFA_REQUIRED') throw { code: 'MFA_REQUIRED', message: 'Enter your authenticator code.' };
       setUser(null);
       await supabase.auth.signOut();
       localStorage.removeItem('artvault_token');
@@ -183,6 +232,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signup = useCallback(async (payload) => {
+    localStorage.removeItem('artvault_explicit_logout');
+    if (!supabase && !PROTOTYPE_AUTH) throw { message: 'Authentication is not configured. Contact the deployment administrator.' };
     if (OFFLINE_READONLY) throw { message: 'Sign-up needs an internet connection. This offline copy is read-only.' };
     if (payload.acceptedTerms !== true) throw { message: 'Accept the Terms and Conditions before creating an account.' };
     if (PROTOTYPE_AUTH) {
@@ -202,7 +253,7 @@ export function AuthProvider({ children }) {
           role: 'artist',
           specializations: payload.specializations || [],
           bio: payload.bio || '',
-          termsVersion: '2026-10-17',
+          termsVersion: '2026-10-21',
           termsAcceptedAt: new Date().toISOString(),
         },
       },
@@ -282,7 +333,7 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, verifySignupOtp, resendConfirmation, logout, updateUser, requestPasswordOtp, updatePassword, prototypeMode: PROTOTYPE_AUTH }}>
+    <AuthContext.Provider value={{ user, loading, sessionError, retrySession: () => { setLoading(true); setRestoreAttempt((value) => value + 1); }, login, signup, verifySignupOtp, resendConfirmation, logout, updateUser, requestPasswordOtp, updatePassword, prototypeMode: PROTOTYPE_AUTH }}>
       {children}
     </AuthContext.Provider>
   );

@@ -65,7 +65,7 @@ test('signup rejects extra spaces in names before creating an account', async ()
 });
 
 test('artwork upload rejects missing or oversized category lists before database writes', async () => {
-  for (const categories of [[], Array(6).fill('Digital Art'), [''], ['Not a real category']]) {
+  for (const categories of [[], Array(6).fill('Digital Art'), [''], ['Others'], ['<script>']]) {
     const res = response();
     let validationError = null;
     await createArtwork({ user: { role: 'artist' }, body: { title: 'Test work', categories, ownershipDeclared: true } }, res, (error) => { validationError = error; });

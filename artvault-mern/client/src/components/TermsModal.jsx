@@ -39,9 +39,9 @@ export default function TermsModal({ onClose }) {
       <div className="terms-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" aria-describedby="terms-modal-intro" onKeyDown={handleKeyDown}>
         <div className="terms-modal-head">
           <div>
-            <div className="eyebrow">Effective 17 October 2026</div>
+            <div className="eyebrow">Updated 21 October 2026</div>
             <h2 id="terms-modal-title">ArtVault Terms and Conditions</h2>
-            <p id="terms-modal-intro">Please review these terms before creating your account.</p>
+            <p id="terms-modal-intro">Review the account requirements, terms, and privacy information before creating your account.</p>
           </div>
           <button className="terms-modal-close" type="button" aria-label="Close terms and conditions" onClick={onClose}>×</button>
         </div>

@@ -16,5 +16,6 @@ const submitExhibitEntrySchema = new mongoose.Schema(
 
 // Keep the combination indexed, but allow a second attempt after a denial.
 submitExhibitEntrySchema.index({ artist: 1, artwork: 1, exhibit: 1, createdAt: -1 });
+submitExhibitEntrySchema.index({ createdAt: -1, status: 1 });
 
 module.exports = mongoose.model('Submit_Exhibit_Entry', submitExhibitEntrySchema);

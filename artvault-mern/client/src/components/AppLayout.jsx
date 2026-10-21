@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import ResponsiveNav from './ResponsiveNav';
+import AccountRoleNotice from './AccountRoleNotice';
 
 export default function AppLayout() {
   const contentRef = useRef(null);
@@ -37,7 +38,10 @@ export default function AppLayout() {
         <Topbar />
         {import.meta.env.VITE_OFFLINE_READONLY === 'true' && <div className="offline-readonly-banner" role="status">Offline workspace · Browse the snapshot and save artwork metadata drafts. Live changes need online sign-in and conflict review.</div>}
         <div className="content" ref={contentRef}>
-          <Outlet />
+          <AccountRoleNotice />
+          <Suspense fallback={<div className="page-content-loading" role="status">Loading page…</div>}>
+            <Outlet />
+          </Suspense>
         </div>
         {showBackToTop && <button className="back-to-top" type="button" onClick={backToTop} aria-label="Back to top" title="Back to top"><span aria-hidden="true">↑</span><span>Top</span></button>}
       </div>

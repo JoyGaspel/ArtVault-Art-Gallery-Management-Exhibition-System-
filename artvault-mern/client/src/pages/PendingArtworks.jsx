@@ -60,6 +60,9 @@ export default function PendingArtworks() {
         <div className="moderation-art-preview"><ArtworkThumbnail artwork={artwork} alt={artwork.title} /></div>
         <div className="admin-artist-info">
           <h2>{artwork.title}</h2>
+          <p>Local duplicates: {artwork.localCheckStatus === 'possible_duplicate' ? 'Possible similar image in ArtVault — review required' : artwork.localCheckStatus === 'no_local_match' ? 'No match among fingerprinted ArtVault records (not an internet search)' : 'Not checked or unavailable'}.</p>
+          <p>Creation proof: {artwork.proofCheckStatus === 'credible' ? 'AI assessment supports creation evidence; not a guarantee of ownership' : artwork.proofCheckStatus === 'uncertain' ? 'Needs human review' : 'Not checked or assessment unavailable'}.</p>
+          <p>Online search: {artwork.webCheckStatus === 'no_match' ? 'Cloud Vision returned no matches' : artwork.webCheckStatus === 'possible_match' ? 'Possible matches found' : 'Not checked successfully — manual search needed'}.</p>
           <p>by {artwork.artist?.name || 'Unknown artist'} · Chosen: {artwork.visibility === 'private' ? 'Vault' : 'Public gallery'}</p>
           <p>{artwork.reviewReason === 'possible_match' ? 'Possible online match — verify the source and permission' : artwork.reviewReason === 'ownership_review' ? 'Creation evidence needs manual verification' : artwork.reviewReason === 'proof_check_unavailable' ? 'Automated proof assessment unavailable — review the proof manually' : 'Online check unavailable or disabled — manually check sources and ownership'}</p>
           {(artwork.webMatchUrls || []).map((url, index) => <p key={url}><a href={url} target="_blank" rel="noopener noreferrer">Review match {index + 1}</a></p>)}
@@ -67,6 +70,7 @@ export default function PendingArtworks() {
         <div className="exhibit-row-actions">
           <Link className="btn btn-ghost btn-sm" to={`/artworks/${artwork._id}`}>View artwork</Link>
           <button className="btn btn-ghost btn-sm" type="button" onClick={() => setProofArtwork(artwork)}>View proof</button>
+          <details className="upload-check-notice"><summary>Manual online-source review</summary><p>Open the artwork to inspect it, then use Google Lens or TinEye to upload the artwork image manually. This sends that image to the selected service; do not upload private ownership proof. An empty search result does not establish ownership. Compare sources, dates, and permission evidence before approving.</p><a className="btn btn-ghost btn-sm" href="https://lens.google/" target="_blank" rel="noopener noreferrer">Open Google Lens</a> <a className="btn btn-ghost btn-sm" href="https://tineye.com/" target="_blank" rel="noopener noreferrer">Open TinEye</a></details>
           {user?.role === 'main_admin' && <>
             <label><input type="checkbox" checked={verified[artwork._id] === artwork.updated_at} onChange={(event) => setVerified((current) => ({ ...current, [artwork._id]: event.target.checked ? artwork.updated_at : null }))} /> I reviewed the proof and online sources and verified ownership or permission.</label>
             <button className="btn btn-primary btn-sm" type="button" disabled={Boolean(reviewingId) || verified[artwork._id] !== artwork.updated_at} onClick={() => decideReview(artwork, 'approve')}>Approve</button>

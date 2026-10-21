@@ -3,7 +3,7 @@
   --bg-card:#FFFFFF;
   --ink:#2B2440;
   --ink-soft:#685C86;
-  --ink-faint:#9C90BC;
+  --ink-faint:#746483;
   --violet:#6E4FA3;
   --violet-deep:#6B4FB0;
   --lilac:#DED0F7;
@@ -818,7 +818,7 @@ button, input, textarea, select{ font-family:inherit; }
 .stat-box:hover{ border-color:rgba(110,79,163,.4); }
 .account-security-card{ margin-top:18px; }
 .account-security-card h2{ font-size:20px; margin-bottom:18px; }
-.security-action-row{ display:flex; justify-content:flex-start; margin-top:14px; }
+.security-action-row{ display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-start; margin-top:14px; }
 .security-primary-btn,.security-secondary-btn{ min-height:42px; padding:10px 20px; justify-content:center; white-space:nowrap; }
 .security-otp-actions{ margin-top:12px; }
 .settings-section{ display:grid; grid-template-columns:minmax(0,1fr) minmax(360px,1fr); column-gap:28px; align-items:start; }
@@ -1597,3 +1597,101 @@ button, input, textarea, select{ font-family:inherit; }
 .ownership-proof-missing > span { font-size: 3rem; line-height: 1; color: var(--violet-deep); }
 .ownership-proof-missing strong { color: var(--ink); }
 .ownership-proof-missing p { margin: 0; max-width: 28rem; }
+/* Reporting and paging controls */
+.pagination-controls, .analytics-filters { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:center; margin:24px 0; }
+.analytics-filters { justify-content:flex-start; align-items:flex-end; }
+.analytics-filters label { display:grid; gap:6px; }
+.analytics-filters input { padding:10px; border:1px solid #b9b1c6; border-radius:8px; font:inherit; }
+.analytics-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin:20px 0; }
+.analytics-metrics .form-card { display:flex; flex-direction:column; gap:12px; padding:20px; }
+.analytics-metrics strong { font-size:1.8rem; }
+.analytics-panels { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr)); gap:20px; }
+.analytics-panels .form-card { min-width:0; }
+.analytics-panels table { width:100%; border-collapse:collapse; }
+.analytics-panels th, .analytics-panels td { padding:9px 6px; text-align:left; border-bottom:1px solid #ddd5e6; overflow-wrap:anywhere; }
+.analytics-scroll { max-height:420px; overflow:auto; }
+.analytics-panels meter { max-width:110px; width:50%; }
+.privacy-page { max-width:850px; }
+.privacy-page p { line-height:1.7; }
+.mfa-qr { width:220px; height:220px; background:white; padding:8px; }
+.account-role-indicator { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 14px; margin-bottom:18px; border:1px solid #c3afd9; border-radius:12px; background:#f5f0fc; color:#493264; font-size:13px; }
+.account-role-badge { padding:5px 10px; border-radius:999px; background:#60418d; color:white; font-size:12px; }
+.page-content-loading { min-height:50vh; padding:24px 0; color:var(--ink-soft); font-size:13px; }
+.upload-proof-guide { padding:16px 18px; margin:12px 0; border:1px solid var(--line); border-radius:12px; background:#f8f5fc; font-size:13px; line-height:1.65; color:#51445f; }
+.upload-proof-guide ul { padding-left:20px; margin:10px 0; }
+.upload-proof-guide li + li { margin-top:8px; }
+.upload-proof-guide p { margin:10px 0 0; }
+.upload-check-notice { margin:16px 0; padding:14px 16px; border:1px solid var(--line); border-radius:12px; font-size:13px; line-height:1.65; color:#51445f; }
+.upload-check-notice summary { cursor:pointer; font-weight:600; color:var(--ink); }
+/* Upload guidance uses compact, high-contrast text and distinct controls. */
+.upload-page .sub { color:#594b6c; line-height:1.6; max-width:850px; }
+.upload-form-card { border-color:#d2c6df; }
+.upload-form-card > .field { margin-bottom:24px; }
+.upload-form-card .field label { color:#30213f; font-size:13px; line-height:1.5; }
+.upload-form-card .hint, .upload-form-card .optional-mark { color:#655474; font-size:12px; line-height:1.6; }
+.upload-form-card input:not([type=radio]):not([type=checkbox]), .upload-form-card textarea, .upload-form-card select { border:1px solid #b6a6c7; background:#fff; color:#30213f; font-size:13px; min-height:44px; }
+.upload-form-card input::placeholder, .upload-form-card textarea::placeholder { color:#756580; opacity:1; }
+.upload-form-card .file-input { width:100%; padding:10px !important; border-radius:10px; overflow:hidden; }
+.upload-form-card .file-input::file-selector-button { background:#60418d; color:#fff; border:1px solid #60418d; min-height:36px; padding:8px 14px; }
+.upload-form-card .file-input::file-selector-button:hover { background:#4d3077; }
+.upload-form-card .chip-select { display:flex; flex-wrap:wrap; gap:9px; margin:8px 0 12px; }
+.upload-form-card .chip-toggle { min-height:40px; border-color:#ad99c4; color:#51356f; font-weight:600; }
+.upload-form-card .chip-toggle:hover:not(:disabled):not(.on) { background:#eee5f8; border-color:#6b4fb0; }
+.upload-form-card .chip-toggle.on { color:#fff; background:#60418d; border-color:#60418d; }
+.upload-form-card .chip-toggle:disabled:not(.on) { color:#766a80; background:#f2eef5; border-color:#cfc5da; cursor:not-allowed; }
+.upload-form-card .ownership-evidence-field { background:#fff; border:1px solid #ad96c8; padding:20px; }
+.upload-form-card .ownership-evidence-heading label { font-size:14px; }
+.upload-proof-guide { background:#f5f0fb; border-color:#c8b6dd; color:#493555; }
+.upload-proof-guide > strong { display:block; color:#352040; }
+.upload-proof-guide li::marker { color:#60418d; }
+.upload-proof-guide li + li { margin-top:12px; }
+.upload-form-card .ownership-evidence-selected { padding:10px 12px; border:1px solid #a7c5b1; border-radius:8px; background:#eff8f2; color:#245335; line-height:1.5; }
+.upload-check-notice { border-color:#bba9cd; background:#f8f5fc; }
+.upload-check-notice summary { padding:4px 0; min-height:32px; color:#493064; }
+.upload-check-notice p { margin:12px 0 0; }
+.upload-form-card .vault-upload-choice { border-color:#baa5d2; background:#f5f0fb; padding:18px; gap:12px; }
+.upload-form-card .vault-upload-choice small { color:#59486b; font-size:12px; line-height:1.6; }
+.upload-form-card .vault-upload-choice input, .upload-form-card .artwork-ownership-choice input { width:18px; height:18px; flex-shrink:0; accent-color:#60418d; }
+.upload-form-card .artwork-ownership-choice { display:flex; align-items:flex-start; gap:12px; padding:16px; border:1px solid #c4b3d6; border-radius:12px; color:#3f2d50; font-size:13px; line-height:1.6; }
+.upload-form-card .artwork-ownership-choice input { margin-top:3px; }
+.upload-actions { flex-wrap:wrap; gap:12px; }
+@media(max-width:620px) {
+  .upload-form-card .ownership-evidence-field { padding:14px; }
+  .upload-proof-guide { padding:14px; }
+  .upload-form-card .chip-toggle { padding:8px 12px; }
+  .upload-actions .btn { width:100%; }
+}
+.content { scrollbar-gutter:stable; }
+.security-feedback { margin:14px 0; padding:12px 14px; border:1px solid var(--line); border-radius:10px; line-height:1.6; overflow-wrap:anywhere; background:var(--lilac-soft); }
+.security-feedback.success { color:#185738; border-color:#aad0ba; background:#eef8f1; }
+.security-feedback.error { color:#8e2929; border-color:#dfb2b2; background:#fff0f0; }
+
+/* Clear button boundaries and readable states across light surfaces. */
+.btn { min-height:44px; justify-content:center; line-height:1.45; text-align:center; }
+.btn-ghost { background:#f5f0fc; border-color:#9b83b8; color:#493264; }
+.btn-ghost:hover:not(:disabled) { background:#e9def7; border-color:#6b4fb0; }
+.btn-primary:hover:not(:disabled) { background:#54388f; }
+.btn-danger { background:#fff1f1; border-color:#bc7272; color:#8c2727; }
+.btn-danger:hover:not(:disabled) { background:#fce0e0; border-color:#962f2f; }
+.btn:disabled, .btn-primary:disabled { opacity:1; background:#eeeaf2; border-color:#c4bacf; color:#6b6177; cursor:not-allowed; transform:none; box-shadow:none; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:3px solid #69419d; outline-offset:3px; }
+.account-security-card { color:var(--ink); }
+.account-security-card p { font-size:13px; line-height:1.45; color:#51445f; margin:10px 0; }
+.account-security-card .hint { font-size:11.5px; line-height:1.45; color:#63536f; }
+.account-security-card .security-feedback { font-size:13px; line-height:1.45; }
+.account-mfa-settings h2, .account-backup-settings h2 { font-size:16px; margin-bottom:10px; }
+.account-security-card .btn { font-size:13px; }
+.account-backup-settings ul { font-size:13px; }
+.account-security-card .eyebrow { color:#604184; }
+.account-security-card .field { min-width:0; }
+.account-security-card input:not([type=checkbox]):not([type=radio]) { border-color:#a99ab9; color:#2b2440; background:#fff; min-height:44px; }
+.account-security-card input::placeholder { color:#776983; opacity:1; }
+.account-mfa-settings, .account-backup-settings { min-width:0; }
+.account-mfa-settings > .btn { margin:6px 10px 6px 0; }
+.account-security-card .security-action-row .btn { white-space:normal; max-width:100%; }
+.account-backup-settings ul { padding:16px 16px 16px 36px; border:1px solid #baacca; border-radius:12px; background:#f5f0fc; color:#352345; line-height:1.9; }
+@media (max-width:620px) {
+  .account-security-card .security-action-row { flex-direction:column; align-items:stretch; }
+  .account-security-card .security-action-row .btn, .account-mfa-settings > .btn { width:100%; margin-right:0; }
+  .account-security-card { padding:20px; }
+}

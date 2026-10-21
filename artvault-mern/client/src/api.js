@@ -10,10 +10,10 @@ const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
 // not silently send image/API requests to the retired Render service.
 export const deployedApiUrl = 'https://artvault-art-gallery-management-exhibition-syste-production.up.railway.app/api';
 const configuredIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(configuredApiUrl);
-// Production must always use the live Railway backend. This prevents a stale
-// Vercel VITE_API_URL (for example an old Render or localhost value) from
-// breaking artwork image requests while the rest of the API still appears to load.
-const apiBaseUrl = isLocal ? '/api' : deployedApiUrl;
+// Honor a single valid deployment URL. Reject accidental comma-separated values
+// and localhost production URLs; preserve the existing Railway fallback.
+const validConfiguredUrl = /^https?:\/\/[^\s,]+$/i.test(configuredApiUrl) && !configuredIsLocal;
+const apiBaseUrl = isLocal ? '/api' : validConfiguredUrl ? configuredApiUrl.replace(/\/$/, '') : deployedApiUrl;
 
 // Fail predictably when the API is offline instead of leaving pages on an
 // indefinite loading state.
@@ -36,6 +36,9 @@ api.interceptors.response.use((response) => {
     try { localStorage.setItem('artvault:data-version', `${Date.now()}:${Math.random()}`); } catch { /* Storage is optional. */ }
   }
   return response;
+}, (error) => {
+  if (error.response?.data?.code === 'MFA_REQUIRED' && window.location.pathname !== '/mfa') window.location.assign('/mfa');
+  return Promise.reject(error);
 });
 
 export default api;

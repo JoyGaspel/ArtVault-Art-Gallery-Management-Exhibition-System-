@@ -1,5 +1,29 @@
 # Free explicit-content screening
 
+## No-billing ownership workflow
+
+Set `ARTWORK_WEB_CHECK_ENABLED=false` locally and on the backend host. This is
+now the example/default setting. Local NSFW checks remain unchanged. A local
+image digest and difference hash flag possible duplicates within fingerprinted
+ArtVault records; these are review signals, not ownership findings. Hash
+similarity can produce false positives and miss altered/cropped images.
+Private matching records and their identities are not returned to uploaders.
+
+Gemini proof assessment now runs independently of Cloud Vision, using the
+configured `GEMINI_API_KEY` and available account quota. It does not search the
+internet. With no successful online check, submissions remain pending, even
+when proof is assessed as credible. Reviewers see separate local/proof/web
+statuses and instructions to manually use Google Lens or TinEye. Uploading to
+those external sites is a deliberate reviewer action; do not upload private proof.
+
+Older artworks need a one-time fingerprint backfill from the server folder:
+`node scripts/fingerprint-artworks.js`. It adds fingerprints without changing
+artwork content, approval or timestamps; external-URL images are skipped.
+Run against the intended database after taking a backup. This command has not
+been run automatically. Existing pending records are not automatically reassessed.
+New submissions and replacement images use the new checks. Update Railway's
+web-check setting separately and restart/redeploy both environments.
+
 From the `server` folder, run `npm install`, then restart the backend with
 `npm run dev` (or `npm start`). On Windows PowerShell, use `npm.cmd` if script
 execution policy prevents running `npm`.

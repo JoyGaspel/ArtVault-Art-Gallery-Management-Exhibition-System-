@@ -56,7 +56,7 @@ async function signup(req, res, next) {
       role: 'artist',
       specializations: specializations || [],
       bio: bio || '',
-      termsVersion: '2026-10-17',
+      termsVersion: '2026-10-21',
       termsAcceptedAt: new Date(),
     });
 

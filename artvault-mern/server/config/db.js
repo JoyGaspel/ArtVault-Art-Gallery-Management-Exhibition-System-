@@ -4,6 +4,9 @@ const Artist = require('../models/Artist');
 const AdminProfile = require('../models/AdminProfile');
 const ArtworkLike = require('../models/ArtworkLike');
 const Notification = require('../models/Notification');
+const RevokedSession = require('../models/RevokedSession');
+const BackupRecoverySession = require('../models/BackupRecoverySession');
+const BackupSecurity = require('../models/BackupSecurity');
 
 async function connectDB() {
   const uri = process.env.MONGO_URI;
@@ -32,6 +35,10 @@ async function connectDB() {
     // This unique key prevents duplicate lifecycle emails when Railway and a
     // standby backend both run the same exhibit check.
     await Notification.createIndexes();
+    await RevokedSession.createIndexes();
+    await BackupRecoverySession.createIndexes();
+    await BackupSecurity.createIndexes();
+    await require('../models/RoleChangeChallenge').createIndexes();
     // Backfill the additive admin directory without changing existing artist
     // accounts, roles, passwords, artwork ownership, or audit references.
     // `sanitizeFilter` is enabled above for request safety. Mark this

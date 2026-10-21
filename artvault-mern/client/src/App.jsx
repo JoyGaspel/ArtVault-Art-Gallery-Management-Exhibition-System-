@@ -1,47 +1,54 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
 
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Gallery from './pages/Gallery';
-import ArtworkDetail from './pages/ArtworkDetail';
-import Artists from './pages/Artists';
-import ArtistProfile from './pages/ArtistProfile';
-import Exhibits from './pages/Exhibits';
-import ExhibitDetail from './pages/ExhibitDetail';
-import Upload from './pages/Upload';
-import Settings from './pages/Settings';
-import ManageExhibits from './pages/ManageExhibits';
-import ManageArtists from './pages/ManageArtists';
-import ManageSubAdmins from './pages/ManageSubAdmins';
-import ManageGallery from './pages/ManageGallery';
-import PendingArtworks from './pages/PendingArtworks';
-import Archives from './pages/Archives';
-import AuditLogs from './pages/AuditLogs';
-import ExhibitSubmissions from './pages/ExhibitSubmissions';
-import ManageExhibitEntries from './pages/ManageExhibitEntries';
-import ExhibitSubmissionStatus from './pages/ExhibitSubmissionStatus';
-import ArtworkLikes from './pages/ArtworkLikes';
-import Vault from './pages/Vault';
-import MyArtworks from './pages/MyArtworks';
-import RemovedArtworks from './pages/RemovedArtworks';
-import OfflineWorkspace from './pages/OfflineWorkspace';
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Gallery = lazy(() => import('./pages/Gallery'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const MfaChallenge = lazy(() => import('./pages/MfaChallenge'));
+const ArtworkDetail = lazy(() => import('./pages/ArtworkDetail'));
+const Artists = lazy(() => import('./pages/Artists'));
+const ArtistProfile = lazy(() => import('./pages/ArtistProfile'));
+const Exhibits = lazy(() => import('./pages/Exhibits'));
+const ExhibitDetail = lazy(() => import('./pages/ExhibitDetail'));
+const Upload = lazy(() => import('./pages/Upload'));
+const Settings = lazy(() => import('./pages/Settings'));
+const ManageExhibits = lazy(() => import('./pages/ManageExhibits'));
+const ManageArtists = lazy(() => import('./pages/ManageArtists'));
+const ManageSubAdmins = lazy(() => import('./pages/ManageSubAdmins'));
+const ManageGallery = lazy(() => import('./pages/ManageGallery'));
+const PendingArtworks = lazy(() => import('./pages/PendingArtworks'));
+const Archives = lazy(() => import('./pages/Archives'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const ExhibitSubmissions = lazy(() => import('./pages/ExhibitSubmissions'));
+const ManageExhibitEntries = lazy(() => import('./pages/ManageExhibitEntries'));
+const ExhibitSubmissionStatus = lazy(() => import('./pages/ExhibitSubmissionStatus'));
+const ArtworkLikes = lazy(() => import('./pages/ArtworkLikes'));
+const Vault = lazy(() => import('./pages/Vault'));
+const MyArtworks = lazy(() => import('./pages/MyArtworks'));
+const RemovedArtworks = lazy(() => import('./pages/RemovedArtworks'));
+const OfflineWorkspace = lazy(() => import('./pages/OfflineWorkspace'));
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true }}>
       <AuthProvider>
         <ToastProvider>
+          <Suspense fallback={<div className="empty" role="status">Loading page…</div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/mfa" element={<MfaChallenge />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/terms" element={<Navigate to="/signup?terms=open" replace />} />
 
             <Route element={<AppLayout />}>
               <Route path="/" element={<Gallery />} />
+              <Route path="/privacy" element={<Navigate to="/signup?terms=open" replace />} />
+              <Route path="/analytics" element={<ProtectedRoute role={['sub_admin', 'main_admin']}><Analytics /></ProtectedRoute>} />
               <Route path="/artworks/:id" element={<ArtworkDetail />} />
               {import.meta.env.VITE_OFFLINE_READONLY === 'true' && <Route path="/offline-workspace" element={<OfflineWorkspace />} />}
               <Route path="/artists" element={<Artists />} />
@@ -67,6 +74,7 @@ export default function App() {
               <Route path="/artwork-likes" element={<ProtectedRoute role="main_admin"><ArtworkLikes /></ProtectedRoute>} />
             </Route>
           </Routes>
+          </Suspense>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

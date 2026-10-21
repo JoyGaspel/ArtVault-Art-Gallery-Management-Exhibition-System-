@@ -4,6 +4,8 @@ const AdminProfile = require('../models/AdminProfile');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+const { updateAdminSelfProfile } = require('../controllers/artistController');
+router.put('/me', requireAuth, requireAdmin, updateAdminSelfProfile);
 
 // Read-only directory for administrator tooling. Authentication and role
 // enforcement still come from the original Artist account.

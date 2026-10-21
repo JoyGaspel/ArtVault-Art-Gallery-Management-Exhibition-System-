@@ -123,8 +123,8 @@ async function listArtists(req, res, next) {
 // in the full artists directory response.
 async function getArtistAvatar(req, res, next) {
   try {
-    const artist = await Artist.findById(req.params.id).select('avatar_path').lean();
-    if (!artist?.avatar_path) return res.status(404).end();
+    const artist = await Artist.findById(req.params.id).select('avatar_path role').lean();
+    if (!artist?.avatar_path || artist.role !== 'artist') return res.status(404).end();
     const match = /^data:([^;]+);base64,(.+)$/s.exec(artist.avatar_path);
     if (!match) return res.redirect(artist.avatar_path);
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -138,7 +138,7 @@ async function getArtist(req, res, next) {
   try {
     res.set('Cache-Control', 'public, no-cache, must-revalidate');
     const artist = await Artist.findById(req.params.id).select('name avatar_path specializations bio role createdAt updatedAt');
-    if (!artist) return res.status(404).json({ message: 'Artist not found.' });
+    if (!artist || artist.role !== 'artist') return res.status(404).json({ message: 'Artist not found.' });
 
     const imageOrigin = `${req.protocol}://${req.get('host')}`;
     const avatarUrl = artist.avatar_path ? `${imageOrigin}/api/artists/${artist._id}/avatar?v=${encodeURIComponent(artist.updatedAt || '')}` : '';
@@ -172,7 +172,7 @@ async function getArtist(req, res, next) {
 // PUT /api/artists/me  (the signed-in artist updates their own profile)
 async function updateMyProfile(req, res, next) {
   try {
-    if (req.user.role !== 'artist') return res.status(403).json({ message: 'Administrator profiles cannot be edited here.' });
+    if (req.user.role !== 'artist' && !req.adminSelfProfile) return res.status(403).json({ message: 'Administrator profiles cannot be edited here.' });
     const { name, firstName, lastName, bio, specializations, avatar_path, emailLikes, emailSubmissionStatus, emailExhibits, emailArtworkRestored } = req.body;
     const artist = req.user;
     const previous = {
@@ -245,8 +245,8 @@ async function requestDeletionCode(req, res, next) {
       const result = await mailer.sendEmail({
         to: artist.email,
         subject: 'Confirm your ArtVault account deletion',
-        text: `Your ArtVault account deletion code is ${code}. It expires in 10 minutes. If you did not request this, do not share the code; your account has not been changed.`,
-        html: `<p>Your ArtVault account deletion code is <strong>${code}</strong>.</p><p>It expires in 10 minutes. If you did not request this, do not share the code; your account has not been changed.</p>`,
+        ...require('../utils/securityEmail').securityEmail({ title: 'Confirm your account deletion', message: 'Enter this code in ArtVault only if you want to continue your account deletion request.', code,
+          footer: 'If you did not request this, ignore this email and do not share the code. Your account has not been changed.' }),
       });
       if (result?.skipped) throw new Error('Email delivery disabled');
     } catch (error) {
@@ -359,10 +359,22 @@ async function setArtistRole(req, res, next) {
     const artist = await Artist.findOne({ _id: req.params.id, role: mongoose.trusted({ $in: ['artist', 'sub_admin'] }) }).select('+supabaseUserId');
     if (!artist) return res.status(404).json({ message: 'Artist account not found.' });
     if (artist.role === role) return res.json({ artist: artist.toSafeObject(), message: 'Role is already up to date.' });
+      if (req.body.confirmed !== true) return res.status(400).json({ message: 'Confirm the administrator access change before continuing.' });
+      await require('../services/roleChangeVerification').consume(req.user._id, artist, role, req.body.otp);
+      const previousRole = artist.role;
+      const updated = await Artist.updateOne({ _id: artist._id, role: previousRole }, { $set: { role } });
+      if (!updated.modifiedCount) return res.status(409).json({ message: 'This account role changed. Refresh and request a new verification code.' });
     artist.role = role;
-    await artist.save();
     await syncAdminProfile(artist);
     recordAudit({ req, action: 'role_change', entityType: 'artist', entityId: artist._id, details: { role } });
+      const { securityEmail } = require('../utils/securityEmail');
+      require('../models/Notification').create({ recipient: artist._id, type: 'role_change',
+        title: role === 'sub_admin' ? 'You are now a Sub-admin' : 'Sub-admin access revoked',
+        message: role === 'sub_admin' ? 'The Main Admin promoted your account to Sub-admin. Your administration tools are now available. Your account no longer has a public artist profile.' : 'The Main Admin revoked your Sub-admin access. Your account is now an Artist account. Your existing artworks and security settings remain.',
+      }).catch(() => console.error('Role-change in-app notification could not be saved.'));
+      for (const email of new Set([req.user.email, artist.email])) {
+        mailer.sendEmail({ to: email, subject: role === 'sub_admin' ? 'ArtVault: Sub-admin access granted' : 'ArtVault: Sub-admin access revoked', ...securityEmail({ title: role === 'sub_admin' ? 'Sub-admin access granted' : 'Sub-admin access revoked', message: `${artist.name} (${artist.email}) is now ${role === 'sub_admin' ? 'a Sub-admin. Administration tools are now available; this account no longer has a public artist profile' : 'an Artist. Sub-admin permissions have been removed; existing artworks and security settings remain'}.`, footer: 'Open ArtVault to see your updated role. If this change was unexpected, contact the Main Admin and secure your account.' }) }).catch(() => console.error('Role-change confirmation email could not be sent.'));
+      }
     res.json({ artist: artist.toSafeObject() });
   } catch (err) {
     next(err);
@@ -425,7 +437,28 @@ async function deleteArtistAsAdmin(req, res, next) {
   }
 }
 
+async function updateAdminSelfProfile(req, res, next) {
+  const allowed = ['firstName', 'lastName', 'avatar_path'];
+  if (Object.keys(req.body).some((key) => !allowed.includes(key))) return res.status(400).json({ message: 'Only your first name, last name, and profile picture can be changed here.' });
+  req.adminSelfProfile = true;
+  return updateMyProfile(req, res, next);
+}
+
+async function requestRoleChangeOtp(req, res, next) {
+  try {
+    if (req.user.role !== 'main_admin') return res.status(403).json({ message: 'Only the Main Admin can request role changes.' });
+    if (!['artist', 'sub_admin'].includes(req.body.role) || !mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Choose a valid account and role.' });
+    const target = await Artist.findOne({ _id: req.params.id, role: mongoose.trusted({ $in: ['artist', 'sub_admin'] }) });
+    if (!target || target.role === req.body.role) return res.status(409).json({ message: 'This account is unavailable or already has that role. Refresh the list.' });
+    await require('../services/roleChangeVerification').send(req.user, target, req.body.role);
+    res.set('Cache-Control', 'no-store');
+    res.json({ message: `Verification email sent to ${req.user.email}. Check your inbox and spam folder. No role has changed yet.` });
+  } catch (error) { next(error); }
+}
+
 module.exports = {
+  requestRoleChangeOtp,
+  updateAdminSelfProfile,
   listArtists,
   getArtistAvatar,
   getArtist,

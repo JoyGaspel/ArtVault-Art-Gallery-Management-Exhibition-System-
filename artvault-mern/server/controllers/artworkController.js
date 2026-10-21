@@ -66,8 +66,9 @@ function validateArtworkLists(categories, materials) {
   if (!Array.isArray(categories) || !categories.length || categories.length > MAX_CATEGORIES || categories.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 40)) {
     throw Object.assign(new Error('Choose between 1 and 5 categories, each 40 characters or fewer.'), { status: 400 });
   }
-  if (categories.some((item) => !ALLOWED_CATEGORIES.has(item.trim()))) {
-    throw Object.assign(new Error('Choose categories from the ArtVault category list.'), { status: 400 });
+  if (categories.some((item) => /^(others?|all)$/i.test(item.trim()) || !/^[\p{L}\p{N}][\p{L}\p{N}\s.'’()&+/-]*$/u.test(item.trim()))
+    || new Set(categories.map((item) => cleanText(item, 40).toLocaleLowerCase())).size !== categories.length) {
+    throw Object.assign(new Error('Specify a distinct art specialization for Others, up to 40 characters. Use names, not links or markup.'), { status: 400 });
   }
   if (materials !== undefined && (!Array.isArray(materials) || materials.length > MAX_MATERIALS || materials.some((item) => typeof item !== 'string' || !item.trim() || item.trim().length > 80))) {
     throw Object.assign(new Error('Use at most 20 materials, each 80 characters or fewer.'), { status: 400 });
@@ -115,7 +116,7 @@ async function getAdminArtworkSummary(req, res, next) {
 async function listPendingArtworkReviews(req, res, next) {
   try {
     const rows = await Artwork.find({ reviewStatus: 'pending' })
-      .select('title artist visibility reviewStatus reviewReason thumbnail_path image_path ownershipDeclared created_at updated_at +webMatchUrls')
+      .select('title artist visibility reviewStatus reviewReason localCheckStatus proofCheckStatus webCheckStatus thumbnail_path image_path ownershipDeclared created_at updated_at +webMatchUrls')
       .populate('artist', 'name email')
       .sort({ created_at: -1 }).limit(100).lean();
     res.set('Cache-Control', 'private, no-store');
@@ -166,14 +167,27 @@ async function listArtworks(req, res, next) {
     // Keep the public catalog briefly cacheable so repeat visits render
     // immediately while still reflecting uploads and edits within seconds.
     res.set('Cache-Control', 'public, no-cache, must-revalidate');
-    const { category, artist } = req.query;
+    const { category, artist, search } = req.query;
+    if ([category, artist].some((value) => value !== undefined && (typeof value !== 'string' || value.length > 120))) return res.status(400).json({ message: 'Category and artist filters must be text up to 120 characters.' });
+    if (search !== undefined && (typeof search !== 'string' || search.length > 120)) return res.status(400).json({ message: 'Search must be text up to 120 characters.' });
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     // Keep the public gallery responsive while still allowing management pages
     // to request a larger page explicitly.
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
     const filter = publicArtworkFilter();
-    if (category) filter.categories = category;
+    if (category === 'Others') filter.categories = mongoose.trusted({ $elemMatch: { $nin: [...ALLOWED_CATEGORIES] } });
+    else if (category) filter.categories = category;
     if (artist && mongoose.isValidObjectId(artist)) filter.artist = new mongoose.Types.ObjectId(artist);
+    if (search?.trim()) {
+      const expression = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const Artist = require('../models/Artist');
+      const artists = await Artist.find({ name: mongoose.trusted({ $regex: expression }) }).select('_id').limit(200).lean();
+      filter.$or = [
+        { title: mongoose.trusted({ $regex: expression }) },
+        { categories: mongoose.trusted({ $regex: expression }) },
+        { artist: mongoose.trusted({ $in: artists.map((entry) => entry._id) }) },
+      ];
+    }
 
     const skip = (page - 1) * limit;
 
@@ -404,6 +418,11 @@ async function createArtwork(req, res, next) {
       reviewStatus,
       reviewReason: check.reviewReason,
       webMatchUrls: check.web.urls,
+      imageDigest: check.local.imageDigest,
+      imageFingerprint: check.local.imageFingerprint,
+      localCheckStatus: check.local.status,
+      proofCheckStatus: check.evidence.status,
+      webCheckStatus: check.web.status,
       ownershipDeclared: true,
       ownershipDeclaredAt: new Date(),
     });
@@ -411,6 +430,8 @@ async function createArtwork(req, res, next) {
 
     const safeArtwork = artwork.toObject();
     delete safeArtwork.ownership_evidence_path;
+    delete safeArtwork.imageDigest;
+    delete safeArtwork.imageFingerprint;
     res.status(201).json({ artwork: safeArtwork, webCheckStatus: check.web.status });
   } catch (err) {
     next(err);
@@ -554,7 +575,12 @@ async function updateArtwork(req, res, next) {
       if (replacingImage) {
         artwork.image_path = replacementImage;
       }
-      const check = await checkArtworkOwnership(artwork.image_path, replacementProof, ownershipDeclared);
+      const check = await checkArtworkOwnership(artwork.image_path, replacementProof, ownershipDeclared, artwork._id);
+      artwork.imageDigest = check.local.imageDigest;
+      artwork.imageFingerprint = check.local.imageFingerprint;
+      artwork.localCheckStatus = check.local.status;
+      artwork.proofCheckStatus = check.evidence.status;
+      artwork.webCheckStatus = check.web.status;
       artwork.reviewStatus = check.reviewStatus;
       artwork.reviewReason = check.reviewReason;
       artwork.webMatchUrls = check.web.urls;

@@ -2,7 +2,7 @@ const sharp = require('sharp');
 
 // A web match is a review signal, never a finding that an artist copied work.
 async function checkArtworkOnWeb(imageDataUrl) {
-  if (process.env.ARTWORK_WEB_CHECK_ENABLED === 'false') return { status: 'disabled', urls: [] };
+  if (process.env.ARTWORK_WEB_CHECK_ENABLED !== 'true') return { status: 'disabled', urls: [] };
   const key = process.env.GOOGLE_VISION_API_KEY;
   if (!key) return { status: 'unavailable', urls: [] };
   try {

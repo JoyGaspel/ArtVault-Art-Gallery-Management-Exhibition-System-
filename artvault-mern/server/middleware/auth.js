@@ -3,6 +3,11 @@ const jwt = require('jsonwebtoken');
 const Artist = require('../models/Artist');
 const Archive = require('../models/Archive');
 const supabase = require('../config/supabase');
+const RevokedSession = require('../models/RevokedSession');
+const { tokenHash, needsMfa } = require('../utils/sessionSecurity');
+const BackupRecoverySession = require('../models/BackupRecoverySession');
+const mongoose = require('mongoose');
+const BackupSecurity = require('../models/BackupSecurity');
 
 async function mirrorSupabaseUser(authUser) {
   if (!authUser?.email || !authUser.email_confirmed_at) return null;
@@ -65,15 +70,23 @@ async function mirrorSupabaseUser(authUser) {
 
 /** Verifies Supabase Auth tokens, mirrors verified users into MongoDB, and
  * retains legacy JWT support while the migration is in progress. */
-async function requireAuth(req, res, next) {
+async function authenticate(req, res, next, allowMfaPending = false) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ message: 'Sign in required for this action.' });
 
   try {
+    if (await RevokedSession.exists({ tokenHash: tokenHash(token) })) return res.status(401).json({ message: 'This session has been signed out. Sign in again.' });
+    req.authToken = token;
     if (supabase) {
       const { data, error } = await supabase.auth.getUser(token);
       if (!error && data.user) {
+        // Claims are used only after Supabase verifies the token with getUser.
+        const claims = jwt.decode(token);
+        if (needsMfa(data.user, claims) && !allowMfaPending) {
+          const recovered = typeof claims?.session_id === 'string' && await BackupRecoverySession.exists({ providerUserId: data.user.id, sessionId: claims.session_id, expiresAt: mongoose.trusted({ $gt: new Date() }) });
+          if (!recovered) return res.status(403).json({ code: 'MFA_REQUIRED', message: 'Complete authenticator verification to continue.' });
+        }
         if (!data.user.email_confirmed_at) {
           return res.status(403).json({ message: 'Please confirm your email before continuing.' });
         }
@@ -100,6 +113,19 @@ async function requireAuth(req, res, next) {
             });
           }
           req.supabaseUserId = data.user.id;
+          // Backup codes can independently protect an account without TOTP.
+          // The setup OTP verifies its current session atomically with code creation.
+          if (!allowMfaPending && claims?.aal !== 'aal2' && !needsMfa(data.user, claims)
+            && await BackupSecurity.exists({ user: user._id, enabled: true })) {
+            const sessionId = claims?.session_id;
+            const verified = typeof sessionId === 'string' && (
+              await BackupSecurity.exists({ user: user._id, enabled: true, verifiedSessionId: sessionId, verifiedSessionExpiresAt: mongoose.trusted({ $gt: new Date() }) })
+              || await BackupRecoverySession.exists({ providerUserId: data.user.id, sessionId, expiresAt: mongoose.trusted({ $gt: new Date() }) })
+            );
+            if (!verified) return res.status(403).json({ code: 'MFA_REQUIRED', message: 'Verify sign-in with a backup security code.' });
+          }
+          req.providerFactors = data.user.factors || [];
+          req.authClaims = claims;
           req.user = user;
           return next();
         }
@@ -107,8 +133,10 @@ async function requireAuth(req, res, next) {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await Artist.findById(payload.sub);
+    const user = await Artist.findById(payload.sub).select('+supabaseUserId');
     if (!user) return res.status(401).json({ message: 'This account no longer exists.' });
+    if (user.supabaseUserId) return res.status(401).json({ message: 'Sign in using your verified account session.' });
+    if (user.removed) return res.status(423).json({ message: 'This account was removed. Contact an ArtVault administrator.' });
     if (user.status === 'suspended') return res.status(423).json({ message: 'This artist account is suspended and awaiting administrator review.' });
     if (user.lockUntil && user.lockUntil > Date.now()) {
       return res.status(423).json({
@@ -124,6 +152,11 @@ async function requireAuth(req, res, next) {
   }
 }
 
+function requireAuth(req, res, next) { return authenticate(req, res, next); }
+// Only backup-code redemption uses this: still requires a verified password
+// session and all account restrictions; it cannot authenticate ordinary routes.
+function requireRecoveryAuth(req, res, next) { return authenticate(req, res, next, true); }
+
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -137,4 +170,4 @@ function requireAdmin(req, res, next) {
   return requireRole('admin', 'sub_admin', 'main_admin')(req, res, next);
 }
 
-module.exports = { requireAuth, requireRole, requireAdmin };
+module.exports = { requireAuth, requireRecoveryAuth, requireRole, requireAdmin };

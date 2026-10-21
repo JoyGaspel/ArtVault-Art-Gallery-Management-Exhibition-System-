@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import PageLoadState from '../components/PageLoadState';
 import ConfirmDialog from '../components/ConfirmDialog';
+import RoleChangeDialog from '../components/RoleChangeDialog';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 
 export default function ManageArtists() {
@@ -58,18 +59,6 @@ export default function ManageArtists() {
     const nextRole = artist.role === 'sub_admin' ? 'artist' : 'sub_admin';
     setPendingRole({ artist, nextRole });
   }
-  async function confirmRole() {
-    const { artist, nextRole } = pendingRole || {}; setPendingRole(null); if (!artist) return;
-    try {
-      const response = await api.put(`/artists/admin/${artist._id}/role`, { role: nextRole });
-      showToast(nextRole === 'sub_admin' ? `${artist.name} is now a sub-admin.` : `${artist.name} is now an artist.`);
-      setArtists((current) => current.map((item) => item._id === artist._id ? { ...item, ...response.data.artist } : item));
-      load();
-    } catch (error) {
-      showToast(error.response?.data?.message || 'Could not change this account role.', true);
-    }
-  }
-
   function changeStatus(artist) {
     setPendingStatus({ artist, nextStatus: artist.status === 'suspended' ? 'active' : 'suspended' });
   }
@@ -137,7 +126,7 @@ export default function ManageArtists() {
       )}
 
       {pendingDelete && <ConfirmDialog title="Archive artist account?" message={`“${pendingDelete.name}” and their artworks will be moved to Archives. You can restore them later.`} confirmLabel="Move to archives" danger onConfirm={confirmRemove} onCancel={() => setPendingDelete(null)} />}
-      {pendingRole && <ConfirmDialog title={pendingRole.nextRole === 'sub_admin' ? 'Make sub-admin?' : 'Revoke sub-admin?'} message={`${pendingRole.artist.name} will ${pendingRole.nextRole === 'sub_admin' ? 'be allowed to manage gallery, exhibits, and users' : 'return to a regular artist account'}.`} confirmLabel="Continue" onConfirm={confirmRole} onCancel={() => setPendingRole(null)} />}
+      {pendingRole && <RoleChangeDialog artist={pendingRole.artist} role={pendingRole.nextRole} onClose={() => setPendingRole(null)} onSuccess={() => { showToast(`${pendingRole.artist.name} is now ${pendingRole.nextRole === 'sub_admin' ? 'a Sub-admin' : 'an Artist'}. Confirmation emails have been queued.`); setPendingRole(null); load(); }} />}
       {pendingStatus && <ConfirmDialog title={pendingStatus.nextStatus === 'suspended' ? 'Suspend artist account?' : 'Activate artist account?'} message={pendingStatus.nextStatus === 'suspended' ? `${pendingStatus.artist.name} will be unable to sign in until an administrator activates the account.` : `${pendingStatus.artist.name} will be allowed to sign in again.`} confirmLabel={pendingStatus.nextStatus === 'suspended' ? 'Suspend account' : 'Activate account'} danger={pendingStatus.nextStatus === 'suspended'} onConfirm={confirmStatus} onCancel={() => setPendingStatus(null)} />}
     </section>
   );

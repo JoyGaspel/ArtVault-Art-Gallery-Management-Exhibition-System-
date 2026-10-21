@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import ArtworkCategoryPicker from '../components/ArtworkCategoryPicker';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
@@ -9,10 +10,6 @@ import PageLoadState from '../components/PageLoadState';
 import { materialError } from '../utils/materialValidation';
 import { useAuth } from '../context/AuthContext';
 
-const categories = [
-  'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
-  'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
-];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/pjpeg', 'image/webp', 'image/gif'];
 
@@ -108,15 +105,6 @@ export default function ManageGallery() {
     setImage(null);
     setImagePreview(editing ? `${(api.defaults.baseURL || '/api').replace(/\/$/, '')}/artworks/${editing._id}/image` : '');
     if (imageInputRef.current) imageInputRef.current.value = '';
-  }
-
-  function toggleCategory(category) {
-    setForm((current) => ({
-      ...current,
-      categories: current.categories.includes(category)
-        ? current.categories.filter((item) => item !== category)
-        : [...current.categories, category],
-    }));
   }
 
   async function save() {
@@ -245,7 +233,7 @@ export default function ManageGallery() {
             </div>}
             <div className="field">
               <label>Categories <span className="optional-mark">(optional)</span></label>
-              <div className="chip-select">{categories.map((item) => <button key={item} type="button" className={`chip-toggle${form.categories.includes(item) ? ' on' : ''}`} onClick={() => toggleCategory(item)}>{item}</button>)}</div>
+              <ArtworkCategoryPicker key={editing._id} value={form.categories} onChange={(categories) => setForm((current) => ({ ...current, categories }))} />
             </div>
             <div className="field"><label>Materials <span className="optional-mark">(optional)</span></label><input value={form.materials} onChange={(event) => setForm({ ...form, materials: event.target.value })} aria-invalid={Boolean(materialError(form.materials))} aria-describedby="moderation-materials-help" /><div className="hint" id="moderation-materials-help">{materialError(form.materials) || 'Use recognizable material names, separated by commas.'}</div></div>
             <div className="modal-actions">

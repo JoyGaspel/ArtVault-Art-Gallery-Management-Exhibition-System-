@@ -93,13 +93,14 @@ export default function Sidebar() {
           </div>}
           <div className="nav-group">
             <div className="nav-heading">Activity &amp; records</div>
+            {hasAdminActivity && <NavigationLink to="/analytics" label="Analytics" icon="activity" />}
             <NavigationLink to="/archives" label="Archives" icon="archives" />
             {hasAdminActivity && <NavigationLink to="/audit-logs" label={isMainAdmin ? 'Activity logs' : 'Artist activity'} icon="activity" />}
             {isMainAdmin && <NavigationLink to="/artwork-likes" label="Artwork likes" icon="likes" />}
           </div>
           <div className="nav-group">
             <div className="nav-heading">Account</div>
-            <NavigationLink to="/settings" label="Account security" icon="settings" />
+            <NavigationLink to="/settings" label="Profile settings" icon="settings" />
           </div>
         </>}
       </nav>

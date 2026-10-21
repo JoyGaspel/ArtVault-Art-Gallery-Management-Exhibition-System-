@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import ArtworkCategoryPicker from '../components/ArtworkCategoryPicker';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useToast } from '../components/Toast';
@@ -7,10 +8,6 @@ import { createGalleryThumbnail, fileToDataUrl } from '../utils/imageProcessing'
 import { materialError } from '../utils/materialValidation';
 import { appendMaterial, suggestedMaterials } from '../utils/materialSuggestions';
 
-const ALL_CATEGORIES = [
-  'Digital Art', 'Illustration', 'Textile Art', 'Crafts', 'Photography',
-  'Sculpture', 'Painting', 'Traditional Art', 'Mixed Media', 'Calligraphy',
-];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/pjpeg', 'image/webp', 'image/gif'];
 
@@ -36,14 +33,6 @@ export default function Upload() {
   const fileInputRef = useRef(null);
   const evidenceInputRef = useRef(null);
   const evidenceSectionRef = useRef(null);
-
-  function toggleCategory(cat) {
-    if (!categories.includes(cat) && categories.length >= 5) {
-      showToast('Choose no more than 5 categories.', true);
-      return;
-    }
-    setCategories((c) => (c.includes(cat) ? c.filter((x) => x !== cat) : [...c, cat]));
-  }
 
   function handleImageChange(event) {
     const file = event.target.files?.[0];
@@ -122,6 +111,10 @@ export default function Upload() {
       showToast('Title must be 50 characters or fewer, and description 1,000 or fewer.', true);
       return;
     }
+    if (categories.some((item) => !item.trim() || /^(others?|all)$/i.test(item.trim()))) {
+      showToast('Specify your art specialization when Others is selected.', true);
+      return;
+    }
     if (!categories.length || categories.length > 5) {
       showToast('Choose between 1 and 5 artwork categories.', true);
       return;
@@ -184,7 +177,7 @@ export default function Upload() {
         <div>
           <div className="eyebrow">ARTIST STUDIO · NEW WORK</div>
           <h1>Upload an artwork</h1>
-          <div className="sub">Submit your original artwork or work you have permission to display. Safe artwork with credible creation proof and no online matches goes straight to your chosen gallery or Vault. Uncertain submissions wait for review.</div>
+          <div className="sub">Share a piece you created or have permission to display. Add its details, choose the gallery or your Vault, and include an image that helps us understand your creative process or permission to share.</div>
         </div>
       </div>
 
@@ -192,7 +185,7 @@ export default function Upload() {
         <div className="field">
           <label htmlFor="artwork-image">Artwork image <span className="required-mark" aria-hidden="true">*</span></label>
           <input className="file-input" ref={fileInputRef} id="artwork-image" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} required aria-required="true" aria-invalid={Boolean(imageError)} aria-describedby="artwork-image-help" />
-          <div className="hint" id="artwork-image-help">Still PNG, JPG/JPEG/JPE, WebP, or GIF only. Maximum 10 MB. Artwork and proof are screened locally for nudity, pornography, and sexually suggestive content. Uploads pause when screening is unavailable. Automated screening can make mistakes.</div>
+          <div className="hint" id="artwork-image-help">Choose a clear image of your artwork. PNG, JPG/JPEG/JPE, WebP, or still GIF, up to 10 MB. Animated images are not supported.</div>
           {imageError && <div className="required-feedback" role="alert">{imageError}</div>}
           {preview && (
             <div className="upload-preview-wrap">
@@ -214,23 +207,12 @@ export default function Upload() {
         </div>
         <div className="field">
           <label>Description <span className="optional-mark">(optional)</span></label>
-          <textarea maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this piece about?" />
+          <textarea maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Tell viewers about your inspiration, process, or the story behind this piece." />
           <div className="hint">{description.length}/1000 characters</div>
         </div>
         <div className="field">
           <label>Categories <span className="required-mark" aria-hidden="true">*</span></label>
-          <div className="chip-select">
-            {ALL_CATEGORIES.map((c) => (
-              <button
-                type="button" key={c}
-                className={`chip-toggle${categories.includes(c) ? ' on' : ''}`}
-                onClick={() => toggleCategory(c)}
-                disabled={categories.length >= 5 && !categories.includes(c)}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+          <ArtworkCategoryPicker value={categories} onChange={setCategories} />
           <div className="hint">Choose 1 to 5 categories. At least one is required.</div>
         </div>
         <div className="field">
@@ -242,24 +224,40 @@ export default function Upload() {
               {suggestedMaterials(categories).map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </div>
-          <div className="hint" id="upload-materials-help">{materialsTouched && materialError(materials) ? materialError(materials) : 'Separate real material names with commas; custom materials are welcome. Maximum 20, each up to 80 characters.'}</div>
+          <div className="hint" id="upload-materials-help">{materialsTouched && materialError(materials) ? materialError(materials) : 'List the materials you used, separated by commas. Choose a suggestion if helpful. Up to 20 materials, 80 characters each; contact an administrator if a material is not recognized.'}</div>
         </div>
 
         <div className="vault-upload-choice" role="group" aria-label="Artwork visibility, required">
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'public'} onChange={() => setVisibility('public')} /> Public gallery</label>
             <label><input type="radio" name="artwork-visibility" checked={visibility === 'private'} onChange={() => setVisibility('private')} /> Save privately to my Vault</label>
-            <small>Choose where to save your artwork before continuing.</small>
+            <small>Approved gallery artworks are visible to visitors. Vault artworks are hidden from visitors, but you and authorized administrators can view them.</small>
         </div>
         <div ref={evidenceSectionRef} className={`field ownership-evidence-field${proofError ? ' has-error' : ''}`}>
-          <div className="ownership-evidence-heading"><span className="ownership-evidence-number" aria-hidden="true">1</span><div><label htmlFor="ownership-evidence">Upload ownership proof <span className="required-mark" aria-hidden="true">*</span></label><div className="hint">Add one sketch, work-in-progress photo, editing/layer screenshot, or photo of a permission note.</div></div></div>
+          <div className="ownership-evidence-heading"><span className="ownership-evidence-number" aria-hidden="true">1</span><div><label htmlFor="ownership-evidence">Creation or permission proof <span className="required-mark" aria-hidden="true">*</span></label><div className="hint">Choose one image showing how you made this piece, or permission from its creator to display it.</div></div></div>
+          <div className="upload-proof-guide">
+            <strong>What can I upload as proof?</strong>
+            <ul>
+              <li><strong>Digital art or pixel art:</strong> a screenshot showing the same artwork with its layers, timeline, or editing workspace.</li>
+              <li><strong>Painting, drawing, or calligraphy:</strong> a sketch or a photo taken while this piece was still in progress.</li>
+              <li><strong>Sculpture, textile art, or crafts:</strong> a photo of this piece during assembly, shaping, stitching, or another making stage.</li>
+              <li><strong>Photography:</strong> a screenshot of the original photo in your editing workflow, or a related behind-the-scenes image. These may need administrator review.</li>
+              <li><strong>Work shared with permission:</strong> an image of a permission message or note that identifies the work and permits you to display it. Permission evidence is reviewed by an administrator.</li>
+            </ul>
+            <p>Choose evidence related to this specific piece. Another copy of the finished image alone may not show the creative process. You do not need to include your face or an ID. Crop or cover unrelated messages, contact details, and other private information while keeping the relevant evidence readable.</p>
+          </div>
           <input ref={evidenceInputRef} id="ownership-evidence" className="file-input" type="file" accept=".png,.jpg,.jpeg,.jpe,.webp,.gif,image/png,image/jpeg,image/webp,image/gif" onChange={handleEvidenceChange} aria-invalid={Boolean(proofError)} aria-describedby="ownership-proof-help" required />
-          <div className="hint" id="ownership-proof-help">PNG, JPG/JPEG/JPE, WebP, or GIF up to 5 MB. Show the same artwork in progress, a related sketch, or editable layers. A copy of the finished artwork alone is insufficient. Permission notes require manual review. Sexual-content screening runs locally; when configured, Gemini receives artwork and proof for ownership assessment and Google Cloud Vision receives the artwork for online matching.</div>
+          <div className="hint" id="ownership-proof-help">One image, up to 5 MB: PNG, JPG/JPEG/JPE, WebP, or still GIF. Proof is not displayed in the public gallery; it can be viewed by you and authorized administrators.</div>
           {ownershipEvidence && <div className="ownership-evidence-selected" role="status">✓ Proof selected: {ownershipEvidence.name}</div>}
           {proofError && <div className="required-feedback" role="alert">{proofError}</div>}
         </div>
+        <details className="upload-check-notice">
+          <summary>How your upload and proof are checked</summary>
+          <p>We use automated checks to help keep the gallery appropriate and support artwork review. Sexual-content screening runs on the ArtVault server. When configured, Google Cloud Vision receives your artwork to look for online matches, and Gemini receives the artwork and proof to assess creation evidence.</p>
+          <p>Some submissions need administrator review before appearing in the gallery or Vault. An online match does not mean you copied a work, and an automated check cannot establish ownership. Checks can make mistakes; contact an administrator if you believe your work was restricted incorrectly. If screening is temporarily unavailable, try uploading again later.</p>
+        </details>
         <label className="artwork-ownership-choice">
           <input type="checkbox" checked={ownershipDeclared} onChange={(event) => setOwnershipDeclared(event.target.checked)} />
-          <span><strong>2. Confirm ownership</strong><br />I created this artwork or have permission to display it on ArtVault. <span className="required-mark" aria-hidden="true">*</span></span>
+          <span><strong>2. Confirm your right to share</strong><br />I created this artwork or have permission from its creator to display it on ArtVault. <span className="required-mark" aria-hidden="true">*</span></span>
         </label>
         <div className="form-actions upload-actions">
           <button className="btn btn-primary" type="button" onClick={publish} disabled={saving}>

@@ -5,6 +5,7 @@ const Artwork = require('../models/Artwork');
 const { createArtwork, updateArtwork, reviewArtwork } = require('../controllers/artworkController');
 
 test('uploads and replacements automatically clear only with credible proof and no web matches', async (t) => {
+  t.mock.method(require('../services/artworkDuplicates'), 'checkDuplicates', async () => ({ status: 'no_local_match' }));
   t.mock.method(require('../services/localContentClassifier'), 'classify', async () => [
     { className: 'Drawing', probability: 0.1 }, { className: 'Neutral', probability: 0.9 },
     { className: 'Porn', probability: 0 }, { className: 'Hentai', probability: 0 }, { className: 'Sexy', probability: 0 },

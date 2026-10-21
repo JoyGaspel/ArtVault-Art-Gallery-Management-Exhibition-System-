@@ -1,5 +1,6 @@
 const sharp = require('sharp');
 const { checkArtworkOnWeb } = require('./artworkWebCheck');
+const duplicates = require('./artworkDuplicates');
 
 async function normalizedImage(dataUrl) {
   return sharp(Buffer.from(dataUrl.split(',')[1], 'base64')).rotate()
@@ -47,16 +48,21 @@ async function assessOwnershipProof(artworkImage, proofImage) {
   } catch { return { status: 'unavailable' }; }
 }
 
-async function checkArtworkOwnership(image, proof, declared) {
+async function checkArtworkOwnership(image, proof, declared, excludeId) {
+  let local;
+  try { local = await duplicates.checkDuplicates(image, excludeId); }
+  catch { local = { status: 'unavailable' }; }
   const web = await checkArtworkOnWeb(image);
-  if (web.status === 'possible_match') return { reviewStatus: 'pending', reviewReason: 'possible_match', web };
-  if (web.status !== 'no_match') return { reviewStatus: 'pending', reviewReason: 'check_unavailable', web };
-  if (!declared || !proof) return { reviewStatus: 'pending', reviewReason: 'ownership_review', web };
-  const evidence = await assessOwnershipProof(image, proof);
+  const evidence = declared && proof ? await assessOwnershipProof(image, proof) : { status: 'uncertain' };
+  const checks = { web, local, evidence };
+  if (local.status === 'possible_duplicate') return { reviewStatus: 'pending', reviewReason: 'local_duplicate', ...checks };
+  if (web.status === 'possible_match') return { reviewStatus: 'pending', reviewReason: 'possible_match', ...checks };
+  if (web.status !== 'no_match') return { reviewStatus: 'pending', reviewReason: 'check_unavailable', ...checks };
+  if (local.status === 'unavailable') return { reviewStatus: 'pending', reviewReason: 'ownership_review', ...checks };
   return {
     reviewStatus: evidence.status === 'credible' ? 'clear' : 'pending',
     reviewReason: evidence.status === 'credible' ? '' : evidence.status === 'unavailable' ? 'proof_check_unavailable' : 'ownership_review',
-    web,
+    ...checks,
   };
 }
 

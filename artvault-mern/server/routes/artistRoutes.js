@@ -7,6 +7,7 @@ const {
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+router.post('/admin/:id/role/otp', requireAuth, requireAdmin, require('../controllers/artistController').requestRoleChangeOtp);
 
 router.get('/', listArtists);
 router.get('/:id/avatar', getArtistAvatar);

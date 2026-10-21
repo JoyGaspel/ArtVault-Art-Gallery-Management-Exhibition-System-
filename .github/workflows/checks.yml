@@ -1,0 +1,24 @@
+name: ArtVault checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            artvault-mern/server/package-lock.json
+            artvault-mern/client/package-lock.json
+      - run: npm ci
+        working-directory: artvault-mern/server
+      - run: npm test
+        working-directory: artvault-mern/server
+      - run: npm ci
+        working-directory: artvault-mern/client
+      - run: npm run build
+        working-directory: artvault-mern/client

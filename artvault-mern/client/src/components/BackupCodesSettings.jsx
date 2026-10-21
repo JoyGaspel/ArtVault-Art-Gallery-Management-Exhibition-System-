@@ -20,6 +20,13 @@ export default function BackupCodesSettings({ email }) {
   const [destination, setDestination] = useState(email || 'your registered email');
   const [statusError, setStatusError] = useState('');
   const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const refresh = () => { if (!busy && !document.hidden) setRetry((value) => value + 1); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const timer = setInterval(refresh, 30000);
+    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); clearInterval(timer); };
+  }, [busy]);
   const resendSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000));
   const expiresSeconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
   useEffect(() => {

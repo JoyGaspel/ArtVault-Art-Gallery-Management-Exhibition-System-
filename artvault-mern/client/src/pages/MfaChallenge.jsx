@@ -44,7 +44,8 @@ export default function MfaChallenge() {
     <div className="field"><label htmlFor="mfa-code">{backupMode ? 'Backup security code' : 'Authenticator code'}</label><input id="mfa-code" inputMode={backupMode ? 'text' : 'numeric'} autoComplete="one-time-code" pattern={backupMode ? '[a-fA-F0-9 -]{20,30}' : '[0-9]{6}'} maxLength={backupMode ? 30 : 6} required value={code} onChange={(event) => setCode(backupMode ? event.target.value : event.target.value.replace(/\D/g, ''))} /></div>
     {error && <p role="alert">{error}</p>}
     <button className="btn btn-primary" disabled={busy || (!backupMode && !factorId)}>{busy ? 'Verifying…' : 'Verify'}</button>
-    <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => { setBackupMode(!backupMode); setCode(''); setError(''); }}>{backupMode ? 'Use authenticator instead' : 'Use a backup code'}</button>
+    {(!backupMode || factors.length > 0) && <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => { setBackupMode(!backupMode); setCode(''); setError(''); }}>{backupMode ? 'Use authenticator instead' : 'Use a backup code'}</button>}
+    {backupMode && <p>After successful verification, this code cannot be used again. Settings shows your updated number of unused codes.</p>}
     <p><Link to="/login">Return to sign in</Link></p>
   </form></main>;
 }

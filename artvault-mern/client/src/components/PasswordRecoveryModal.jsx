@@ -4,7 +4,7 @@ import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp
 
 const RESEND_WAIT_SECONDS = 60;
 
-export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPasswordChanged }) {
+export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPasswordChanged, onContinueSignIn }) {
   const [client] = useState(createRecoveryClient);
   const [step, setStep] = useState('email');
   const [email, setEmail] = useState(initialEmail.trim().toLowerCase());
@@ -17,12 +17,14 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
   const [resendSeconds, setResendSeconds] = useState(0);
   const dialogRef = useRef(null);
   const verifiedRef = useRef(false);
+  const newCredentials = useRef(null);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previousOverflow;
+      newCredentials.current = null;
       if (verifiedRef.current) client?.auth.signOut({ scope: 'local' }).catch(() => null);
     };
   }, [client]);
@@ -139,6 +141,7 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
       // not incorrectly tell the user that the password update failed.
       try { await client.auth.signOut({ scope: 'local' }); } catch { /* isolated client is discarded on close */ }
       verifiedRef.current = false;
+      newCredentials.current = { email, password };
       setPassword('');
       setConfirmPassword('');
       onPasswordChanged?.();
@@ -148,6 +151,17 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
     } finally {
       setBusy(false);
     }
+  }
+
+  async function continueSignIn() {
+    if (busy || !newCredentials.current || !onContinueSignIn) return;
+    setBusy(true); setError('');
+    try {
+      await onContinueSignIn(newCredentials.current.email, newCredentials.current.password);
+      newCredentials.current = null;
+    } catch (err) {
+      setError(`Your password was saved, but sign-in could not finish. ${err.message || 'Close this dialog and sign in with your new password.'}`);
+    } finally { setBusy(false); }
   }
 
   return (
@@ -208,8 +222,10 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
         </>}
 
         {step === 'success' && <>
-          <p id="recovery-description" className="recovery-description" role="status">Your password has been changed. You can now sign in with the new password.{' '}If sign-in is temporarily locked, wait for the countdown to finish.</p>
-          <button className="gate-submit" data-recovery-focus type="button" onClick={close}>Back to sign in</button>
+          <p id="recovery-description" className="recovery-description" role="status">Your password has been changed. Continue to sign in with your new password. If additional protection is enabled, verify with your authenticator or one unused backup code. A successfully used backup code is removed from your unused codes.</p>
+          {error && <p className="recovery-error" role="alert">{error}</p>}
+          {onContinueSignIn && <button className="gate-submit" data-recovery-focus type="button" disabled={busy} onClick={continueSignIn}>{busy ? 'Continuing…' : 'Continue to sign in'}</button>}
+          <button className="btn btn-ghost" type="button" disabled={busy} onClick={close}>Back to sign in</button>
         </>}
       </div>
     </div>

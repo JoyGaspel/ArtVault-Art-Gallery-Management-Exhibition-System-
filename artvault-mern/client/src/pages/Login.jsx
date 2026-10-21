@@ -205,6 +205,21 @@ export default function Login() {
           initialEmail={email}
           onClose={closeRecovery}
           onPasswordChanged={() => { setPassword(''); setError(''); setAttemptsRemaining(null); setRecoverySuggested(false); }}
+          onContinueSignIn={async (recoveredEmail, newPassword) => {
+            setSubmitting(true);
+            try {
+              const signedInUser = await login(recoveredEmail, newPassword);
+              setRecoveryOpen(false);
+              navigate(['admin', 'sub_admin', 'main_admin'].includes(signedInUser?.role) ? '/manage-gallery' : '/', { replace: true });
+            } catch (err) {
+              if (err.code === 'MFA_REQUIRED') {
+                setRecoveryOpen(false);
+                navigate('/mfa', { replace: true });
+                return;
+              }
+              throw err;
+            } finally { setSubmitting(false); }
+          }}
         />
       )}
     </div>

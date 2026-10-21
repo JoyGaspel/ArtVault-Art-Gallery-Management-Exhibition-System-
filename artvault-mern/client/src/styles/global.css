@@ -1775,3 +1775,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline: 3px solid #6b4db5;
   outline-offset: 4px;
 }
+.mfa-layout { min-height: calc(100vh - 100px); display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 64px; max-width: 1160px; padding: 64px 32px; margin: auto; }
+.mfa-brand-mark { width: 48px; height: 48px; margin-bottom: 24px; }
+.mfa-intro h1 { font-size: clamp(30px, 3vw, 44px); line-height: 1.2; margin: 18px 0; }
+.mfa-intro p { max-width: 400px; font-size: 14px; line-height: 1.8; color: #655779; }
+.mfa-card { background: #f8f5fc; border: 1px solid #ded5eb; border-radius: 20px; padding: 32px; min-width: 0; }
+.mfa-card h2 { font-size: 28px; margin: 14px 0; }
+.mfa-card .eyebrow { font-size: 11px; }
+.mfa-description, .mfa-note { font-size: 13px; line-height: 1.7; color: #655779; }
+.mfa-card .field { margin: 24px 0 18px; }
+.mfa-card .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mfa-card input:not([type=checkbox]), .mfa-card select { width: 100%; min-height: 46px; background: #fff; border: 1px solid #cfc3e1; border-radius: 10px; padding: 12px; font: inherit; font-size: 14px; }
+.mfa-card .mfa-remember { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.6; margin: 20px 0; cursor: pointer; }
+.mfa-remember input { width: 17px; height: 17px; margin: 2px 0 0; flex-shrink: 0; accent-color: #6b4db5; }
+.mfa-remember small { display: block; color: #655779; font-size: 12px; margin-top: 3px; }
+.mfa-actions { display: flex; flex-direction: column; gap: 10px; margin: 24px 0 18px; }
+.mfa-actions .btn { width: 100%; min-height: 44px; font-size: 13px; }
+.mfa-error { background: #fff0f0; border: 1px solid #e8b5b5; border-radius: 10px; padding: 12px; color: #9d2424; font-size: 13px; }
+.mfa-back { display: inline-block; margin-top: 18px; font-size: 13px; color: #593995; text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .mfa-layout { grid-template-columns: 1fr; gap: 24px; padding: 28px 18px; }
+  .mfa-intro h1 { font-size: 28px; }
+  .mfa-intro .mfa-brand-mark { display: none; }
+  .mfa-card { padding: 24px 20px; }
+  .mfa-card h2 { font-size: 24px; }
+}

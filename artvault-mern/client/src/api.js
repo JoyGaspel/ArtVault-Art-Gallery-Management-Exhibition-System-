@@ -31,6 +31,8 @@ const api = axios.create({ baseURL: apiBaseUrl, timeout: 12000 });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('artvault_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const rememberedDevice = localStorage.getItem('artvault_mfa_device');
+  if (rememberedDevice) config.headers['X-ArtVault-MFA-Device'] = rememberedDevice;
   return config;
 });
 

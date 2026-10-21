@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import api from '../api';
 import { createRecoveryClient } from '../lib/supabase';
 import { EMAIL_OTP_LENGTH, EMAIL_OTP_PATTERN, isValidEmailOtp, normalizeEmailOtp } from '../lib/emailOtp';
 
@@ -135,6 +136,13 @@ export default function PasswordRecoveryModal({ initialEmail = '', onClose, onPa
     setBusy(true);
     setError('');
     try {
+      const { data: recovery } = await client.auth.getSession();
+      if (!recovery.session) throw new Error('Recovery session expired. Request a new email code.');
+      const revoked = await fetch(`${api.defaults.baseURL}/auth/mfa/forget-devices`, {
+        method: 'POST', headers: { Authorization: `Bearer ${recovery.session.access_token}` },
+      });
+      if (!revoked.ok) throw new Error('Could not revoke remembered browsers. Please retry after the backend is updated.');
+      localStorage.removeItem('artvault_mfa_device');
       const { error: updateError } = await client.auth.updateUser({ password });
       if (updateError) throw updateError;
       // The password is already saved at this point; a sign-out failure must

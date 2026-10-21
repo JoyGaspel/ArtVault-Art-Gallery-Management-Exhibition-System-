@@ -83,9 +83,11 @@ async function authenticate(req, res, next, allowMfaPending = false) {
       if (!error && data.user) {
         // Claims are used only after Supabase verifies the token with getUser.
         const claims = jwt.decode(token);
+        const remembered = await require('../services/trustedMfaDevice').verify(data.user.id, req.headers['x-artvault-mfa-device']);
+        req.rememberedMfaDevice = remembered;
         if (needsMfa(data.user, claims) && !allowMfaPending) {
           const recovered = typeof claims?.session_id === 'string' && await BackupRecoverySession.exists({ providerUserId: data.user.id, sessionId: claims.session_id, expiresAt: mongoose.trusted({ $gt: new Date() }) });
-          if (!recovered) return res.status(403).json({ code: 'MFA_REQUIRED', message: 'Complete authenticator verification to continue.' });
+          if (!recovered && !remembered) return res.status(403).json({ code: 'MFA_REQUIRED', message: 'Complete authenticator verification to continue.' });
         }
         if (!data.user.email_confirmed_at) {
           return res.status(403).json({ message: 'Please confirm your email before continuing.' });
@@ -122,7 +124,7 @@ async function authenticate(req, res, next, allowMfaPending = false) {
               await BackupSecurity.exists({ user: user._id, enabled: true, verifiedSessionId: sessionId, verifiedSessionExpiresAt: mongoose.trusted({ $gt: new Date() }) })
               || await BackupRecoverySession.exists({ providerUserId: data.user.id, sessionId, expiresAt: mongoose.trusted({ $gt: new Date() }) })
             );
-            if (!verified) return res.status(403).json({ code: 'MFA_REQUIRED', message: 'Verify sign-in with a backup security code.' });
+            if (!verified && !remembered) return res.status(403).json({ code: 'MFA_REQUIRED', message: 'Verify sign-in with a backup security code.' });
           }
           req.providerFactors = data.user.factors || [];
           req.authClaims = claims;

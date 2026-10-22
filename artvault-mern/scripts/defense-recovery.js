@@ -93,7 +93,7 @@ async function backup() {
   if (importantCollections.some((name) => !before[name])) throw new Error('Core ArtVault collections are missing or empty. Refusing to create a misleading backup.');
   fs.mkdirSync(backupDirectory, { recursive: true });
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
-  const file = path.join(backupDirectory, `artvault-defense-${stamp}.archive.gz`);
+  const file = path.join(backupDirectory, `artvault-current-${stamp}.archive.gz`);
   const pending = `${file}.pending`;
   if (fs.existsSync(file) || fs.existsSync(pending)) throw new Error('Backup filename already exists; wait a second and retry.');
   try {

@@ -1800,3 +1800,38 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .mfa-card { padding: 24px 20px; }
   .mfa-card h2 { font-size: 24px; }
 }
+.gallery-page .gallery-masonry.filtered-results > .art-card {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+.gallery-page .gallery-masonry.filtered-results .art-thumb.has-image,
+.gallery-page .gallery-masonry.filtered-results .art-thumb.has-image img {
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+.gallery-page .gallery-masonry.gallery-packed {
+  display: grid;
+  grid-template-columns: repeat(var(--gallery-columns, 1), minmax(0, 1fr));
+  column-count: auto;
+  gap: 18px;
+  width: 100%;
+  align-items: start;
+}
+.gallery-page .gallery-packed-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.gallery-page .gallery-packed-column > .art-card {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+@media (max-width: 620px) {
+  .gallery-page .gallery-masonry.gallery-packed,
+  .gallery-page .gallery-packed-column { gap: 10px; }
+}

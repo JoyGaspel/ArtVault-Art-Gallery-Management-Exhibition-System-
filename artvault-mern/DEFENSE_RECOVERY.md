@@ -12,6 +12,7 @@ This is a **manual, trusted-computer** recovery procedure. It does not run in th
    ```
 
 3. The command saves a dated `.archive.gz` and matching `.archive.gz.json` checksum manifest in `C:\Users\gaspe\Documents\ArtVaultBackups`. It checks the archive with `mongorestore --dryRun`. Keep both files. Repeat this step immediately before the defense if the site has changed since the previous backup.
+   New dumps use the clearer `artvault-current-YYYYMMDD-HHMMSS.archive.gz` name. Older `artvault-defense-*` archives remain valid if their matching manifest and checksum pass verification; they are not renamed or removed.
 4. Check that the Vercel frontend, Railway backend, Atlas database, and Supabase authentication all work. The MongoDB backup does **not** back up Supabase Auth or Storage.
 
 ## If the evaluators drop `artvault` in Atlas
@@ -21,7 +22,7 @@ This is a **manual, trusted-computer** recovery procedure. It does not run in th
 3. On the trusted computer, from `artvault-mern`, run:
 
    ```powershell
-   node scripts/defense-recovery.js restore "C:\Users\gaspe\Documents\ArtVaultBackups\artvault-defense-YYYYMMDD-HHMMSS.archive.gz"
+   node scripts/defense-recovery.js restore "C:\Users\gaspe\Documents\ArtVaultBackups\artvault-current-YYYYMMDD-HHMMSS.archive.gz"
    ```
 
 4. The script validates the checksum, dry-runs the archive, and checks Atlas twice. If **any** collection contains documents, it refuses to restore. It never uses `--drop`. It then verifies the core collections returned.
@@ -30,7 +31,7 @@ This is a **manual, trusted-computer** recovery procedure. It does not run in th
 To check an archive without modifying a database:
 
 ```powershell
-node scripts/defense-recovery.js verify "C:\Users\gaspe\Documents\ArtVaultBackups\artvault-defense-YYYYMMDD-HHMMSS.archive.gz"
+node scripts/defense-recovery.js verify "C:\Users\gaspe\Documents\ArtVaultBackups\artvault-current-YYYYMMDD-HHMMSS.archive.gz"
 ```
 
 ## Important limits

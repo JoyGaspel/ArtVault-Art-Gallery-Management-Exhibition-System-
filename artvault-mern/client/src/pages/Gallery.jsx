@@ -18,6 +18,8 @@ export default function Gallery() {
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
   const requestVersion = useRef(0);
+  const sentinel = useRef(null);
+  const inFlight = useRef(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [columnCount, setColumnCount] = useState(() => getColumnCount());
@@ -28,39 +30,51 @@ export default function Gallery() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  function loadGallery(showLoading = true) {
+  function loadGallery(showLoading = true, nextPage = 1, append = false) {
+    if (!showLoading && inFlight.current) return;
     const version = ++requestVersion.current;
+    inFlight.current = true;
     if (showLoading) setLoading(true);
     if (showLoading) setErr('');
     const query = active !== 'All' ? { category: active } : {};
-    api
-      .get('/artworks', { params: { ...query, search, page, limit: 24 } })
-      .then((res) => {
+    const requestedPages = append ? [nextPage] : Array.from({ length: nextPage }, (_, index) => index + 1);
+    Promise.all(requestedPages.map((requestedPage) => api.get('/artworks', { params: { ...query, search, page: requestedPage, limit: 24 } })))
+      .then((responses) => {
         if (version !== requestVersion.current) return;
-        const result = res.data?.artworks;
-        if (!Array.isArray(result)) throw new Error('The gallery response was invalid.');
-        setArtworks(result);
+        if (responses.some((response) => !Array.isArray(response.data?.artworks))) throw new Error('The gallery response was invalid.');
+        const res = responses[responses.length - 1];
+        const result = responses.flatMap((response) => response.data.artworks);
+        setArtworks((current) => [...new Map((append ? [...current, ...result] : result).map((item) => [item._id, item])).values()]);
         setTotal(res.data.total || 0);
         setPages(res.data.pages || 0);
-        if (res.data.pages > 0 && page > res.data.pages) setPage(res.data.pages);
+        setPage(Math.max(1, Math.min(nextPage, res.data.pages || 1)));
         setErr('');
       })
       .catch((error) => {
         if (version !== requestVersion.current) return;
-        if (showLoading) setArtworks([]);
-        if (showLoading) setErr(error.response?.data?.message || 'Could not load the gallery. Check that the API is running.');
+        setErr(error.response?.data?.message || 'Could not load artworks. Please retry.');
       })
       .finally(() => {
-        if (version === requestVersion.current) setLoading(false);
+        if (version === requestVersion.current) { inFlight.current = false; setLoading(false); }
       });
 
     return () => { if (version === requestVersion.current) requestVersion.current++; };
   }
 
   // New searches begin on the first page; version checks ignore stale responses.
-  useEffect(() => { setPage(1); }, [search]);
-  useEffect(() => loadGallery(true), [active, search, page]);
-  useAutoRefresh(() => loadGallery(false));
+  useEffect(() => {
+    setArtworks([]); setPage(1); setPages(0);
+    return loadGallery(true);
+  }, [active, search]);
+  useAutoRefresh(() => loadGallery(false, page));
+  useEffect(() => {
+    if (!sentinel.current || loading || err || page >= pages) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !inFlight.current) loadGallery(true, page + 1, true);
+    }, { rootMargin: '400px' });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [loading, err, page, pages, active, search]);
 
   const visible = artworks;
 
@@ -68,11 +82,12 @@ export default function Gallery() {
   // fewer artworks than the available screen columns.
   // Adapt the number of columns to the result count so the final cards do
   // not sit in mostly empty columns, especially on wide screens.
-  const idealColumns = Math.ceil(Math.sqrt(visible.length * 1.25));
-  const renderedColumnCount = Math.min(columnCount, Math.max(1, idealColumns));
+  const renderedColumnCount = Math.min(columnCount, Math.max(1, visible.length));
+  const columns = Array.from({ length: renderedColumnCount }, () => []);
+  visible.forEach((artwork, index) => columns[index % renderedColumnCount].push({ artwork, index }));
 
   return (
-    <section>
+    <section className="gallery-page">
       <div className="page-head">
         <div>
           <div className="eyebrow">Browse</div>
@@ -95,24 +110,22 @@ export default function Gallery() {
         ))}
       </div>
 
-      {err && <div className="empty">{err}</div>}
-      {!err && loading && <div className="empty">Loading…</div>}
+      {err && <div className="empty" role="alert">{err} <button className="btn btn-ghost" onClick={() => loadGallery(true, artworks.length ? page + 1 : 1, artworks.length > 0)}>Retry loading</button></div>}
+      {loading && !visible.length && <div className="empty" role="status">Loading…</div>}
       {!err && !loading && visible.length === 0 && (
         <div className="empty">No artworks here yet. Be the first to upload one.</div>
       )}
-      {!err && !loading && visible.length > 0 && (
+      {visible.length > 0 && (
         <>
-          <div className={`gallery-masonry${search || active !== 'All' ? ' filtered-results' : ''}`} style={{ '--gallery-columns': renderedColumnCount }}>
-            {visible.map((w, index) => <ArtCard key={w._id} artwork={w} priority={index < 4} />)}
+          <div className={`gallery-masonry gallery-packed${search || active !== 'All' ? ' filtered-results' : ''}`} style={{ '--gallery-columns': renderedColumnCount }}>
+            {columns.map((items, column) => <div className="gallery-packed-column" key={column}>
+              {items.map(({ artwork, index }) => <ArtCard key={artwork._id} artwork={artwork} priority={index < 4} />)}
+            </div>)}
           </div>
-          {page >= pages && <div className="gallery-end-marker" role="status">You&apos;ve reached the end of the results.</div>}
+          {!loading && !err && page >= pages && <div className="gallery-end-marker" role="status">You&apos;ve reached the end of the results.</div>}
         </>
       )}
-      {!err && pages > 1 && <nav className="pagination-controls" aria-label="Gallery pages">
-        <button className="btn btn-ghost" disabled={loading || page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
-        <span role="status">Page {page} of {pages}</span>
-        <button className="btn btn-ghost" disabled={loading || page >= pages} onClick={() => setPage((value) => value + 1)}>Next</button>
-      </nav>}
+      <div ref={sentinel} className="gallery-end-marker" role="status">{loading && visible.length > 0 ? 'Loading more artworks…' : ''}</div>
     </section>
   );
 }

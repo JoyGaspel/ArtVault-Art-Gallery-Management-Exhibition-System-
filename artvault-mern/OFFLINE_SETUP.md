@@ -33,7 +33,7 @@ node scripts/refresh-offline.js
 
 This reads the `artvault` database from the `MONGO_URI` in `server/.env` and copies its collections into a **new** local MongoDB database. It does not write to Atlas, drop the old offline database, or erase browser drafts. A local `.offline-state.json` pointer chooses the new snapshot on the next launcher start; this pointer is Git-ignored and contains no secrets. Do not share or commit database dumps because they include private account and artwork information.
 
-The October 17 refresh created `artvault_offline_20261017134206_0809e9` with 9 collections (25 artworks, 21 artists, 4 exhibits). The October 12 `artvault_offline` database remains intact. Future refreshes create separate databases; old copies can consume disk space and should be reviewed before any manual removal.
+The October 22 refresh selected `artvault_offline_20261022042551_9239b1` with 13 collections (31 artworks, 25 artist/account records, 5 exhibits, 32 archive records). Earlier offline databases remain intact. Future refreshes create separate databases; old copies can consume disk space and should be reviewed before any manual removal. The separate Compass database `localhost/artvault` is not used by this launcher and is not overwritten by refresh. Its one local-only exhibit and two local-only archive records were backed up and then added to Atlas on October 22; `localhost/artvault` itself remains an older, separate copy.
 
 ## 2. Start ArtVault without internet
 

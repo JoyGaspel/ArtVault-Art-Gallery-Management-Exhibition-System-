@@ -108,6 +108,8 @@ export default function ManageGallery() {
   }
 
   async function save() {
+    const categoriesIssue = categoryError(form.categories);
+    if (categoriesIssue) { showToast(categoriesIssue, true); return; }
     if (image && (!proof || !ownershipDeclared)) {
       showToast('Add ownership proof and confirm ownership or permission for the replacement image.', true);
       return;
@@ -247,3 +249,4 @@ export default function ManageGallery() {
     </section>
   );
 }
+import { categoryError } from '../lib/artworkCategories';

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import { categoryError } from '../lib/artworkCategories';
 import api, { deployedApiUrl } from '../api';
 import { createOfflineSyncClient, supabaseEnabled } from '../lib/supabase';
 import { makeOfflineDraft, readOfflineDrafts, writeOfflineDrafts } from '../lib/offlineDrafts';
@@ -24,9 +25,7 @@ function parseList(value, max, label) {
   if (items.length > max || items.some((part) => part.length > (label === 'Category' ? 40 : 80))) {
     throw new Error(`${label}: use at most ${max} comma-separated values with short names.`);
   }
-  if (label === 'Category' && items.some((part) => !allowedCategories.has(part))) {
-    throw new Error('Choose categories from the ArtVault category list.');
-  }
+  if (label === 'Category' && categoryError(items)) throw new Error(categoryError(items));
   return items;
 }
 

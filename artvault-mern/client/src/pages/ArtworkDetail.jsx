@@ -144,6 +144,8 @@ export default function ArtworkDetail() {
   }
 
   async function saveEdit() {
+    const categoriesIssue = categoryError(form.categories);
+    if (categoriesIssue) { showToast(categoriesIssue, true); return; }
     const materialsIssue = materialError(form.materials);
     if (materialsIssue) { showToast(materialsIssue, true); return; }
     setSaving(true);
@@ -272,7 +274,7 @@ export default function ArtworkDetail() {
                 <div className="hint">{form.description.length}/1000 characters</div>
               </div>
               <div className="field">
-                <label>Categories <span className="optional-mark">(optional)</span></label>
+                <label>Categories <span className="required-mark">*</span></label>
                 <ArtworkCategoryPicker value={form.categories} onChange={(categories) => setForm((current) => ({ ...current, categories }))} />
               </div>
               <div className="field">
@@ -309,3 +311,4 @@ export default function ArtworkDetail() {
     </section>
   );
 }
+import { categoryError } from '../lib/artworkCategories';
